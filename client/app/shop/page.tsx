@@ -4,8 +4,8 @@ import { useState, useEffect, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { useProducts } from "@/hooks/useProducts";
 import ProductCard from "@/components/ProductCard";
-import DynamicFilterSidebar from "@/components/DynamicFilterSidebar";
-import { SlidersHorizontal } from "lucide-react";
+import DynamicFilterSidebar, { countActiveFilters } from "@/components/DynamicFilterSidebar";
+import { SlidersHorizontal, ArrowUpDown, X } from "lucide-react";
 
 interface ShopContentProps {
     basePath?: string;
@@ -75,15 +75,37 @@ export function ShopContent({ basePath = "/shop", initialFilters = {} }: ShopCon
         }
     }, [data, facets.specs]);
 
+    const activeFilterCount = countActiveFilters(filters);
+    const sortOptions = [
+        { value: "newest", label: "Newest" },
+        { value: "price-asc", label: "Price: Low to High" },
+        { value: "price-desc", label: "Price: High to Low" },
+        { value: "name-asc", label: "Name: A–Z" },
+    ] as const;
+
+    const clearFilters = () => {
+        setFilters((prev: Record<string, unknown>) => ({
+            search: prev.search,
+            sort: prev.sort,
+            page: 1,
+        }));
+    };
+
     return (
         <div className="flex flex-col lg:flex-row gap-8">
             {/* Sidebar Toggle (Mobile) */}
-            <div className="lg:hidden mb-4">
+            <div className="lg:hidden flex items-center gap-3">
                 <button
                     onClick={() => setIsSidebarOpen(true)}
-                    className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white"
+                    className="flex items-center gap-2 px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white hover:bg-white/10 transition-colors font-medium"
                 >
-                    <SlidersHorizontal className="h-4 w-4" /> Filters
+                    <SlidersHorizontal className="h-4 w-4" />
+                    Filters
+                    {activeFilterCount > 0 && (
+                        <span className="min-w-[1.25rem] h-5 px-1.5 rounded-full bg-accent/20 text-accent text-xs font-semibold flex items-center justify-center">
+                            {activeFilterCount}
+                        </span>
+                    )}
                 </button>
             </div>
 
@@ -96,8 +118,41 @@ export function ShopContent({ basePath = "/shop", initialFilters = {} }: ShopCon
                 onClose={() => setIsSidebarOpen(false)}
             />
 
-            {/* Product Grid */}
-            <div className="flex-1">
+            {/* Product Grid + Toolbar */}
+            <div className="flex-1 min-w-0">
+                {/* Toolbar: sort + active filters */}
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <label className="flex items-center gap-2 text-sub text-sm">
+                            <ArrowUpDown className="h-4 w-4" />
+                            <span className="sr-only">Sort by</span>
+                            <select
+                                value={filters.sort}
+                                onChange={(e) => setFilters((prev: Record<string, unknown>) => ({ ...prev, sort: e.target.value, page: 1 }))}
+                                className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-main focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent/50"
+                            >
+                                {sortOptions.map((opt) => (
+                                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                ))}
+                            </select>
+                        </label>
+                        {activeFilterCount > 0 && (
+                            <button
+                                onClick={clearFilters}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-accent hover:bg-accent/10 transition-colors"
+                            >
+                                <X className="h-3.5 w-3.5" />
+                                Clear {activeFilterCount} filter{activeFilterCount !== 1 ? "s" : ""}
+                            </button>
+                        )}
+                    </div>
+                    {!isLoading && !error && (
+                        <p className="text-sm text-sub">
+                            {data?.total != null ? `${data.total} product${data.total !== 1 ? "s" : ""}` : ""}
+                        </p>
+                    )}
+                </div>
+
                 {isLoading ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                         {[...Array(6)].map((_, i) => (

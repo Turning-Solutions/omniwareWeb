@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ChevronDown, ChevronUp, X } from "lucide-react";
+import { ChevronDown, ChevronUp, X, SlidersHorizontal } from "lucide-react";
 import { Facets } from "@/hooks/useProducts";
 
 interface DynamicFilterSidebarProps {
@@ -12,18 +12,34 @@ interface DynamicFilterSidebarProps {
     onClose: () => void;
 }
 
+/** Count active filters (excluding search/sort/page) for badge and toolbar */
+export function countActiveFilters(filters: Record<string, unknown>): number {
+    let n = 0;
+    if (filters.category) n += 1;
+    if (filters.minPrice !== undefined || filters.maxPrice !== undefined) n += 1;
+    if (filters.brand && String(filters.brand).trim()) n += 1;
+    if (filters.spec && typeof filters.spec === "object") {
+        n += Object.keys(filters.spec).length;
+    }
+    return n;
+}
+
+function formatPrice(value: number): string {
+    if (value >= 1000) return `$${(value / 1000).toFixed(value % 1000 === 0 ? 0 : 1)}k`;
+    return `$${value}`;
+}
+
 export default function DynamicFilterSidebar({ facets, filters, setFilters, isOpen, onClose }: DynamicFilterSidebarProps) {
     // Local state for price to avoid heavy re-fetching while dragging
     const [priceRange, setPriceRange] = useState<{ min: number; max: number }>({ min: 0, max: 0 });
 
-    // Track only sections the user has explicitly CLOSED — everything is open by default
+    const activeCount = countActiveFilters(filters);
+
+    // Track which sections the user has closed — all expanded by default
     const [closedSections, setClosedSections] = useState<Record<string, boolean>>({});
-
-    // Helper: a section is open unless the user explicitly closed it
     const isOpen_ = (key: string) => !closedSections[key];
-
     const toggleSection = (section: string) => {
-        setClosedSections(prev => ({ ...prev, [section]: !prev[section] }));
+        setClosedSections((prev) => ({ ...prev, [section]: !prev[section] }));
     };
 
     // Sync local price state when facets change (initial load or reset)
@@ -95,170 +111,189 @@ export default function DynamicFilterSidebar({ facets, filters, setFilters, isOp
                 onClick={onClose}
             />
 
-            {/* Sidebar */}
+            {/* Sidebar — collapsible sections, scrolls with page; background ends with content */}
             <div className={`
-                fixed inset-y-0 left-0 z-50 w-80 bg-surface border-r border-border-soft p-6 transform transition-transform duration-300 ease-in-out lg:transform-none lg:static lg:w-72 lg:h-fit lg:rounded-xl lg:z-0 lg:border lg:border-border-soft lg:shadow-lg h-full overflow-y-auto scrollbar-hide
+                fixed inset-y-0 left-0 z-50 w-[min(320px,85vw)] bg-surface border-r border-border-soft transform transition-transform duration-300 ease-in-out
+                lg:transform-none lg:static lg:w-72 lg:rounded-2xl lg:z-0 lg:border lg:border-border-soft lg:shadow-xl h-full lg:h-fit lg:self-start flex flex-col
                 ${isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
             `}>
-                <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-xl font-bold text-main">Filters</h2>
-                    <button onClick={onClose} className="p-2 lg:hidden text-sub hover:text-main">
-                        <X className="h-6 w-6" />
-                    </button>
-                    <button
-                        onClick={clearAll}
-                        className="text-sm text-accent hover:text-accent/80 font-medium"
-                    >
-                        Clear All
-                    </button>
+                {/* Sticky header */}
+                <div className="flex-shrink-0 flex items-center justify-between gap-3 p-4 lg:p-5 border-b border-border-soft bg-surface">
+                    <div className="flex items-center gap-2 min-w-0">
+                        <SlidersHorizontal className="h-5 w-5 text-accent flex-shrink-0" />
+                        <h2 className="text-lg font-bold text-main truncate">Filters</h2>
+                        {activeCount > 0 && (
+                            <span className="flex-shrink-0 min-w-[1.25rem] h-5 px-1.5 rounded-full bg-accent/20 text-accent text-xs font-semibold flex items-center justify-center">
+                                {activeCount}
+                            </span>
+                        )}
+                    </div>
+                    <div className="flex items-center gap-1">
+                        {activeCount > 0 && (
+                            <button
+                                onClick={clearAll}
+                                className="text-sm text-accent hover:text-accent/90 font-medium px-2 py-1 rounded-lg hover:bg-accent/10 transition-colors"
+                            >
+                                Clear all
+                            </button>
+                        )}
+                        <button
+                            onClick={onClose}
+                            className="p-2 lg:hidden rounded-lg text-sub hover:text-main hover:bg-white/5 transition-colors"
+                            aria-label="Close filters"
+                        >
+                            <X className="h-5 w-5" />
+                        </button>
+                    </div>
                 </div>
 
-                <div className="space-y-6">
+                <div className="flex-1 lg:flex-none p-4 lg:p-5 space-y-4">
 
                     {/* Categories Filter — Always Visible */}
                     {facets.categories && facets.categories.length > 0 && (
-                        <div className="border-b border-border-soft pb-4">
+                        <section className="rounded-xl bg-white/5 border border-white/10 overflow-hidden">
                             <button
-                                className="flex items-center justify-between w-full text-left font-semibold text-main mb-2"
-                                onClick={() => toggleSection('categories')}
+                                type="button"
+                                className="flex items-center justify-between w-full text-left font-semibold text-main px-4 py-3 hover:bg-white/5 transition-colors"
+                                onClick={() => toggleSection("categories")}
                             >
                                 <span>Categories</span>
-                                {isOpen_('categories') ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                                {isOpen_("categories") ? <ChevronUp className="h-4 w-4 text-sub" /> : <ChevronDown className="h-4 w-4 text-sub" />}
                             </button>
-
-                            {isOpen_('categories') && (
-                                <div className="space-y-2 max-h-48 overflow-y-auto scrollbar-thin pt-2">
+                            {isOpen_("categories") && (
+                                <div className="px-4 pb-3 space-y-1">
                                     {facets.categories.map((category) => (
-                                        <label key={category.value} className="flex items-center space-x-3 cursor-pointer group">
-                                            <div className="relative flex items-center">
-                                                <input
-                                                    type="radio"
-                                                    name="categoryFilter"
-                                                    checked={filters.category === category.value}
-                                                    onChange={() => handleCategoryChange(category.value)}
-                                                    onClick={() => {
-                                                        // Allow unchecking a radio button by clicking it again
-                                                        if (filters.category === category.value) {
-                                                            handleCategoryChange(category.value);
-                                                        }
-                                                    }}
-                                                    className="peer h-4 w-4 rounded-full border-border-soft bg-base text-accent focus:ring-accent focus:ring-offset-surface"
-                                                />
-                                            </div>
-                                            <span className="text-sub group-hover:text-main transition-colors text-sm">{category.label}</span>
-                                            <span className="ml-auto text-xs text-sub/50">({category.count})</span>
+                                        <label key={category.value} className="flex items-center gap-3 cursor-pointer group py-2 px-2 rounded-lg hover:bg-white/5">
+                                            <input
+                                                type="radio"
+                                                name="categoryFilter"
+                                                checked={filters.category === category.value}
+                                                onChange={() => handleCategoryChange(category.value)}
+                                                onClick={() => { if (filters.category === category.value) handleCategoryChange(category.value); }}
+                                                className="h-4 w-4 rounded-full border-2 border-white/20 bg-base text-accent focus:ring-2 focus:ring-accent/50 focus:ring-offset-0"
+                                            />
+                                            <span className="text-sub group-hover:text-main transition-colors text-sm flex-1 min-w-0 truncate">{category.label}</span>
+                                            <span className="text-xs text-sub/60 tabular-nums">({category.count})</span>
                                         </label>
                                     ))}
                                 </div>
                             )}
-                        </div>
+                        </section>
                     )}
 
                     {/* Price Filter — Always Visible (respects allowedFilters config) */}
                     {(!facets.allowedFilters || facets.allowedFilters.price) && facets.price && (
-                        <div className="border-b border-border-soft pb-4">
+                        <section className="rounded-xl bg-white/5 border border-white/10 overflow-hidden">
                             <button
-                                className="flex items-center justify-between w-full text-left font-semibold text-main mb-2"
-                                onClick={() => toggleSection('price')}
+                                type="button"
+                                className="flex items-center justify-between w-full text-left font-semibold text-main px-4 py-3 hover:bg-white/5 transition-colors"
+                                onClick={() => toggleSection("price")}
                             >
                                 <span>Price Range</span>
-                                {isOpen_('price') ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                                {isOpen_("price") ? <ChevronUp className="h-4 w-4 text-sub" /> : <ChevronDown className="h-4 w-4 text-sub" />}
                             </button>
-
-                            {isOpen_('price') && (
-                                <div className="space-y-4 pt-2">
-                                    <div className="flex items-center justify-between gap-4">
-                                        <input
-                                            type="number"
-                                            value={priceRange.min}
-                                            min={facets.price?.min || 0}
-                                            max={priceRange.max}
-                                            onChange={(e) => handlePriceChange(Number(e.target.value), priceRange.max)}
-                                            className="w-full bg-base border border-border-soft rounded px-2 py-1 text-sm text-main"
-                                        />
-                                        <span className="text-sub">-</span>
-                                        <input
-                                            type="number"
-                                            value={priceRange.max}
-                                            min={priceRange.min}
-                                            max={facets.price?.max || 1000000}
-                                            onChange={(e) => handlePriceChange(priceRange.min, Number(e.target.value))}
-                                            className="w-full bg-base border border-border-soft rounded px-2 py-1 text-sm text-main"
-                                        />
+                            {isOpen_("price") && (
+                                <div className="px-4 py-4 space-y-3">
+                                    <div className="flex items-center gap-2">
+                                        <label className="flex-1 min-w-0">
+                                            <span className="sr-only">Min price</span>
+                                            <input
+                                                type="number"
+                                                value={priceRange.min}
+                                                min={facets.price?.min || 0}
+                                                max={priceRange.max}
+                                                onChange={(e) => handlePriceChange(Number(e.target.value), priceRange.max)}
+                                                className="w-full bg-base border border-white/15 rounded-lg px-3 py-2 text-sm text-main placeholder:text-sub/50 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent/50"
+                                                placeholder="Min"
+                                            />
+                                        </label>
+                                        <span className="text-sub font-medium">–</span>
+                                        <label className="flex-1 min-w-0">
+                                            <span className="sr-only">Max price</span>
+                                            <input
+                                                type="number"
+                                                value={priceRange.max}
+                                                min={priceRange.min}
+                                                max={facets.price?.max || 1000000}
+                                                onChange={(e) => handlePriceChange(priceRange.min, Number(e.target.value))}
+                                                className="w-full bg-base border border-white/15 rounded-lg px-3 py-2 text-sm text-main placeholder:text-sub/50 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent/50"
+                                                placeholder="Max"
+                                            />
+                                        </label>
                                     </div>
+                                    <p className="text-xs text-sub/70">
+                                        {formatPrice(priceRange.min)} – {formatPrice(priceRange.max)}
+                                    </p>
                                     <button
+                                        type="button"
                                         onClick={applyPriceFilter}
-                                        className="w-full py-1.5 bg-accent/10 text-accent hover:bg-accent/20 rounded-lg text-sm font-medium transition-colors"
+                                        className="w-full py-2.5 bg-accent/15 text-accent hover:bg-accent/25 rounded-lg text-sm font-medium transition-colors"
                                     >
-                                        Apply Price
+                                        Apply price
                                     </button>
                                 </div>
                             )}
-                        </div>
+                        </section>
                     )}
 
                     {/* Brands Filter — Always Visible (respects allowedFilters config) */}
                     {(!facets.allowedFilters || facets.allowedFilters.brand) && facets.brands && facets.brands.length > 0 && (
-                        <div className="border-b border-border-soft pb-4">
+                        <section className="rounded-xl bg-white/5 border border-white/10 overflow-hidden">
                             <button
-                                className="flex items-center justify-between w-full text-left font-semibold text-main mb-2"
-                                onClick={() => toggleSection('brands')}
+                                type="button"
+                                className="flex items-center justify-between w-full text-left font-semibold text-main px-4 py-3 hover:bg-white/5 transition-colors"
+                                onClick={() => toggleSection("brands")}
                             >
                                 <span>Brands</span>
-                                {isOpen_('brands') ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                                {isOpen_("brands") ? <ChevronUp className="h-4 w-4 text-sub" /> : <ChevronDown className="h-4 w-4 text-sub" />}
                             </button>
-
-                            {isOpen_('brands') && (
-                                <div className="space-y-2 max-h-48 overflow-y-auto scrollbar-thin pt-2">
+                            {isOpen_("brands") && (
+                                <div className="px-4 pb-3 space-y-1">
                                     {facets.brands.map((brand) => (
-                                        <label key={brand.value} className="flex items-center space-x-3 cursor-pointer group">
-                                            <div className="relative flex items-center">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={filters.brand?.split(',').includes(brand.value) ?? false}
-                                                    onChange={() => handleBrandChange(brand.value)}
-                                                    className="peer h-4 w-4 rounded border-border-soft bg-base text-accent focus:ring-accent focus:ring-offset-surface"
-                                                />
-                                            </div>
-                                            <span className="text-sub group-hover:text-main transition-colors text-sm">{brand.label}</span>
-                                            <span className="ml-auto text-xs text-sub/50">({brand.count})</span>
+                                        <label key={brand.value} className="flex items-center gap-3 cursor-pointer group py-2 px-2 rounded-lg hover:bg-white/5">
+                                            <input
+                                                type="checkbox"
+                                                checked={filters.brand?.split(',').includes(brand.value) ?? false}
+                                                onChange={() => handleBrandChange(brand.value)}
+                                                className="h-4 w-4 rounded border-2 border-white/20 bg-base text-accent focus:ring-2 focus:ring-accent/50 focus:ring-offset-0"
+                                            />
+                                            <span className="text-sub group-hover:text-main transition-colors text-sm flex-1 min-w-0 truncate">{brand.label}</span>
+                                            <span className="text-xs text-sub/60 tabular-nums">({brand.count})</span>
                                         </label>
                                     ))}
                                 </div>
                             )}
-                        </div>
+                        </section>
                     )}
 
-                    {/* Dynamic Spec Filters — shown only for keys with filterable:true products AND when a category is selected */}
+                    {/* Dynamic Spec Filters — shown only when a category is selected */}
                     {filters.category && Object.entries(facets.specs || {}).map(([key, values]) => (
-                        <div key={key} className="border-b border-border-soft pb-4 last:border-0">
+                        <section key={key} className="rounded-xl bg-white/5 border border-white/10 overflow-hidden">
                             <button
-                                className="flex items-center justify-between w-full text-left font-semibold text-main mb-2 capitalize"
+                                type="button"
+                                className="flex items-center justify-between w-full text-left font-semibold text-main px-4 py-3 hover:bg-white/5 transition-colors capitalize"
                                 onClick={() => toggleSection(key)}
                             >
-                                <span>{key.replace(/_/g, ' ')}</span>
-                                {isOpen_(key) ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                                <span>{key.replace(/_/g, " ")}</span>
+                                {isOpen_(key) ? <ChevronUp className="h-4 w-4 text-sub" /> : <ChevronDown className="h-4 w-4 text-sub" />}
                             </button>
-
                             {isOpen_(key) && (
-                                <div className="space-y-2 max-h-48 overflow-y-auto scrollbar-thin pt-2">
+                                <div className="px-4 pb-3 space-y-1">
                                     {values.map((item) => (
-                                        <label key={item.value} className="flex items-center space-x-3 cursor-pointer group">
-                                            <div className="relative flex items-center">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={filters.spec?.[key]?.split(',').includes(item.value) ?? false}
-                                                    onChange={() => handleSpecChange(key, item.value)}
-                                                    className="peer h-4 w-4 rounded border-border-soft bg-base text-accent focus:ring-accent focus:ring-offset-surface"
-                                                />
-                                            </div>
-                                            <span className="text-sub group-hover:text-main transition-colors text-sm">{item.value}</span>
-                                            <span className="ml-auto text-xs text-sub/50">({item.count})</span>
+                                        <label key={item.value} className="flex items-center gap-3 cursor-pointer group py-2 px-2 rounded-lg hover:bg-white/5">
+                                            <input
+                                                type="checkbox"
+                                                checked={filters.spec?.[key]?.split(',').includes(item.value) ?? false}
+                                                onChange={() => handleSpecChange(key, item.value)}
+                                                className="h-4 w-4 rounded border-2 border-white/20 bg-base text-accent focus:ring-2 focus:ring-accent/50 focus:ring-offset-0"
+                                            />
+                                            <span className="text-sub group-hover:text-main transition-colors text-sm flex-1 min-w-0 truncate">{item.value}</span>
+                                            <span className="text-xs text-sub/60 tabular-nums">({item.count})</span>
                                         </label>
                                     ))}
                                 </div>
                             )}
-                        </div>
+                        </section>
                     ))}
 
                 </div>
