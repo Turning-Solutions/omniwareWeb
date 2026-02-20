@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import api from '../lib/api';
 
-interface UseProductsOptions {
+export interface UseProductsOptions {
     limit?: number;
     sort?: string;
     search?: string;
@@ -10,6 +10,10 @@ interface UseProductsOptions {
     minPrice?: number;
     maxPrice?: number;
     page?: number;
+    /** Spec filters e.g. { vram: '16GB', chipset: 'RTX 4070' } — sent as spec[key]=value */
+    spec?: Record<string, string>;
+    availability?: string;
+    inStock?: string;
 }
 
 export interface Product {
@@ -50,21 +54,35 @@ export interface Facets {
     };
 }
 
+function buildProductsQueryString(options: UseProductsOptions): string {
+    const params = new URLSearchParams();
+    // Always send limit so server returns full facets when limit >= 20 (shop page)
+    const limit = options.limit ?? 20;
+    params.append('limit', limit.toString());
+    if (options.sort) params.append('sort', options.sort);
+    if (options.search) params.append('search', options.search);
+    if (options.category) params.append('category', options.category);
+    if (options.brand) params.append('brand', options.brand);
+    if (options.minPrice != null) params.append('minPrice', options.minPrice.toString());
+    if (options.maxPrice != null) params.append('maxPrice', options.maxPrice.toString());
+    if (options.page) params.append('page', options.page.toString());
+    if (options.availability) params.append('availability', options.availability);
+    if (options.inStock) params.append('inStock', options.inStock);
+    // Spec filters: API expects spec[key]=value (e.g. spec[vram]=16GB)
+    if (options.spec && typeof options.spec === 'object') {
+        for (const [key, value] of Object.entries(options.spec)) {
+            if (value != null && value !== '') params.append(`spec[${key}]`, value);
+        }
+    }
+    return params.toString();
+}
+
 export const useProducts = (options: UseProductsOptions = {}) => {
     return useQuery<ProductsResponse>({
         queryKey: ['products', options],
         queryFn: async () => {
-            const params = new URLSearchParams();
-            if (options.limit) params.append('limit', options.limit.toString());
-            if (options.sort) params.append('sort', options.sort);
-            if (options.search) params.append('search', options.search);
-            if (options.category) params.append('category', options.category);
-            if (options.brand) params.append('brand', options.brand);
-            if (options.minPrice) params.append('minPrice', options.minPrice.toString());
-            if (options.maxPrice) params.append('maxPrice', options.maxPrice.toString());
-            if (options.page) params.append('page', options.page.toString());
-
-            const { data } = await api.get(`/products?${params.toString()}`);
+            const query = buildProductsQueryString(options);
+            const { data } = await api.get(`/products?${query}`);
             return data;
         },
         staleTime: 2 * 60 * 1000, // 2 minutes — avoid refetch on every mount
