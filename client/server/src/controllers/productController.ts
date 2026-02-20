@@ -121,7 +121,17 @@ export const getProducts = async (req: Request, res: Response) => {
 
         const results = await Product.aggregate(pipeline as any);
         const data = results[0];
-        const total = data.totalCount[0] ? data.totalCount[0].count : 0;
+        if (!data) {
+            return res.json({
+                products: [],
+                pagination: { total: 0, page: Number(page), limit: Number(limit), pages: 0 },
+                categoryKey: category || null,
+                featuredMode: 'default_all',
+                featuredSpecKeys: [],
+                facets: { price: { min: 0, max: 0 }, categories: [], brands: [], availability: [], specs: {} },
+            });
+        }
+        const total = data.totalCount?.[0]?.count ?? 0;
 
         let featuredMode = 'default_all';
         let featuredSpecKeys: string[] = [];
@@ -134,9 +144,9 @@ export const getProducts = async (req: Request, res: Response) => {
             }
         }
 
-        // Apply Gating
+        // Apply Gating (guard against missing facet data)
         const specsFacet: Record<string, any[]> = {};
-        data.specs.forEach((item: any) => {
+        (data.specs || []).forEach((item: any) => {
             const normalizedKey = normalizeSpecKey(item._id);
             if (featuredMode === 'default_all') {
                 specsFacet[normalizedKey] = item.values;
@@ -147,16 +157,16 @@ export const getProducts = async (req: Request, res: Response) => {
 
         // Filter other facets if config exists
         let finalFacets = {
-            price: data.price[0] || { min: 0, max: 0 },
-            categories: data.categories,
-            brands: data.brands,
-            availability: data.availability,
+            price: data.price?.[0] || { min: 0, max: 0 },
+            categories: data.categories || [],
+            brands: data.brands || [],
+            availability: data.availability || [],
             specs: featuredMode === 'none' ? {} : specsFacet
         };
 
 
         res.json({
-            products: data.products,
+            products: data.products || [],
             pagination: {
                 total,
                 page: Number(page),

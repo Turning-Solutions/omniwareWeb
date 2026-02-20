@@ -8,19 +8,19 @@ export interface AppError extends Error {
 }
 
 export const errorHandler = (err: AppError, req: Request, res: Response, next: NextFunction) => {
+    if (res.headersSent) return next(err);
     const statusCode = err.status || res.statusCode || 500;
-
-    // Ensure we don't send back 200 for an error (standard Express default if no status set)
-    res.status(statusCode === 200 ? 500 : statusCode);
-
+    const code = statusCode === 200 ? 500 : statusCode;
+    res.status(code);
+    const message =
+        err.message || (code === 500 ? 'An unexpected error occurred' : 'Request failed');
+    if (code >= 500) console.error('[API Error]', err.message, err.stack);
     res.json({
         error: {
             code: err.code || 'INTERNAL_SERVER_ERROR',
-            message: err.message || 'An unexpected error occurred',
+            message,
             details: err.details,
-            requestId: req.id // set by requestId middleware
-        }
+            requestId: req.id,
+        },
     });
-
-    // We can also stringify standard Node errors if we want, but the prompt mandates this exact structure.
 };
