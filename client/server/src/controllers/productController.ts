@@ -3,32 +3,62 @@ import Product from '../models/Product';
 import Brand from '../models/Brand';
 import Category from '../models/Category';
 import CategoryFeaturedSpecs from '../models/CategoryFeaturedSpecs';
-import { buildProductMatchStage } from '../utils/productAggregation';
+import { buildProductMatchStage, type MatchStageCache } from '../utils/productAggregation';
 import { normalizeSpecKey } from '../utils/normalizeSpecKey';
+
+const hasFilters = (req: Request): boolean => {
+    const { search, minPrice, maxPrice, brand, category, availability, inStock } = req.query;
+    if (search || minPrice || maxPrice || brand || category || availability || inStock) return true;
+    const keys = Object.keys(req.query).filter((k) => k.startsWith('spec['));
+    return keys.length > 0;
+};
 
 export const getProducts = async (req: Request, res: Response) => {
     try {
         const { search, minPrice, maxPrice, brand, category, sort, page = 1, limit = 20, ...dynamicFilters } = req.query;
+        const limitNum = Math.min(Number(limit) || 20, 100);
+        const pageNum = Math.max(Number(page) || 1, 1);
+        const skip = (pageNum - 1) * limitNum;
 
+        // Lightweight path: no filters + small limit (e.g. homepage featured) — skip heavy facets
+        if (!hasFilters(req) && limitNum <= 20) {
+            const sortStage: any = sort === 'price_asc' ? { price: 1 } : sort === 'price_desc' ? { price: -1 } : { createdAt: -1 };
+            const [products, total] = await Promise.all([
+                Product.aggregate([
+                    { $match: { isActive: true } },
+                    { $sort: sortStage },
+                    { $skip: skip },
+                    { $limit: limitNum },
+                    { $lookup: { from: 'brands', localField: 'brandId', foreignField: '_id', as: 'brand' } },
+                    { $unwind: { path: '$brand', preserveNullAndEmptyArrays: true } },
+                    { $lookup: { from: 'categories', localField: 'categoryIds', foreignField: '_id', as: 'categories' } },
+                ]),
+                Product.countDocuments({ isActive: true }),
+            ]);
+            res.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=120');
+            return res.json({
+                products,
+                pagination: { total, page: pageNum, limit: limitNum, pages: Math.ceil(total / limitNum) },
+                categoryKey: null,
+                featuredMode: 'default_all',
+                featuredSpecKeys: [],
+                facets: { price: { min: 0, max: 0 }, categories: [], brands: [], availability: [], specs: {} },
+            });
+        }
+
+        const lookupCache: MatchStageCache = {};
         // 1. Full Match (For Products & Counts)
-        const matchStage = await buildProductMatchStage(req);
-
-        // 2. Facet Matches (Exclude specific filters to keep options visible)
-        // For Brands: Exclude 'brand' filter so we see other brands
-        // For Categories: Exclude 'category' filter
-        const categoryMatchStage = await buildProductMatchStage(req, ['category']);
-        // For Brands: Exclude 'brand' filter so we see other brands
-        const brandMatchStage = await buildProductMatchStage(req, ['brand']);
-        // For Price: Exclude 'price' filter so we see full range
-        const priceMatchStage = await buildProductMatchStage(req, ['price']);
+        const matchStage = await buildProductMatchStage(req, [], lookupCache);
+        // 2. Facet Matches (Exclude specific filters) — reuse cached Brand/Category lookups
+        const categoryMatchStage = await buildProductMatchStage(req, ['category'], lookupCache);
+        const brandMatchStage = await buildProductMatchStage(req, ['brand'], lookupCache);
+        const priceMatchStage = await buildProductMatchStage(req, ['price'], lookupCache);
 
         // --- Build Sort Stage ---
         let sortStage: any = { createdAt: -1 };
         if (sort === 'price_asc') sortStage = { price: 1 };
         else if (sort === 'price_desc') sortStage = { price: -1 };
         else if (sort === 'newest') sortStage = { createdAt: -1 };
-
-        const skip = (Number(page) - 1) * Number(limit);
 
         // --- Aggregation Pipeline ---
         // Note: We cannot start with a common $match because facets need DIFFERENT matches.
@@ -42,7 +72,7 @@ export const getProducts = async (req: Request, res: Response) => {
                         { $match: matchStage },
                         { $sort: sortStage },
                         { $skip: skip },
-                        { $limit: Number(limit) },
+                        { $limit: limitNum },
                         { $lookup: { from: 'brands', localField: 'brandId', foreignField: '_id', as: 'brand' } },
                         { $unwind: { path: '$brand', preserveNullAndEmptyArrays: true } },
                         { $lookup: { from: 'categories', localField: 'categoryIds', foreignField: '_id', as: 'categories' } }
@@ -124,7 +154,7 @@ export const getProducts = async (req: Request, res: Response) => {
         if (!data) {
             return res.json({
                 products: [],
-                pagination: { total: 0, page: Number(page), limit: Number(limit), pages: 0 },
+                pagination: { total: 0, page: pageNum, limit: limitNum, pages: 0 },
                 categoryKey: category || null,
                 featuredMode: 'default_all',
                 featuredSpecKeys: [],
@@ -169,9 +199,9 @@ export const getProducts = async (req: Request, res: Response) => {
             products: data.products || [],
             pagination: {
                 total,
-                page: Number(page),
-                limit: Number(limit),
-                pages: Math.ceil(total / Number(limit))
+                page: pageNum,
+                limit: limitNum,
+                pages: Math.ceil(total / limitNum)
             },
             categoryKey: category || null,
             featuredMode,

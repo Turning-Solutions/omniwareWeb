@@ -67,6 +67,8 @@ export const useProducts = (options: UseProductsOptions = {}) => {
             const { data } = await api.get(`/products?${params.toString()}`);
             return data;
         },
+        staleTime: 2 * 60 * 1000, // 2 minutes — avoid refetch on every mount
+        placeholderData: (previousData) => previousData, // show previous list while refetching
     });
 };
 
@@ -78,5 +80,6 @@ export const useProduct = (slug: string) => {
             return data;
         },
         enabled: !!slug,
+        staleTime: 5 * 60 * 1000, // 5 minutes for single product
     });
 };

@@ -3,8 +3,16 @@ import mongoose from 'mongoose';
 import Brand from '../models/Brand';
 import Category from '../models/Category';
 
-export const buildProductMatchStage = async (req: Request, exclude: string[] = []) => {
-    // console.log('DEBUG QUERY:', JSON.stringify(req.query, null, 2));
+export interface MatchStageCache {
+    brandIds?: mongoose.Types.ObjectId[];
+    categoryIds?: mongoose.Types.ObjectId[];
+}
+
+export const buildProductMatchStage = async (
+    req: Request,
+    exclude: string[] = [],
+    cache?: MatchStageCache
+) => {
     const { search, minPrice, maxPrice, brand, category, availability, inStock, ...dynamicFilters } = req.query;
     const matchStage: any = { isActive: true };
 
@@ -28,28 +36,36 @@ export const buildProductMatchStage = async (req: Request, exclude: string[] = [
     }
 
     if (brand && !exclude.includes('brand')) {
-        const brands = (brand as string).split(',');
-        const brandDocs = await Brand.find({
-            $or: [
-                { slug: { $in: brands } },
-                { _id: { $in: brands.filter(b => mongoose.Types.ObjectId.isValid(b)) } }
-            ]
-        });
-        if (brandDocs.length > 0) {
-            matchStage.brandId = { $in: brandDocs.map(b => b._id) };
+        if (cache && 'brandIds' in cache && cache.brandIds !== undefined) {
+            if (cache.brandIds.length > 0) matchStage.brandId = { $in: cache.brandIds };
+        } else {
+            const brands = (brand as string).split(',');
+            const brandDocs = await Brand.find({
+                $or: [
+                    { slug: { $in: brands } },
+                    { _id: { $in: brands.filter((b: string) => mongoose.Types.ObjectId.isValid(b)) } }
+                ]
+            });
+            const ids = brandDocs.map((b) => b._id);
+            if (cache) cache.brandIds = ids;
+            if (ids.length > 0) matchStage.brandId = { $in: ids };
         }
     }
 
     if (category && !exclude.includes('category')) {
-        const cats = (category as string).split(',');
-        const catDocs = await Category.find({
-            $or: [
-                { slug: { $in: cats } },
-                { _id: { $in: cats.filter(c => mongoose.Types.ObjectId.isValid(c)) } }
-            ]
-        });
-        if (catDocs.length > 0) {
-            matchStage.categoryIds = { $in: catDocs.map(c => c._id) };
+        if (cache && 'categoryIds' in cache && cache.categoryIds !== undefined) {
+            if (cache.categoryIds.length > 0) matchStage.categoryIds = { $in: cache.categoryIds };
+        } else {
+            const cats = (category as string).split(',');
+            const catDocs = await Category.find({
+                $or: [
+                    { slug: { $in: cats } },
+                    { _id: { $in: cats.filter((c: string) => mongoose.Types.ObjectId.isValid(c)) } }
+                ]
+            });
+            const ids = catDocs.map((c) => c._id);
+            if (cache) cache.categoryIds = ids;
+            if (ids.length > 0) matchStage.categoryIds = { $in: ids };
         }
     }
 
