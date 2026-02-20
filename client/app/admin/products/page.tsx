@@ -40,8 +40,8 @@ export default function ProductsPage() {
         const fetchFilters = async () => {
             try {
                 const [catsRes, brandsRes] = await Promise.all([
-                    fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}/api/v1/products/categories`),
-                    fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}/api/v1/products/brands`)
+                    fetch(`/api/v1/products/categories`),
+                    fetch(`/api/v1/products/brands`)
                 ]);
                 setCategories(await catsRes.json());
                 setBrands(await brandsRes.json());
@@ -67,7 +67,7 @@ export default function ProductsPage() {
             });
 
             const res = await fetch(
-                `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}/api/v1/admin/products?${queryParams}`,
+                `/api/v1/admin/products?${queryParams}`,
                 {
                     headers: {
                         "Content-Type": "application/json",
@@ -97,7 +97,7 @@ export default function ProductsPage() {
             // Based on task, we need CRUD. Let's assume we need to implement DELETE if not present.
             // Checking routes, I saw 'updateProduct', 'createProduct'. I didn't see explicit DELETE.
             // I'll implement soft delete by toggling isActive via update.
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/v1/admin/products/${id}`, {
+            const res = await fetch(`/api/v1/admin/products/${id}`, {
                 method: 'PATCH',
                 headers: {
                     'Content-Type': 'application/json',

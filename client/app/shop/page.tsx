@@ -17,9 +17,9 @@ export function ShopContent({ basePath = "/shop", initialFilters = {} }: ShopCon
 
     // Initialize filters from URL or props
     const [filters, setFilters] = useState<Record<string, any>>({
-        search: searchParams.get("search") || "",
-        sort: searchParams.get("sort") || "newest",
-        page: Number(searchParams.get("page")) || 1,
+        search: searchParams?.get("search") || "",
+        sort: searchParams?.get("sort") || "newest",
+        page: Number(searchParams?.get("page")) || 1,
         ...initialFilters
     });
 

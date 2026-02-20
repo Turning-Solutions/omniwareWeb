@@ -38,7 +38,7 @@ export default function AdminPage() {
     const fetchAnalytics = async () => {
         setLoading(true);
         try {
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}/api/v1/admin/analytics/summary?range=${range}`);
+            const res = await fetch(`/api/v1/admin/analytics/summary?range=${range}`);
             const data = await res.json();
 
             if (data.summary) {

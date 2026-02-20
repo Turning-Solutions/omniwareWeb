@@ -22,7 +22,7 @@ export default function FeaturedSpecsAdmin() {
 
     useEffect(() => {
         // Fetch categories on mount
-        fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/v1/products/categories`)
+        fetch(`/api/v1/products/categories`)
             .then(res => res.json())
             .then(data => setCategories(data))
             .catch(err => console.error("Failed to fetch categories", err));
@@ -40,11 +40,11 @@ export default function FeaturedSpecsAdmin() {
             setLoading(true);
             try {
                 // Fetch Available Specs
-                const availRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/v1/admin/categories/${selectedCategory}/spec-keys`);
+                const availRes = await fetch(`/api/v1/admin/categories/${selectedCategory}/spec-keys`);
                 const availData = await availRes.json();
 
                 // Fetch Featured Config
-                const confRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/v1/admin/categories/${selectedCategory}/featured-specs`);
+                const confRes = await fetch(`/api/v1/admin/categories/${selectedCategory}/featured-specs`);
                 const confData = await confRes.json();
 
                 setAvailableSpecKeys(availData.availableSpecKeys || []);
@@ -85,7 +85,7 @@ export default function FeaturedSpecsAdmin() {
         setLoading(true);
         try {
             const token = JSON.parse(localStorage.getItem('userInfo') || '{}').token;
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/v1/admin/categories/${selectedCategory}/featured-specs`, {
+            const res = await fetch(`/api/v1/admin/categories/${selectedCategory}/featured-specs`, {
                 method: "PUT",
                 headers: {
                     "Content-Type": "application/json",
@@ -114,7 +114,7 @@ export default function FeaturedSpecsAdmin() {
         setLoading(true);
         try {
             const token = JSON.parse(localStorage.getItem('userInfo') || '{}').token;
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/v1/admin/categories/${selectedCategory}/featured-specs`, {
+            const res = await fetch(`/api/v1/admin/categories/${selectedCategory}/featured-specs`, {
                 method: "DELETE",
                 headers: { Authorization: `Bearer ${token}` }
             });

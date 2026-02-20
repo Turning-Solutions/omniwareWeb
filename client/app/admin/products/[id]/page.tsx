@@ -47,8 +47,8 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
         const fetchData = async () => {
             try {
                 const [brandsRes, categoriesRes] = await Promise.all([
-                    fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/v1/products/brands`),
-                    fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/v1/products/categories`)
+                    fetch(`/api/v1/products/brands`),
+                    fetch(`/api/v1/products/categories`)
                 ]);
                 setBrands(await brandsRes.json());
                 setCategories(await categoriesRes.json());
@@ -65,7 +65,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
         if (isNew) return;
         const fetchProduct = async () => {
             try {
-                const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/v1/products/id/${id}`);
+                const res = await fetch(`/api/v1/products/id/${id}`);
                 if (res.ok) {
                     const data = await res.json();
                     setFormData({
@@ -103,8 +103,8 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
             };
 
             const url = isNew
-                ? `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/v1/admin/products`
-                : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/v1/admin/products/${id}`;
+                ? `/api/v1/admin/products`
+                : `/api/v1/admin/products/${id}`;
 
             const res = await fetch(url, {
                 method: isNew ? 'POST' : 'PATCH',
@@ -151,7 +151,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
         if (!name) return;
         const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
         try {
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/v1/admin/products/brands`, {
+            const res = await fetch(`/api/v1/admin/products/brands`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${JSON.parse(localStorage.getItem('userInfo') || '{}').token}` },
                 body: JSON.stringify({ name, slug })
@@ -177,7 +177,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
         if (!newName || newName === brand.name) return;
         const slug = newName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
         try {
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/v1/admin/products/brands/${brand._id}`, {
+            const res = await fetch(`/api/v1/admin/products/brands/${brand._id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${JSON.parse(localStorage.getItem('userInfo') || '{}').token}` },
                 body: JSON.stringify({ name: newName, slug })
@@ -199,7 +199,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
         if (!name) return;
         const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
         try {
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/v1/admin/products/categories`, {
+            const res = await fetch(`/api/v1/admin/products/categories`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${JSON.parse(localStorage.getItem('userInfo') || '{}').token}` },
                 body: JSON.stringify({ name, slug })
@@ -225,7 +225,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
         if (!newName || newName === category.name) return;
         const slug = newName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
         try {
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/v1/admin/products/categories/${category._id}`, {
+            const res = await fetch(`/api/v1/admin/products/categories/${category._id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${JSON.parse(localStorage.getItem('userInfo') || '{}').token}` },
                 body: JSON.stringify({ name: newName, slug })

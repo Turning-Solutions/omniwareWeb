@@ -43,7 +43,7 @@ export default function AdminOrdersPage() {
                 ...(sort && { sort })
             });
 
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}/api/v1/admin/orders?${params}`, {
+            const res = await fetch(`/api/v1/admin/orders?${params}`, {
                 headers: {
                     // "Authorization": ... // Auth disabled
                 }

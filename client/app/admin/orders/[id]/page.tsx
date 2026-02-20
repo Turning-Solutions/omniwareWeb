@@ -51,7 +51,7 @@ export default function AdminOrderDetailsPage({ params }: PageProps) {
 
     const fetchOrder = async () => {
         try {
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}/api/v1/admin/orders/${id}`);
+            const res = await fetch(`/api/v1/admin/orders/${id}`);
             if (res.ok) {
                 const data = await res.json();
                 setOrder(data);
@@ -68,7 +68,7 @@ export default function AdminOrderDetailsPage({ params }: PageProps) {
 
         setUpdating(true);
         try {
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}/api/v1/admin/orders/${id}/status`, {
+            const res = await fetch(`/api/v1/admin/orders/${id}/status`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ status: newStatus })

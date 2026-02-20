@@ -31,6 +31,10 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 
 ## Deploy on Vercel
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+The app is set up for serverless deployment on Vercel. The API (Express) runs as serverless functions under `/api/*`.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. **Import the project** in [Vercel](https://vercel.com/new) and set the **Root Directory** to `client` (or deploy from inside the `client` folder).
+2. **Environment variables** (Project → Settings → Environment Variables):
+   - `MONGODB_URI` – your MongoDB connection string (required).
+   - `JWT_ACCESS_SECRET` – secret for JWT auth (required; use a long random string).
+3. Deploy. The frontend and all `/api/v1/*` routes will be served from the same origin.
