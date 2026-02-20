@@ -17,4 +17,4 @@ const CategoryFeaturedSpecsSchema: Schema = new Schema({
 // Ensure unique index on categoryKey
 CategoryFeaturedSpecsSchema.index({ categoryKey: 1 }, { unique: true });
 
-export default mongoose.model<ICategoryFeaturedSpecs>('CategoryFeaturedSpecs', CategoryFeaturedSpecsSchema);
+export default (mongoose.models?.CategoryFeaturedSpecs as mongoose.Model<ICategoryFeaturedSpecs>) ?? mongoose.model<ICategoryFeaturedSpecs>('CategoryFeaturedSpecs', CategoryFeaturedSpecsSchema);

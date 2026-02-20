@@ -53,20 +53,19 @@ export default function AdminPage() {
     };
 
     if (loading && !summary) {
-        return <div className="p-12 text-center text-white">Loading Dashboard...</div>;
+        return <div className="p-12 text-center text-main">Loading Dashboard...</div>;
     }
 
     return (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
             <div className="flex justify-between items-center mb-8">
-                <h1 className="text-3xl font-bold text-white">Dashboard</h1>
-                <div className="flex bg-white/5 rounded-lg p-1">
+                <h1 className="text-3xl font-bold text-main">Dashboard</h1>
+                <div className="flex bg-base rounded-lg p-1 border border-border-soft">
                     {['today', '7d', '30d'].map((r) => (
                         <button
                             key={r}
                             onClick={() => setRange(r)}
-                            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${range === r ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'
-                                }`}
+                            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${range === r ? 'bg-accent text-white' : 'text-sub hover:text-main'}`}
                         >
                             {r === 'today' ? 'Today' : r === '7d' ? '7 Days' : '30 Days'}
                         </button>
@@ -76,43 +75,40 @@ export default function AdminPage() {
 
             {/* Stats Grid */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-12">
-                <div className="glass p-6 rounded-xl flex items-center space-x-4">
-                    <div className="h-12 w-12 bg-blue-500/20 text-blue-500 rounded-lg flex items-center justify-center">
+                <div className="admin-card p-6 rounded-xl flex items-center space-x-4">
+                    <div className="h-12 w-12 bg-accent/20 text-accent rounded-lg flex items-center justify-center">
                         <DollarSign className="h-6 w-6" />
                     </div>
                     <div>
-                        <p className="text-sm text-gray-400">Total Revenue</p>
-                        <h3 className="text-2xl font-bold text-white">
-                            LKR {summary?.revenue.toLocaleString() || 0}
-                        </h3>
+                        <p className="text-sm text-sub">Total Revenue</p>
+                        <h3 className="text-2xl font-bold text-main">LKR {summary?.revenue.toLocaleString() || 0}</h3>
                     </div>
                 </div>
-                <div className="glass p-6 rounded-xl flex items-center space-x-4">
-                    <div className="h-12 w-12 bg-purple-500/20 text-purple-500 rounded-lg flex items-center justify-center">
+                <div className="admin-card p-6 rounded-xl flex items-center space-x-4">
+                    <div className="h-12 w-12 bg-accent/20 text-accent rounded-lg flex items-center justify-center">
                         <ShoppingBag className="h-6 w-6" />
                     </div>
                     <div>
-                        <p className="text-sm text-gray-400">Orders</p>
-                        <h3 className="text-2xl font-bold text-white">{summary?.orders || 0}</h3>
+                        <p className="text-sm text-sub">Orders</p>
+                        <h3 className="text-2xl font-bold text-main">{summary?.orders || 0}</h3>
                     </div>
                 </div>
-                <div className="glass p-6 rounded-xl flex items-center space-x-4">
-                    <div className="h-12 w-12 bg-green-500/20 text-green-500 rounded-lg flex items-center justify-center">
+                <div className="admin-card p-6 rounded-xl flex items-center space-x-4">
+                    <div className="h-12 w-12 bg-accent/20 text-accent rounded-lg flex items-center justify-center">
                         <Eye className="h-6 w-6" />
                     </div>
                     <div>
-                        <p className="text-sm text-gray-400">Product Views</p>
-                        <h3 className="text-2xl font-bold text-white">{summary?.productViews || 0}</h3>
+                        <p className="text-sm text-sub">Product Views</p>
+                        <h3 className="text-2xl font-bold text-main">{summary?.productViews || 0}</h3>
                     </div>
                 </div>
-                <div className="glass p-6 rounded-xl flex items-center space-x-4">
-                    <div className="h-12 w-12 bg-orange-500/20 text-orange-500 rounded-lg flex items-center justify-center">
+                <div className="admin-card p-6 rounded-xl flex items-center space-x-4">
+                    <div className="h-12 w-12 bg-accent/20 text-accent rounded-lg flex items-center justify-center">
                         <Activity className="h-6 w-6" />
                     </div>
                     <div>
-                        <p className="text-sm text-gray-400">Conversion Rate</p>
-                        {/* A bit of math if needed or use pre-calculated */}
-                        <h3 className="text-2xl font-bold text-white">
+                        <p className="text-sm text-sub">Conversion Rate</p>
+                        <h3 className="text-2xl font-bold text-main">
                             {((summary?.orders && summary.orders > 0 && summary?.productViews && summary.productViews > 0)
                                 ? ((summary.orders / summary.productViews) * 100).toFixed(2)
                                 : '0.00')}%
@@ -122,26 +118,25 @@ export default function AdminPage() {
             </div>
 
             <div className="flex justify-end mb-8 gap-4">
-                <Link href="/admin/orders" className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-xl flex items-center gap-2 transition-colors">
+                <Link href="/admin/orders" className="bg-accent hover:bg-accent/90 text-white px-6 py-3 rounded-xl flex items-center gap-2 transition-colors">
                     <ShoppingBag className="h-5 w-5" />
                     Manage Orders
                 </Link>
-                <Link href="/admin/products" className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl flex items-center gap-2 transition-colors">
+                <Link href="/admin/products" className="bg-accent hover:bg-accent/90 text-white px-6 py-3 rounded-xl flex items-center gap-2 transition-colors">
                     <PackageIcon className="h-5 w-5" />
                     Manage Products
                 </Link>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-                {/* Recent Orders */}
-                <div className="glass rounded-2xl overflow-hidden flex flex-col">
-                    <div className="p-6 border-b border-white/10 flex justify-between items-center">
-                        <h2 className="text-xl font-bold text-white">Recent Orders</h2>
-                        <Link href="/admin/orders" className="text-sm text-blue-400 hover:text-blue-300">View All</Link>
+                <div className="admin-card rounded-2xl overflow-hidden flex flex-col">
+                    <div className="p-6 border-b border-border-soft flex justify-between items-center">
+                        <h2 className="text-xl font-bold text-main">Recent Orders</h2>
+                        <Link href="/admin/orders" className="text-sm text-accent hover:text-accent/80">View All</Link>
                     </div>
                     <div className="overflow-x-auto flex-1">
                         <table className="w-full text-left">
-                            <thead className="bg-white/5 text-gray-400 uppercase text-xs">
+                            <thead className="bg-base text-sub uppercase text-xs">
                                 <tr>
                                     <th className="px-6 py-4">ID</th>
                                     <th className="px-6 py-4">Customer</th>
@@ -149,21 +144,17 @@ export default function AdminPage() {
                                     <th className="px-6 py-4">Status</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-white/10 text-gray-300">
+                            <tbody className="divide-y divide-border-soft text-main">
                                 {recentOrders.length === 0 ? (
-                                    <tr><td colSpan={4} className="p-6 text-center text-gray-500">No recent orders</td></tr>
+                                    <tr><td colSpan={4} className="p-6 text-center text-sub">No recent orders</td></tr>
                                 ) : (
                                     recentOrders.map((order: RecentOrder) => (
-                                        <tr key={order.id} className="hover:bg-white/5">
+                                        <tr key={order.id} className="hover:bg-base/50">
                                             <td className="px-6 py-4 font-mono text-xs">{order.id.slice(-6)}</td>
                                             <td className="px-6 py-4">{order.customer}</td>
                                             <td className="px-6 py-4">LKR {order.total.toLocaleString()}</td>
                                             <td className="px-6 py-4">
-                                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${order.status === 'paid' ? 'bg-green-400/10 text-green-400' :
-                                                    order.status === 'delivered' ? 'bg-green-400/10 text-green-400' :
-                                                        order.status === 'pending' ? 'bg-yellow-400/10 text-yellow-400' :
-                                                            'bg-gray-400/10 text-gray-400'
-                                                    }`}>
+                                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${order.status === 'paid' || order.status === 'delivered' ? 'bg-accent/20 text-accent' : order.status === 'pending' ? 'bg-amber-500/20 text-amber-400' : 'bg-base text-sub'}`}>
                                                     {order.status}
                                                 </span>
                                             </td>
@@ -175,26 +166,25 @@ export default function AdminPage() {
                     </div>
                 </div>
 
-                {/* Top Products */}
-                <div className="glass rounded-2xl overflow-hidden flex flex-col">
-                    <div className="p-6 border-b border-white/10">
-                        <h2 className="text-xl font-bold text-white">Top Products</h2>
+                <div className="admin-card rounded-2xl overflow-hidden flex flex-col">
+                    <div className="p-6 border-b border-border-soft">
+                        <h2 className="text-xl font-bold text-main">Top Products</h2>
                     </div>
                     <div className="overflow-x-auto flex-1">
                         <table className="w-full text-left">
-                            <thead className="bg-white/5 text-gray-400 uppercase text-xs">
+                            <thead className="bg-base text-sub uppercase text-xs">
                                 <tr>
                                     <th className="px-6 py-4">Product</th>
                                     <th className="px-6 py-4 text-right">Views</th>
                                     <th className="px-6 py-4 text-right">Sales</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-white/10 text-gray-300">
+                            <tbody className="divide-y divide-border-soft text-main">
                                 {summary?.topProducts?.length === 0 ? (
-                                    <tr><td colSpan={3} className="p-6 text-center text-gray-500">No data available</td></tr>
+                                    <tr><td colSpan={3} className="p-6 text-center text-sub">No data available</td></tr>
                                 ) : (
                                     summary?.topProducts?.map((p) => (
-                                        <tr key={p.productId || Math.random()} className="hover:bg-white/5">
+                                        <tr key={p.productId || Math.random()} className="hover:bg-base/50">
                                             <td className="px-6 py-4 max-w-[200px] truncate" title={p.title}>{p.title}</td>
                                             <td className="px-6 py-4 text-right">{p.views}</td>
                                             <td className="px-6 py-4 text-right">{p.purchases}</td>

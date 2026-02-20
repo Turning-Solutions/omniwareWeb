@@ -123,35 +123,34 @@ export const getProducts = async (req: Request, res: Response) => {
         const data = results[0];
         const total = data.totalCount[0] ? data.totalCount[0].count : 0;
 
-        let featuredMode = 'default_all';
+        // Only show spec filters that are in the category's featured list; never show all attributes
+        let featuredMode: 'restricted' | 'none' = 'none';
         let featuredSpecKeys: string[] = [];
 
         if (category) {
             const featuredConfig = await CategoryFeaturedSpecs.findOne({ categoryKey: category });
-            if (featuredConfig) {
-                featuredSpecKeys = featuredConfig.featuredSpecKeys || [];
-                featuredMode = featuredSpecKeys.length > 0 ? 'restricted' : 'none';
+            if (featuredConfig && Array.isArray(featuredConfig.featuredSpecKeys) && featuredConfig.featuredSpecKeys.length > 0) {
+                featuredSpecKeys = featuredConfig.featuredSpecKeys;
+                featuredMode = 'restricted';
             }
         }
 
-        // Apply Gating
         const specsFacet: Record<string, any[]> = {};
-        data.specs.forEach((item: any) => {
-            const normalizedKey = normalizeSpecKey(item._id);
-            if (featuredMode === 'default_all') {
-                specsFacet[normalizedKey] = item.values;
-            } else if (featuredMode === 'restricted' && featuredSpecKeys.includes(normalizedKey)) {
-                specsFacet[normalizedKey] = item.values;
-            }
-        });
+        if (featuredMode === 'restricted') {
+            (data.specs || []).forEach((item: any) => {
+                const normalizedKey = normalizeSpecKey(item._id);
+                if (featuredSpecKeys.includes(normalizedKey)) {
+                    specsFacet[normalizedKey] = item.values;
+                }
+            });
+        }
 
-        // Filter other facets if config exists
         let finalFacets = {
-            price: data.price[0] || { min: 0, max: 0 },
-            categories: data.categories,
-            brands: data.brands,
-            availability: data.availability,
-            specs: featuredMode === 'none' ? {} : specsFacet
+            price: data.price?.[0] || { min: 0, max: 0 },
+            categories: data.categories || [],
+            brands: data.brands || [],
+            availability: data.availability || [],
+            specs: specsFacet
         };
 
 
@@ -238,36 +237,34 @@ export const getProductFacets = async (req: Request, res: Response) => {
         const results = await Product.aggregate(pipeline as any);
         const data = results[0];
 
-        let featuredMode = 'default_all';
+        let featuredMode: 'restricted' | 'none' = 'none';
         let featuredSpecKeys: string[] = [];
 
         if (category) {
             const featuredConfig = await CategoryFeaturedSpecs.findOne({ categoryKey: category });
-            if (featuredConfig) {
-                featuredSpecKeys = featuredConfig.featuredSpecKeys || [];
-                featuredMode = featuredSpecKeys.length > 0 ? 'restricted' : 'none';
+            if (featuredConfig && Array.isArray(featuredConfig.featuredSpecKeys) && featuredConfig.featuredSpecKeys.length > 0) {
+                featuredSpecKeys = featuredConfig.featuredSpecKeys;
+                featuredMode = 'restricted';
             }
         }
 
         const specsFacet: Record<string, any[]> = {};
-        data.specs.forEach((item: any) => {
-            const normalizedKey = normalizeSpecKey(item._id);
-            if (featuredMode === 'default_all') {
-                specsFacet[normalizedKey] = item.values;
-            } else if (featuredMode === 'restricted' && featuredSpecKeys.includes(normalizedKey)) {
-                specsFacet[normalizedKey] = item.values;
-            }
-        });
+        if (featuredMode === 'restricted' && data.specs) {
+            data.specs.forEach((item: any) => {
+                const normalizedKey = normalizeSpecKey(item._id);
+                if (featuredSpecKeys.includes(normalizedKey)) {
+                    specsFacet[normalizedKey] = item.values;
+                }
+            });
+        }
 
-        // Filter other facets if config exists
         let finalFacets = {
-            price: data.price[0] || { min: 0, max: 0 },
-            categories: data.categories,
-            brands: data.brands,
-            availability: data.availability,
-            specs: featuredMode === 'none' ? {} : specsFacet
+            price: data.price?.[0] || { min: 0, max: 0 },
+            categories: data.categories || [],
+            brands: data.brands || [],
+            availability: data.availability || [],
+            specs: specsFacet
         };
-
 
         res.json({
             categoryKey: category || null,
@@ -300,11 +297,21 @@ export const getProductBySlug = async (req: Request, res: Response) => {
 import { productSchema, productUpdateSchema } from '../schemas/productSchema';
 import mongoose from 'mongoose';
 
+function normalizeProductSpecs(specs: Record<string, string> | undefined): Record<string, string> | undefined {
+    if (!specs || typeof specs !== 'object') return specs;
+    const out: Record<string, string> = {};
+    for (const [k, v] of Object.entries(specs)) {
+        if (k != null && v != null) out[normalizeSpecKey(k)] = String(v);
+    }
+    return Object.keys(out).length ? out : undefined;
+}
+
 // ... (getProducts)
 
 export const createProduct = async (req: Request, res: Response) => {
     try {
         const validatedData = productSchema.parse(req.body);
+        if (validatedData.specs) validatedData.specs = normalizeProductSpecs(validatedData.specs);
         const product = new Product(validatedData);
         const createdProduct = await product.save();
         res.status(201).json(createdProduct);
@@ -322,6 +329,7 @@ export const createProduct = async (req: Request, res: Response) => {
 export const updateProduct = async (req: Request, res: Response) => {
     try {
         const validatedData = productUpdateSchema.parse(req.body);
+        if (validatedData.specs) validatedData.specs = normalizeProductSpecs(validatedData.specs);
         const product = await Product.findById(req.params.id);
         if (product) {
             Object.assign(product, validatedData);

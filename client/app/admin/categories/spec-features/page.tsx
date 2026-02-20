@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Save, RefreshCw, Search } from "lucide-react";
+import { Save, RefreshCw, Search, Plus, Trash2 } from "lucide-react";
 
 interface Category {
     _id: string;
@@ -14,14 +14,15 @@ export default function FeaturedSpecsAdmin() {
     const [selectedCategory, setSelectedCategory] = useState("");
 
     const [availableSpecKeys, setAvailableSpecKeys] = useState<string[]>([]);
-    const [featuredSpecKeys, setFeaturedSpecKeys] = useState<Set<string>>(new Set());
+    /** Featured specs in display order; selected are shown first and can be edited */
+    const [featuredSpecKeys, setFeaturedSpecKeys] = useState<string[]>([]);
+    const [newSpecInput, setNewSpecInput] = useState("");
 
     const [mode, setMode] = useState<"default_all" | "restricted" | "none">("default_all");
     const [loading, setLoading] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
 
     useEffect(() => {
-        // Fetch categories on mount
         fetch(`/api/v1/products/categories`)
             .then(res => res.json())
             .then(data => setCategories(data))
@@ -31,7 +32,7 @@ export default function FeaturedSpecsAdmin() {
     useEffect(() => {
         if (!selectedCategory) {
             setAvailableSpecKeys([]);
-            setFeaturedSpecKeys(new Set());
+            setFeaturedSpecKeys([]);
             setMode("default_all");
             return;
         }
@@ -39,16 +40,13 @@ export default function FeaturedSpecsAdmin() {
         const fetchSpecs = async () => {
             setLoading(true);
             try {
-                // Fetch Available Specs
                 const availRes = await fetch(`/api/v1/admin/categories/${selectedCategory}/spec-keys`);
                 const availData = await availRes.json();
-
-                // Fetch Featured Config
                 const confRes = await fetch(`/api/v1/admin/categories/${selectedCategory}/featured-specs`);
                 const confData = await confRes.json();
 
                 setAvailableSpecKeys(availData.availableSpecKeys || []);
-                setFeaturedSpecKeys(new Set(confData.featuredSpecKeys || []));
+                setFeaturedSpecKeys(confData.featuredSpecKeys || []);
                 setMode(confData.mode || "default_all");
             } catch (err) {
                 console.error("Failed to fetch specs for category", err);
@@ -60,24 +58,32 @@ export default function FeaturedSpecsAdmin() {
         fetchSpecs();
     }, [selectedCategory]);
 
-    const filteredSpecKeys = availableSpecKeys.filter(k => k.toLowerCase().includes(searchQuery.toLowerCase()));
+    const featuredSet = new Set(featuredSpecKeys);
+    const availableOnly = availableSpecKeys.filter(k => !featuredSet.has(k));
+    const filteredAvailable = availableOnly.filter(k => k.toLowerCase().includes(searchQuery.toLowerCase()));
 
-    const handleToggle = (key: string) => {
-        const next = new Set(featuredSpecKeys);
-        if (next.has(key)) {
-            next.delete(key);
-        } else {
-            next.add(key);
-        }
+    const updateFeaturedAt = (index: number, newKey: string) => {
+        const trimmed = newKey.trim();
+        if (!trimmed) return;
+        const next = [...featuredSpecKeys];
+        next[index] = trimmed;
         setFeaturedSpecKeys(next);
     };
 
-    const handleSelectAll = () => {
-        setFeaturedSpecKeys(new Set(availableSpecKeys));
+    const removeFeatured = (index: number) => {
+        setFeaturedSpecKeys(featuredSpecKeys.filter((_, i) => i !== index));
     };
 
-    const handleClearAll = () => {
-        setFeaturedSpecKeys(new Set());
+    const addFeatured = (key: string) => {
+        const trimmed = key.trim();
+        if (!trimmed || featuredSet.has(trimmed)) return;
+        setFeaturedSpecKeys([...featuredSpecKeys, trimmed]);
+        setNewSpecInput("");
+    };
+
+    const addFromAvailable = (key: string) => {
+        if (featuredSet.has(key)) return;
+        setFeaturedSpecKeys([...featuredSpecKeys, key]);
     };
 
     const handleSave = async () => {
@@ -91,7 +97,7 @@ export default function FeaturedSpecsAdmin() {
                     "Content-Type": "application/json",
                     Authorization: `Bearer ${token}`
                 },
-                body: JSON.stringify({ featuredSpecKeys: Array.from(featuredSpecKeys) })
+                body: JSON.stringify({ featuredSpecKeys })
             });
 
             if (res.ok) {
@@ -120,7 +126,7 @@ export default function FeaturedSpecsAdmin() {
             });
 
             if (res.ok) {
-                setFeaturedSpecKeys(new Set());
+                setFeaturedSpecKeys([]);
                 setMode("default_all");
                 alert("Configuration deleted. Reverted to default behavior.");
             } else {
@@ -187,66 +193,94 @@ export default function FeaturedSpecsAdmin() {
                         </div>
                     </div>
 
-                    <div className="mb-4 flex flex-col sm:flex-row gap-4 justify-between items-center bg-base p-4 rounded-lg border border-border-soft">
-                        <div className="relative w-full sm:w-64">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-sub" />
-                            <input
-                                type="text"
-                                placeholder="Search spec keys..."
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full bg-surface border border-border-soft rounded-lg pl-9 pr-4 py-2 text-sm text-main focus:ring-accent"
-                            />
-                        </div>
-                        <div className="flex gap-2 w-full sm:w-auto">
-                            <button
-                                onClick={handleSelectAll}
-                                className="flex-1 sm:flex-none px-3 py-1.5 text-sm font-medium bg-surface border border-border-soft hover:bg-white/5 rounded text-main"
-                            >
-                                Select All
-                            </button>
-                            <button
-                                onClick={handleClearAll}
-                                className="flex-1 sm:flex-none px-3 py-1.5 text-sm font-medium bg-surface border border-border-soft hover:bg-white/5 rounded text-main"
-                            >
-                                Clear All
-                            </button>
-                        </div>
-                    </div>
-
-                    {loading && availableSpecKeys.length === 0 ? (
+                    {loading && availableSpecKeys.length === 0 && featuredSpecKeys.length === 0 ? (
                         <div className="text-center py-10 text-sub">Loading spec keys...</div>
-                    ) : availableSpecKeys.length === 0 ? (
-                        <div className="text-center py-10 border border-dashed border-border-soft rounded-lg text-sub">
-                            No specifications found for products in this category.
-                        </div>
                     ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                            {filteredSpecKeys.map(key => (
-                                <label
-                                    key={key}
-                                    className={`
-                                        flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors
-                                        ${featuredSpecKeys.has(key)
-                                            ? 'bg-accent/10 border-accent/30 text-main'
-                                            : 'bg-base border-border-soft text-sub hover:border-accent/40'}
-                                    `}
-                                >
-                                    <input
-                                        type="checkbox"
-                                        checked={featuredSpecKeys.has(key)}
-                                        onChange={() => handleToggle(key)}
-                                        className="h-4 w-4 bg-surface border-border-soft rounded text-accent focus:ring-accent"
-                                    />
-                                    <span className="text-sm font-medium break-all">{key}</span>
-                                </label>
-                            ))}
-                            {filteredSpecKeys.length === 0 && searchQuery && (
-                                <div className="col-span-full text-center py-6 text-sub">
-                                    No spec keys match your search.
+                        <>
+                            {/* Section 1: Selected featured specs first — editable list */}
+                            <div className="mb-6">
+                                <h3 className="text-sm font-semibold text-main mb-2">Featured specs (shown as filters) — edit or reorder</h3>
+                                <div className="space-y-2">
+                                    {featuredSpecKeys.map((key, index) => (
+                                        <div
+                                            key={`${index}-${key}`}
+                                            className="flex items-center gap-2 p-3 rounded-lg border border-accent/30 bg-accent/10"
+                                        >
+                                            <input
+                                                type="text"
+                                                value={key}
+                                                onChange={(e) => updateFeaturedAt(index, e.target.value)}
+                                                className="flex-1 min-w-0 bg-surface border border-border-soft rounded-lg px-3 py-1.5 text-sm text-main focus:ring-accent focus:border-accent"
+                                                placeholder="Spec key (e.g. Vram)"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => removeFeatured(index)}
+                                                className="p-1.5 text-red-400 hover:bg-red-400/10 rounded transition-colors"
+                                                title="Remove"
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                            </button>
+                                        </div>
+                                    ))}
                                 </div>
-                            )}
-                        </div>
+                                <div className="flex gap-2 mt-3">
+                                    <input
+                                        type="text"
+                                        value={newSpecInput}
+                                        onChange={(e) => setNewSpecInput(e.target.value)}
+                                        onKeyDown={(e) => e.key === "Enter" && addFeatured(newSpecInput)}
+                                        placeholder="Add new spec key..."
+                                        className="flex-1 bg-surface border border-border-soft rounded-lg px-3 py-2 text-sm text-main focus:ring-accent"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => addFeatured(newSpecInput)}
+                                        className="px-3 py-2 bg-accent/20 text-accent hover:bg-accent/30 rounded-lg text-sm font-medium flex items-center gap-1.5"
+                                    >
+                                        <Plus className="h-4 w-4" /> Add
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Section 2: Add from existing product specs */}
+                            <div>
+                                <h3 className="text-sm font-semibold text-main mb-2">Add from existing product specs</h3>
+                                <div className="relative w-full max-w-xs mb-3">
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-sub" />
+                                    <input
+                                        type="text"
+                                        placeholder="Search..."
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        className="w-full bg-base border border-border-soft rounded-lg pl-9 pr-4 py-2 text-sm text-main focus:ring-accent"
+                                    />
+                                </div>
+                                {availableOnly.length === 0 ? (
+                                    <p className="text-sub text-sm py-4">
+                                        {availableSpecKeys.length === 0
+                                            ? "No specifications found for products in this category."
+                                            : "All available spec keys are already in the featured list."}
+                                    </p>
+                                ) : (
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                                        {filteredAvailable.map(k => (
+                                            <button
+                                                key={k}
+                                                type="button"
+                                                onClick={() => addFromAvailable(k)}
+                                                className="text-left px-3 py-2 rounded-lg border border-border-soft bg-base hover:border-accent/40 hover:bg-white/5 text-sub hover:text-main text-sm transition-colors"
+                                            >
+                                                + {k}
+                                            </button>
+                                        ))}
+                                        {filteredAvailable.length === 0 && searchQuery && (
+                                            <p className="col-span-full text-sub text-sm py-2">No keys match your search.</p>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        </>
                     )}
                 </div>
             )}

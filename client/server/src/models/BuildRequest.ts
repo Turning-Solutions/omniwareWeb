@@ -15,5 +15,5 @@ const buildRequestSchema = new mongoose.Schema({
     timestamps: true
 });
 
-const BuildRequest = mongoose.model('BuildRequest', buildRequestSchema);
+const BuildRequest = mongoose.models.BuildRequest ?? mongoose.model('BuildRequest', buildRequestSchema);
 export default BuildRequest;

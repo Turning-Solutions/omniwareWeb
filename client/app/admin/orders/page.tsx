@@ -82,27 +82,23 @@ export default function AdminOrdersPage() {
     return (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
             <div className="flex justify-between items-center mb-8">
-                <h1 className="text-3xl font-bold text-white">Orders</h1>
+                <h1 className="text-3xl font-bold text-main">Orders</h1>
             </div>
 
-            {/* Filters */}
-            <div className="glass rounded-xl p-6 mb-8 space-y-4">
+            <div className="admin-card rounded-xl p-6 mb-8 space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    {/* Search */}
                     <div className="relative">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-sub h-4 w-4" />
                         <input
                             type="text"
                             placeholder="Search ID..."
-                            className="w-full bg-white/5 border border-white/10 rounded-lg pl-10 pr-4 py-2 text-white text-sm focus:outline-none focus:border-blue-500"
+                            className="w-full bg-base border border-border-soft rounded-lg pl-10 pr-4 py-2 text-main text-sm focus:outline-none focus:border-accent"
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                         />
                     </div>
-
-                    {/* Status */}
                     <select
-                        className="bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-blue-500 [&>option]:text-black"
+                        className="bg-base border border-border-soft rounded-lg px-4 py-2 text-main text-sm focus:outline-none focus:border-accent [&>option]:text-black"
                         value={status}
                         onChange={(e) => setStatus(e.target.value)}
                     >
@@ -113,10 +109,8 @@ export default function AdminOrdersPage() {
                         <option value="delivered">Delivered</option>
                         <option value="cancelled">Cancelled</option>
                     </select>
-
-                    {/* Sort */}
                     <select
-                        className="bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-blue-500 [&>option]:text-black"
+                        className="bg-base border border-border-soft rounded-lg px-4 py-2 text-main text-sm focus:outline-none focus:border-accent [&>option]:text-black"
                         value={sort}
                         onChange={(e) => setSort(e.target.value)}
                     >
@@ -128,11 +122,10 @@ export default function AdminOrdersPage() {
                 </div>
             </div>
 
-            {/* Table */}
-            <div className="glass rounded-xl overflow-hidden">
+            <div className="admin-card rounded-xl overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="w-full text-left">
-                        <thead className="bg-white/5 text-gray-400 uppercase text-xs">
+                        <thead className="bg-base text-sub uppercase text-xs">
                             <tr>
                                 <th className="px-6 py-4">Order ID</th>
                                 <th className="px-6 py-4">Customer</th>
@@ -142,18 +135,18 @@ export default function AdminOrdersPage() {
                                 <th className="px-6 py-4 text-right">Actions</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-white/10 text-gray-300">
+                        <tbody className="divide-y divide-border-soft text-main">
                             {loading ? (
-                                <tr><td colSpan={6} className="px-6 py-8 text-center">Loading...</td></tr>
+                                <tr><td colSpan={6} className="px-6 py-8 text-center text-sub">Loading...</td></tr>
                             ) : orders.length === 0 ? (
-                                <tr><td colSpan={6} className="px-6 py-8 text-center">No orders found</td></tr>
+                                <tr><td colSpan={6} className="px-6 py-8 text-center text-sub">No orders found</td></tr>
                             ) : (
                                 orders.map((order) => (
-                                    <tr key={order._id} className="hover:bg-white/5 transition-colors">
+                                    <tr key={order._id} className="hover:bg-base/50 transition-colors">
                                         <td className="px-6 py-4 font-mono text-xs">{order._id}</td>
                                         <td className="px-6 py-4">
-                                            <div className="text-sm font-medium text-white">{order.user?.name || 'Unknown'}</div>
-                                            <div className="text-xs text-gray-500">{order.user?.email}</div>
+                                            <div className="text-sm font-medium">{order.user?.name || 'Unknown'}</div>
+                                            <div className="text-xs text-sub">{order.user?.email}</div>
                                         </td>
                                         <td className="px-6 py-4 text-sm">{new Date(order.createdAt).toLocaleDateString()}</td>
                                         <td className="px-6 py-4 text-sm">LKR {order.totalPrice.toLocaleString()}</td>
@@ -163,10 +156,7 @@ export default function AdminOrdersPage() {
                                             </span>
                                         </td>
                                         <td className="px-6 py-4 text-right">
-                                            <Link
-                                                href={`/admin/orders/${order._id}`}
-                                                className="inline-flex items-center justify-center p-2 hover:bg-white/10 rounded-lg text-blue-400 transition-colors"
-                                            >
+                                            <Link href={`/admin/orders/${order._id}`} className="inline-flex items-center justify-center p-2 hover:bg-base rounded-lg text-accent transition-colors">
                                                 <Eye className="h-4 w-4" />
                                             </Link>
                                         </td>
@@ -176,22 +166,12 @@ export default function AdminOrdersPage() {
                         </tbody>
                     </table>
                 </div>
-
-                {/* Pagination */}
-                <div className="p-4 border-t border-white/10 flex justify-center gap-2">
-                    <button
-                        disabled={page === 1}
-                        onClick={() => setPage(p => Math.max(1, p - 1))}
-                        className="px-3 py-1 rounded bg-white/5 hover:bg-white/10 disabled:opacity-50 text-sm"
-                    >
+                <div className="p-4 border-t border-border-soft flex justify-center gap-2">
+                    <button disabled={page === 1} onClick={() => setPage(p => Math.max(1, p - 1))} className="px-3 py-1 rounded bg-base hover:bg-base/80 disabled:opacity-50 text-sm text-main">
                         Prev
                     </button>
-                    <span className="px-3 py-1 text-sm text-gray-400">Page {page} of {totalPages}</span>
-                    <button
-                        disabled={page === totalPages}
-                        onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                        className="px-3 py-1 rounded bg-white/5 hover:bg-white/10 disabled:opacity-50 text-sm"
-                    >
+                    <span className="px-3 py-1 text-sm text-sub">Page {page} of {totalPages}</span>
+                    <button disabled={page === totalPages} onClick={() => setPage(p => Math.min(totalPages, p + 1))} className="px-3 py-1 rounded bg-base hover:bg-base/80 disabled:opacity-50 text-sm text-main">
                         Next
                     </button>
                 </div>

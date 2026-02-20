@@ -80,4 +80,4 @@ const analyticsDailySchema = new Schema<IAnalyticsDaily>({
     timestamps: true
 });
 
-export const AnalyticsDaily = mongoose.model<IAnalyticsDaily>('AnalyticsDaily', analyticsDailySchema);
+export const AnalyticsDaily = (mongoose.models?.AnalyticsDaily as mongoose.Model<IAnalyticsDaily>) ?? mongoose.model<IAnalyticsDaily>('AnalyticsDaily', analyticsDailySchema);

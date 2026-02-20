@@ -5,9 +5,51 @@
     --foreground: #171717;
 }
 
+/* Admin: soothing dark theme — applied via .admin-theme wrapper */
+:root {
+    --admin-bg: #0d0e12;
+    --admin-surface: #16181d;
+    --admin-base: #1c1e24;
+    --admin-border: #2a2d35;
+    --admin-main: #e2e4e9;
+    --admin-sub: #8c8f99;
+    --admin-accent: #5ba89c;
+    --admin-accent-soft: #3d7a72;
+}
+
+.admin-theme {
+    --background: var(--admin-bg);
+    --foreground: var(--admin-main);
+    --admin-main: #e2e4e9;
+    --admin-sub: #8c8f99;
+    --admin-surface: #16181d;
+    --admin-base: #1c1e24;
+    --admin-border: #2a2d35;
+    --admin-accent: #5ba89c;
+}
+
+.admin-theme {
+    background: var(--admin-bg);
+    color: var(--admin-main);
+    min-height: 100vh;
+}
+
+/* Admin card/panel style (replaces undefined "glass") */
+.admin-theme .admin-card {
+    background: var(--admin-surface);
+    border: 1px solid var(--admin-border);
+    border-radius: 0.75rem;
+}
+
 @theme inline {
     --color-background: var(--background);
     --color-foreground: var(--foreground);
+    --color-main: var(--admin-main, #171717);
+    --color-sub: var(--admin-sub, #525252);
+    --color-surface: var(--admin-surface, #f4f4f5);
+    --color-base: var(--admin-base, #fafafa);
+    --color-border-soft: var(--admin-border, #e4e4e7);
+    --color-accent: var(--admin-accent, #0d9488);
     --font-sans: var(--font-geist-sans);
     --font-mono: var(--font-geist-mono);
 }

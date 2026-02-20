@@ -50,5 +50,5 @@ productSchema.index({ availability: 1 });
 // Wildcard index for dynamic specs used in faceted filters
 productSchema.index({ 'specs.$**': 1 });
 
-const Product = mongoose.model('Product', productSchema);
+const Product = mongoose.models.Product ?? mongoose.model('Product', productSchema);
 export default Product;

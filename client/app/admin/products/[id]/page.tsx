@@ -13,11 +13,29 @@ interface Brand {
 interface Category {
     _id: string;
     name: string;
+    slug?: string;
 }
 
 interface Attribute {
     name: string;
     value: string;
+}
+
+interface FilterSpec {
+    key: string;
+    value: string;
+}
+
+/** Match server normalizeSpecKey so stored keys align with shop filter facet keys */
+function normalizeSpecKey(key: string): string {
+    if (!key) return "";
+    return key
+        .replace(/[_\-\/\\]+/g, " ")
+        .trim()
+        .replace(/\s+/g, " ")
+        .split(" ")
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+        .join("_");
 }
 
 export default function ProductFormPage({ params }: { params: Promise<{ id: string }> }) {
@@ -35,11 +53,14 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
         brandId: "",
         categoryIds: [] as string[],
         attributes: [] as Attribute[],
+        filterSpecs: [] as FilterSpec[],
         isActive: true
     });
 
     const [brands, setBrands] = useState<Brand[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
+    const [featuredSpecKeys, setFeaturedSpecKeys] = useState<string[]>([]);
+    const [featuredSpecsLoading, setFeaturedSpecsLoading] = useState(false);
     const [loading, setLoading] = useState(false);
     const [initialLoading, setInitialLoading] = useState(true);
 
@@ -68,6 +89,10 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                 const res = await fetch(`/api/v1/products/id/${id}`);
                 if (res.ok) {
                     const data = await res.json();
+                    const specsObj = data.specs;
+                    const filterSpecs: FilterSpec[] = specsObj && typeof specsObj === 'object' && !Array.isArray(specsObj)
+                        ? Object.entries(specsObj).map(([k, v]) => ({ key: normalizeSpecKey(k), value: String(v) }))
+                        : [];
                     setFormData({
                         title: data.title,
                         price: data.price,
@@ -82,6 +107,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                             value: a.value,
                             filterable: a.filterable ?? false
                         })),
+                        filterSpecs,
                         isActive: data.isActive
                     });
                 }
@@ -92,14 +118,45 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
         fetchProduct();
     }, [id, isNew]);
 
+    // Fetch featured spec keys for the selected category (only these show in Filter Specs)
+    useEffect(() => {
+        const categoryId = formData.categoryIds[0];
+        if (!categoryId) {
+            setFeaturedSpecKeys([]);
+            return;
+        }
+        const category = categories.find(c => c._id === categoryId);
+        const slug = category?.slug ?? (category as { slug?: string })?.slug;
+        if (!slug) {
+            setFeaturedSpecKeys([]);
+            return;
+        }
+        setFeaturedSpecsLoading(true);
+        const token = JSON.parse(localStorage.getItem('userInfo') || '{}').token;
+        fetch(`/api/v1/admin/categories/${encodeURIComponent(slug)}/featured-specs`, {
+            headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+        })
+            .then(res => res.ok ? res.json() : { featuredSpecKeys: [] })
+            .then((data: { featuredSpecKeys?: string[] }) => setFeaturedSpecKeys(data.featuredSpecKeys || []))
+            .catch(() => setFeaturedSpecKeys([]))
+            .finally(() => setFeaturedSpecsLoading(false));
+    }, [formData.categoryIds[0], categories]);
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
         try {
+            const specsRecord: Record<string, string> = {};
+            formData.filterSpecs.forEach(({ key, value }) => {
+                const k = key.trim();
+                if (k && featuredSpecKeys.includes(k)) specsRecord[k] = value.trim();
+            });
+            const { filterSpecs: _omit, ...rest } = formData;
             const payload = {
-                ...formData,
+                ...rest,
                 price: parseFloat(formData.price),
                 stock: { qty: parseInt(formData.stock) },
+                specs: Object.keys(specsRecord).length ? specsRecord : undefined,
             };
 
             const url = isNew
@@ -144,6 +201,19 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
 
     const removeAttribute = (index: number) => {
         setFormData({ ...formData, attributes: formData.attributes.filter((_, i) => i !== index) });
+    };
+
+    const getFilterSpecValue = (specKey: string) =>
+        formData.filterSpecs.find(s => s.key === specKey)?.value ?? "";
+
+    const updateFilterSpecValue = (specKey: string, value: string) => {
+        const next = formData.filterSpecs.filter(s => s.key !== specKey);
+        if (value.trim()) next.push({ key: specKey, value: value.trim() });
+        setFormData({ ...formData, filterSpecs: next });
+    };
+
+    const removeFilterSpecByKey = (specKey: string) => {
+        setFormData({ ...formData, filterSpecs: formData.filterSpecs.filter(s => s.key !== specKey) });
     };
 
     const handleAddBrand = async () => {
@@ -242,83 +312,79 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
         }
     };
 
-    if (initialLoading && !isNew) return <div className="p-10 text-center text-white">Loading...</div>;
+    if (initialLoading && !isNew) return <div className="p-10 text-center text-main">Loading...</div>;
 
     return (
         <div className="max-w-4xl mx-auto px-4 py-12">
             <div className="flex items-center gap-4 mb-8">
-                <Link href="/admin/products" className="p-2 glass rounded-lg hover:bg-white/10 text-white transition-colors">
+                <Link href="/admin/products" className="p-2 admin-card rounded-lg hover:bg-base text-main transition-colors">
                     <ArrowLeft className="h-5 w-5" />
                 </Link>
-                <h1 className="text-3xl font-bold text-white">{isNew ? 'New Product' : 'Edit Product'}</h1>
+                <h1 className="text-3xl font-bold text-main">{isNew ? 'New Product' : 'Edit Product'}</h1>
             </div>
 
-            <form onSubmit={handleSubmit} className="glass rounded-xl p-8 space-y-6">
+            <form onSubmit={handleSubmit} className="admin-card rounded-xl p-8 space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
-                        <label className="text-gray-400 text-sm">Product Title</label>
+                        <label className="text-sub text-sm">Product Title</label>
                         <input
                             type="text"
                             required
-                            className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
+                            className="w-full bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent"
                             value={formData.title}
                             onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                         />
                     </div>
-
                     <div className="space-y-2">
-                        <label className="text-gray-400 text-sm">SKU</label>
+                        <label className="text-sub text-sm">SKU</label>
                         <input
                             type="text"
                             required
-                            className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
+                            className="w-full bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent"
                             value={formData.sku}
                             onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
                         />
                     </div>
-
                     <div className="space-y-2">
-                        <label className="text-gray-400 text-sm">Slug (Optional/Auto)</label>
+                        <label className="text-sub text-sm">Slug (Optional/Auto)</label>
                         <input
                             type="text"
-                            className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
+                            className="w-full bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent"
                             value={formData.slug}
                             onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
                         />
                     </div>
-
                     <div className="space-y-2">
-                        <label className="text-gray-400 text-sm">Price (LKR)</label>
+                        <label className="text-sub text-sm">Price (LKR)</label>
                         <input
                             type="number"
                             required
-                            className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
+                            className="w-full bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent"
                             value={formData.price}
                             onChange={(e) => setFormData({ ...formData, price: e.target.value })}
                         />
                     </div>
-
                     <div className="space-y-2">
-                        <label className="text-gray-400 text-sm">Stock Quantity</label>
+                        <label className="text-sub text-sm">Stock Quantity</label>
                         <input
                             type="number"
                             required
-                            className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
+                            className="w-full bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent"
                             value={formData.stock}
                             onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
                         />
                     </div>
 
                     <div className="space-y-2">
-                        <label className="text-gray-400 text-sm flex justify-between">
+                        <label className="text-sub text-sm flex justify-between">
                             Brand
                             <div className="space-x-2">
-                                <button type="button" onClick={handleEditBrand} title="Edit Brand" className="text-gray-500 hover:text-white"><Edit2 className="w-4 h-4 inline" /></button>
+                                <button type="button" onClick={handleEditBrand} title="Edit Brand" className="text-sub hover:text-main"><Edit2 className="w-4 h-4 inline" /></button>
                                 <button type="button" onClick={handleAddBrand} title="Add Brand" className="text-blue-500 hover:text-blue-400"><Plus className="w-4 h-4 inline" /></button>
                             </div>
                         </label>
                         <select
-                            className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500 [&>option]:text-black"
+                            className="w-full bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent [&>option]:text-black"
                             value={formData.brandId}
                             onChange={(e) => setFormData({ ...formData, brandId: e.target.value })}
                         >
@@ -330,15 +396,15 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                     </div>
 
                     <div className="space-y-2">
-                        <label className="text-gray-400 text-sm flex justify-between">
+                        <label className="text-sub text-sm flex justify-between">
                             Category
                             <div className="space-x-2">
-                                <button type="button" onClick={handleEditCategory} title="Edit Category" className="text-gray-500 hover:text-white"><Edit2 className="w-4 h-4 inline" /></button>
+                                <button type="button" onClick={handleEditCategory} title="Edit Category" className="text-sub hover:text-main"><Edit2 className="w-4 h-4 inline" /></button>
                                 <button type="button" onClick={handleAddCategory} title="Add Category" className="text-blue-500 hover:text-blue-400"><Plus className="w-4 h-4 inline" /></button>
                             </div>
                         </label>
                         <select
-                            className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500 [&>option]:text-black"
+                            className="w-full bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent [&>option]:text-black"
                             value={formData.categoryIds[0] || ""}
                             onChange={(e) => setFormData({ ...formData, categoryIds: [e.target.value] })}
                         >
@@ -351,24 +417,78 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                 </div>
 
                 <div className="space-y-2">
-                    <label className="text-gray-400 text-sm">Description</label>
+                    <label className="text-sub text-sm">Description</label>
                     <textarea
-                        className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500 h-32"
+                        className="w-full bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent h-32"
                         value={formData.description}
                         onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                     ></textarea>
                 </div>
 
+                {/* Filter Specs — only featured spec keys for the selected category */}
+                <div className="border-t border-border-soft pt-6">
+                    <div className="mb-4">
+                        <h2 className="text-xl font-bold text-main">Filter Specs</h2>
+                        <p className="text-sub text-sm mt-0.5">Only the category’s featured specs are shown. Set values to appear in shop filters.</p>
+                    </div>
+
+                    {featuredSpecsLoading && (
+                        <p className="text-sub text-sm italic">Loading featured specs for category…</p>
+                    )}
+                    {!featuredSpecsLoading && !formData.categoryIds[0] && (
+                        <p className="text-sub text-sm italic">Select a category to see filter specs.</p>
+                    )}
+                    {!featuredSpecsLoading && formData.categoryIds[0] && featuredSpecKeys.length === 0 && (
+                        <p className="text-sub text-sm italic">No featured specs for this category. Configure them under Admin → Categories → Featured Specs.</p>
+                    )}
+                    {!featuredSpecsLoading && featuredSpecKeys.length > 0 && (
+                        <>
+                            <div className="flex gap-4 mb-2 px-1">
+                                <span className="flex-1 text-xs text-sub uppercase tracking-wider">Key</span>
+                                <span className="flex-1 text-xs text-sub uppercase tracking-wider">Value</span>
+                                <span className="w-8" />
+                            </div>
+                            <div className="space-y-3">
+                                {featuredSpecKeys.map((specKey) => (
+                                    <div key={specKey} className="flex gap-4 items-center">
+                                        <input
+                                            type="text"
+                                            readOnly
+                                            className="flex-1 bg-base border border-border-soft rounded-lg px-4 py-2 text-sub cursor-default"
+                                            value={specKey}
+                                        />
+                                        <input
+                                            type="text"
+                                            placeholder="Value"
+                                            className="flex-1 bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent"
+                                            value={getFilterSpecValue(specKey)}
+                                            onChange={(e) => updateFilterSpecValue(specKey, e.target.value)}
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => removeFilterSpecByKey(specKey)}
+                                            className="p-2 text-red-400 hover:bg-red-400/10 rounded"
+                                            title="Clear value"
+                                        >
+                                            <Trash2 className="h-5 w-5" />
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        </>
+                    )}
+                </div>
+
                 {/* Properties / Attributes */}
-                <div className="border-t border-white/10 pt-6">
+                <div className="border-t border-border-soft pt-6">
                     <div className="flex justify-between items-center mb-4">
                         <div>
-                            <h2 className="text-xl font-bold text-white">Properties / Attributes</h2>
+                            <h2 className="text-xl font-bold text-main">Properties / Attributes</h2>
                         </div>
                         <button
                             type="button"
                             onClick={addAttribute}
-                            className="text-sm bg-blue-600/20 text-blue-400 px-3 py-1 rounded hover:bg-blue-600/30 transition-colors"
+                            className="text-sm bg-accent/20 text-accent px-3 py-1 rounded hover:bg-accent/30 transition-colors"
                         >
                             + Add Property
                         </button>
@@ -376,8 +496,8 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
 
                     {formData.attributes.length > 0 && (
                         <div className="flex gap-4 mb-2 px-1">
-                            <span className="flex-1 text-xs text-gray-500 uppercase tracking-wider">Name</span>
-                            <span className="flex-1 text-xs text-gray-500 uppercase tracking-wider">Value</span>
+                            <span className="flex-1 text-xs text-sub uppercase tracking-wider">Name</span>
+                            <span className="flex-1 text-xs text-sub uppercase tracking-wider">Value</span>
                             <span className="w-8" />
                         </div>
                     )}
@@ -388,14 +508,14 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                                 <input
                                     type="text"
                                     placeholder="Name (e.g. Color)"
-                                    className="flex-1 bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
+                                    className="flex-1 bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent"
                                     value={attr.name}
                                     onChange={(e) => updateAttribute(index, 'name', e.target.value)}
                                 />
                                 <input
                                     type="text"
                                     placeholder="Value (e.g. Red)"
-                                    className="flex-1 bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
+                                    className="flex-1 bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent"
                                     value={attr.value}
                                     onChange={(e) => updateAttribute(index, 'value', e.target.value)}
                                 />
@@ -409,12 +529,12 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                             </div>
                         ))}
                         {formData.attributes.length === 0 && (
-                            <p className="text-gray-500 text-sm italic">No properties added.</p>
+                            <p className="text-sub text-sm italic">No properties added.</p>
                         )}
                     </div>
                 </div>
 
-                <div className="flex items-center gap-2 pt-4 border-t border-white/10">
+                <div className="flex items-center gap-2 pt-4 border-t border-border-soft">
                     <input
                         type="checkbox"
                         id="isActive"
@@ -422,14 +542,14 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                         onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
                         className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                     />
-                    <label htmlFor="isActive" className="text-white">Active Product</label>
+                    <label htmlFor="isActive" className="text-main">Active Product</label>
                 </div>
 
                 <div className="flex justify-end pt-4">
                     <button
                         type="submit"
                         disabled={loading}
-                        className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg flex items-center gap-2 transition-colors disabled:opacity-50"
+                        className="bg-accent hover:bg-accent/90 text-white px-6 py-2 rounded-lg flex items-center gap-2 transition-colors disabled:opacity-50"
                     >
                         <Save className="h-5 w-5" />
                         {loading ? 'Saving...' : 'Save Product'}

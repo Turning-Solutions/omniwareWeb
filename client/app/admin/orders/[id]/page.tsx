@@ -86,28 +86,28 @@ export default function AdminOrderDetailsPage({ params }: PageProps) {
         }
     };
 
-    if (loading) return <div className="text-center py-20 text-white">Loading Order...</div>;
-    if (!order) return <div className="text-center py-20 text-red-500">Order not found</div>;
+    if (loading) return <div className="text-center py-20 text-main">Loading Order...</div>;
+    if (!order) return <div className="text-center py-20 text-red-400">Order not found</div>;
 
     return (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
             <div className="mb-8">
-                <Link href="/admin/orders" className="text-gray-400 hover:text-white flex items-center gap-2 mb-4 transition-colors">
+                <Link href="/admin/orders" className="text-sub hover:text-main flex items-center gap-2 mb-4 transition-colors">
                     <ArrowLeft className="h-4 w-4" /> Back to Orders
                 </Link>
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <h1 className="text-3xl font-bold text-white flex items-center gap-4">
+                    <h1 className="text-3xl font-bold text-main flex items-center gap-4">
                         Order #{order._id.substring(order._id.length - 6)}
-                        <span className="text-lg font-normal text-gray-500 font-mono">({order._id})</span>
+                        <span className="text-lg font-normal text-sub font-mono">({order._id})</span>
                     </h1>
                     <div className="flex items-center gap-2">
-                        <div className="bg-white/5 border border-white/10 rounded-lg px-2">
-                            <span className="text-sm text-gray-400 mr-2">Status:</span>
+                        <div className="admin-card rounded-lg px-2">
+                            <span className="text-sm text-sub mr-2">Status:</span>
                             <select
                                 value={order.status}
                                 onChange={(e) => updateStatus(e.target.value)}
                                 disabled={updating}
-                                className="bg-transparent text-white font-medium py-2 focus:outline-none [&>option]:text-black"
+                                className="bg-transparent text-main font-medium py-2 focus:outline-none [&>option]:text-black"
                             >
                                 <option value="pending">Pending</option>
                                 <option value="paid">Paid</option>
@@ -125,21 +125,21 @@ export default function AdminOrderDetailsPage({ params }: PageProps) {
                 {/* Main Content */}
                 <div className="lg:col-span-2 space-y-8">
                     {/* Items */}
-                    <div className="glass rounded-xl p-6">
-                        <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-                            <Package className="h-5 w-5 text-blue-400" /> Order Items
+                    <div className="admin-card rounded-xl p-6">
+                        <h2 className="text-xl font-bold text-main mb-6 flex items-center gap-2">
+                            <Package className="h-5 w-5 text-accent" /> Order Items
                         </h2>
                         <div className="space-y-4">
                             {order.orderItems.map((item, idx) => (
-                                <div key={idx} className="flex items-center gap-4 py-4 border-b border-white/5 last:border-0">
-                                    <div className="h-16 w-16 bg-white/5 rounded-lg overflow-hidden flex-shrink-0">
+                                <div key={idx} className="flex items-center gap-4 py-4 border-b border-border-soft last:border-0">
+                                    <div className="h-16 w-16 bg-base rounded-lg overflow-hidden flex-shrink-0">
                                         <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
                                     </div>
                                     <div className="flex-1">
-                                        <h3 className="text-white font-medium">{item.name}</h3>
-                                        <p className="text-gray-400 text-sm">Qty: {item.qty} × LKR {item.price.toLocaleString()}</p>
+                                        <h3 className="text-main font-medium">{item.name}</h3>
+                                        <p className="text-sub text-sm">Qty: {item.qty} × LKR {item.price.toLocaleString()}</p>
                                     </div>
-                                    <div className="text-white font-medium">
+                                    <div className="text-main font-medium">
                                         LKR {(item.qty * item.price).toLocaleString()}
                                     </div>
                                 </div>
@@ -147,23 +147,22 @@ export default function AdminOrderDetailsPage({ params }: PageProps) {
                         </div>
                     </div>
 
-                    {/* Summary */}
-                    <div className="glass rounded-xl p-6">
-                        <h2 className="text-xl font-bold text-white mb-6">Payment Summary</h2>
+                    <div className="admin-card rounded-xl p-6">
+                        <h2 className="text-xl font-bold text-main mb-6">Payment Summary</h2>
                         <div className="space-y-3 text-sm">
-                            <div className="flex justify-between text-gray-300">
+                            <div className="flex justify-between text-sub">
                                 <span>Subtotal</span>
                                 <span>LKR {order.itemsPrice.toLocaleString()}</span>
                             </div>
-                            <div className="flex justify-between text-gray-300">
+                            <div className="flex justify-between text-sub">
                                 <span>Shipping</span>
                                 <span>LKR {order.shippingPrice.toLocaleString()}</span>
                             </div>
-                            <div className="flex justify-between text-gray-300">
+                            <div className="flex justify-between text-sub">
                                 <span>Tax</span>
                                 <span>LKR {order.taxPrice.toLocaleString()}</span>
                             </div>
-                            <div className="pt-3 border-t border-white/10 flex justify-between text-white font-bold text-lg">
+                            <div className="pt-3 border-t border-border-soft flex justify-between text-main font-bold text-lg">
                                 <span>Total</span>
                                 <span>LKR {order.totalPrice.toLocaleString()}</span>
                             </div>
@@ -171,39 +170,36 @@ export default function AdminOrderDetailsPage({ params }: PageProps) {
                     </div>
                 </div>
 
-                {/* Sidebar */}
                 <div className="space-y-8">
-                    {/* Customer */}
-                    <div className="glass rounded-xl p-6">
-                        <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-                            <User className="h-5 w-5 text-purple-400" /> Customer
+                    <div className="admin-card rounded-xl p-6">
+                        <h2 className="text-xl font-bold text-main mb-6 flex items-center gap-2">
+                            <User className="h-5 w-5 text-accent" /> Customer
                         </h2>
                         <div className="space-y-3">
                             <div className="flex flex-col">
-                                <span className="text-xs text-gray-500 uppercase">Name</span>
-                                <span className="text-white">{order.user?.name || 'Unknown'}</span>
+                                <span className="text-xs text-sub uppercase">Name</span>
+                                <span className="text-main">{order.user?.name || 'Unknown'}</span>
                             </div>
                             <div className="flex flex-col">
-                                <span className="text-xs text-gray-500 uppercase">Email</span>
-                                <span className="text-white">{order.user?.email || 'N/A'}</span>
+                                <span className="text-xs text-sub uppercase">Email</span>
+                                <span className="text-main">{order.user?.email || 'N/A'}</span>
                             </div>
                         </div>
                     </div>
 
-                    {/* Shipping */}
-                    <div className="glass rounded-xl p-6">
-                        <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-                            <MapPin className="h-5 w-5 text-red-400" /> Shipping
+                    <div className="admin-card rounded-xl p-6">
+                        <h2 className="text-xl font-bold text-main mb-6 flex items-center gap-2">
+                            <MapPin className="h-5 w-5 text-accent" /> Shipping
                         </h2>
-                        <div className="space-y-1 text-sm text-gray-300">
+                        <div className="space-y-1 text-sm text-sub">
                             <p>{order.shippingAddress.address}</p>
                             <p>{order.shippingAddress.city}, {order.shippingAddress.postalCode}</p>
                             <p>{order.shippingAddress.country}</p>
                         </div>
-                        <div className="mt-4 pt-4 border-t border-white/10">
+                        <div className="mt-4 pt-4 border-t border-border-soft">
                             <div className="flex items-center gap-2 text-sm">
-                                <span className={`w-2 h-2 rounded-full ${order.isDelivered ? 'bg-green-500' : 'bg-gray-500'}`} />
-                                <span className="text-gray-300">
+                                <span className={`w-2 h-2 rounded-full ${order.isDelivered ? 'bg-accent' : 'bg-sub'}`} />
+                                <span className="text-sub">
                                     {order.isDelivered
                                         ? `Delivered on ${new Date(order.deliveredAt!).toLocaleDateString()}`
                                         : 'Not Delivered'}
@@ -212,19 +208,18 @@ export default function AdminOrderDetailsPage({ params }: PageProps) {
                         </div>
                     </div>
 
-                    {/* Payment Info */}
-                    <div className="glass rounded-xl p-6">
-                        <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-                            <CreditCard className="h-5 w-5 text-green-400" /> Payment
+                    <div className="admin-card rounded-xl p-6">
+                        <h2 className="text-xl font-bold text-main mb-6 flex items-center gap-2">
+                            <CreditCard className="h-5 w-5 text-accent" /> Payment
                         </h2>
                         <div className="space-y-3">
                             <div className="flex flex-col">
-                                <span className="text-xs text-gray-500 uppercase">Method</span>
-                                <span className="text-white capitalize">{order.paymentMethod}</span>
+                                <span className="text-xs text-sub uppercase">Method</span>
+                                <span className="text-main capitalize">{order.paymentMethod}</span>
                             </div>
                             <div className="flex items-center gap-2 text-sm mt-2">
-                                <span className={`w-2 h-2 rounded-full ${order.isPaid ? 'bg-green-500' : 'bg-red-500'}`} />
-                                <span className="text-gray-300">
+                                <span className={`w-2 h-2 rounded-full ${order.isPaid ? 'bg-accent' : 'bg-red-400'}`} />
+                                <span className="text-sub">
                                     {order.isPaid
                                         ? `Paid on ${new Date(order.paidAt!).toLocaleDateString()}`
                                         : 'Not Paid'}
@@ -233,9 +228,8 @@ export default function AdminOrderDetailsPage({ params }: PageProps) {
                         </div>
                     </div>
 
-                    {/* Meta */}
-                    <div className="glass rounded-xl p-6">
-                        <div className="flex items-center gap-2 text-gray-400 text-sm">
+                    <div className="admin-card rounded-xl p-6">
+                        <div className="flex items-center gap-2 text-sub text-sm">
                             <Calendar className="h-4 w-4" />
                             Created: {new Date(order.createdAt).toLocaleString()}
                         </div>

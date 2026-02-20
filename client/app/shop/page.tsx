@@ -122,7 +122,7 @@ export function ShopContent({ basePath = "/shop", initialFilters = {} }: ShopCon
 
 export default function ShopPage() {
     return (
-        <div className="min-h-screen bg-base pt-20 pb-12">
+        <div className="min-h-screen bg-black pt-20 pb-12">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <h1 className="text-3xl font-bold text-white mb-8">Shop All Products</h1>
                 <Suspense fallback={<div className="text-main text-center pt-20">Loading Shop...</div>}>

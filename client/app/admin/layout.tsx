@@ -8,7 +8,7 @@ export default function AdminLayout({
     children: React.ReactNode;
 }) {
     return (
-        <div className="flex min-h-screen bg-background">
+        <div className="admin-theme flex min-h-screen bg-background">
             {/* Sidebar */}
             <aside className="w-64 bg-surface border-r border-border-soft hidden lg:block">
                 <div className="p-6">
