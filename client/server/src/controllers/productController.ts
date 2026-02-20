@@ -20,8 +20,9 @@ export const getProducts = async (req: Request, res: Response) => {
         const pageNum = Math.max(Number(page) || 1, 1);
         const skip = (pageNum - 1) * limitNum;
 
-        // Lightweight path: no filters + small limit (e.g. homepage featured) — skip heavy facets
-        if (!hasFilters(req) && limitNum <= 20) {
+        // Lightweight path: no filters + small limit (e.g. homepage featured only) — skip facets.
+        // Shop page uses limit 20 and needs facets for the filter sidebar, so only use when limit <= 8.
+        if (!hasFilters(req) && limitNum <= 8) {
             const sortStage: any = sort === 'price_asc' ? { price: 1 } : sort === 'price_desc' ? { price: -1 } : { createdAt: -1 };
             const [products, total] = await Promise.all([
                 Product.aggregate([
