@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400" fill="none">
+  <rect width="400" height="400" fill="#1f2937"/>
+  <path d="M160 140h80v80h-80z" stroke="#4b5563" stroke-width="2" fill="none"/>
+  <path d="M120 200l40-40 40 40 40-60 40 80" stroke="#4b5563" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="200" y="280" text-anchor="middle" fill="#6b7280" font-family="system-ui,sans-serif" font-size="14">No image</text>
+</svg>

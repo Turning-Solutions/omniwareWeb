@@ -9,7 +9,7 @@ export default function ProductCard({ product }: { product: Product }) {
         <div className="group relative bg-white/5 rounded-xl overflow-hidden hover:bg-white/10 transition-colors border border-white/5 hover:border-white/10">
             <div className="aspect-square relative overflow-hidden bg-white/5">
                 <img
-                    src={product.images[0] || "/placeholder.png"}
+                    src={product.images?.[0] || "/placeholder.svg"}
                     alt={product.title}
                     className="object-cover w-full h-full group-hover:scale-110 transition-transform duration-300"
                 />
