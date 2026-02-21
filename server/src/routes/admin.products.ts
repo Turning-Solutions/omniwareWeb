@@ -59,6 +59,9 @@ function normalizeProductBody(body: Record<string, unknown>): Record<string, unk
     if (b.sku === '' || (typeof b.sku === 'string' && !b.sku.trim())) {
         delete b.sku;
     }
+    if (b.slug === '' || (typeof b.slug === 'string' && !b.slug.trim())) {
+        delete b.slug;
+    }
     return b;
 }
 
