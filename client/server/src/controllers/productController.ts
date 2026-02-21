@@ -320,11 +320,21 @@ export const getProductFacets = async (req: Request, res: Response) => {
     }
 };
 
+function isValidObjectIdString(s: string): boolean {
+    return /^[a-fA-F0-9]{24}$/.test(s);
+}
+
 export const getProductBySlug = async (req: Request, res: Response) => {
     try {
-        const product = await Product.findOne({ slug: req.params.slug, isActive: true })
-            .populate('brandId', 'name slug logoUrl')
-            .populate('categoryIds', 'name slug');
+        const slugOrId = req.params.slug;
+        const byId = isValidObjectIdString(slugOrId);
+        const product = byId
+            ? await Product.findOne({ _id: slugOrId, isActive: true })
+                .populate('brandId', 'name slug logoUrl')
+                .populate('categoryIds', 'name slug')
+            : await Product.findOne({ slug: slugOrId, isActive: true })
+                .populate('brandId', 'name slug logoUrl')
+                .populate('categoryIds', 'name slug');
 
         if (product) {
             res.json(product);
