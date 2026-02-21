@@ -2,7 +2,7 @@
 
 import { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
-import { Save, ArrowLeft, Trash2, Edit2, Plus, ChevronUp, ChevronDown } from "lucide-react";
+import { Save, ArrowLeft, Trash2, Edit2, Plus, ChevronUp, ChevronDown, ImagePlus, Upload, Loader2 } from "lucide-react";
 import Link from "next/link";
 
 interface Brand {
@@ -54,6 +54,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
         categoryIds: [] as string[],
         attributes: [] as Attribute[],
         filterSpecs: [] as FilterSpec[],
+        images: [] as string[],
         isActive: true
     });
 
@@ -63,6 +64,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
     const [featuredSpecsLoading, setFeaturedSpecsLoading] = useState(false);
     const [loading, setLoading] = useState(false);
     const [initialLoading, setInitialLoading] = useState(true);
+    const [imageUploading, setImageUploading] = useState<string | number | null>(null); // 'add' or index when replacing
 
     useEffect(() => {
         const fetchData = async () => {
@@ -108,6 +110,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                             filterable: a.filterable ?? false
                         })),
                         filterSpecs,
+                        images: Array.isArray(data.images) ? data.images : [],
                         isActive: data.isActive
                     });
                 }
@@ -215,6 +218,106 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
         const newAttrs = [...formData.attributes];
         [newAttrs[index], newAttrs[index + 1]] = [newAttrs[index + 1], newAttrs[index]];
         setFormData({ ...formData, attributes: newAttrs });
+    };
+
+    const getUploadAuthHeaders = (): Record<string, string> => {
+        try {
+            const token = JSON.parse(localStorage.getItem("userInfo") || "{}").token;
+            if (token) return { Authorization: `Bearer ${token}` };
+        } catch {
+            // ignore
+        }
+        return {};
+    };
+
+    const uploadImage = async (file: File): Promise<{ url: string }> => {
+        const formDataUpload = new FormData();
+        formDataUpload.append("image", file);
+        const headers = getUploadAuthHeaders();
+        const res = await fetch("/api/v1/admin/upload/image", {
+            method: "POST",
+            headers,
+            body: formDataUpload,
+            credentials: "include",
+        });
+        if (res.status === 401) {
+            throw new Error("Please log in to upload images. Go to Login and sign in as admin.");
+        }
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({ message: res.statusText }));
+            throw new Error(err.message || "Upload failed");
+        }
+        return res.json();
+    };
+
+    const deleteImageFromCloud = async (url: string): Promise<void> => {
+        const res = await fetch("/api/v1/admin/upload/delete-image", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", ...getUploadAuthHeaders() },
+            body: JSON.stringify({ url }),
+            credentials: "include",
+        });
+        if (res.status === 401) {
+            throw new Error("Please log in to delete images.");
+        }
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({ message: res.statusText }));
+            throw new Error(err.message || "Delete failed");
+        }
+    };
+
+    const handleAddImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        e.target.value = "";
+        setImageUploading("add");
+        try {
+            const { url } = await uploadImage(file);
+            setFormData((prev) => ({ ...prev, images: [...prev.images, url] }));
+        } catch (err) {
+            alert((err as Error).message);
+        } finally {
+            setImageUploading(null);
+        }
+    };
+
+    const handleRemoveImage = async (index: number) => {
+        const url = formData.images[index];
+        if (!url) return;
+        const isCloudinary = url.includes("cloudinary.com");
+        if (isCloudinary) {
+            try {
+                await deleteImageFromCloud(url);
+            } catch (err) {
+                alert((err as Error).message);
+                return;
+            }
+        }
+        setFormData((prev) => ({
+            ...prev,
+            images: prev.images.filter((_, i) => i !== index),
+        }));
+    };
+
+    const handleReplaceImage = async (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        e.target.value = "";
+        const oldUrl = formData.images[index];
+        const isCloudinary = oldUrl?.includes("cloudinary.com");
+        setImageUploading(index);
+        try {
+            if (isCloudinary && oldUrl) await deleteImageFromCloud(oldUrl);
+            const { url } = await uploadImage(file);
+            setFormData((prev) => ({
+                ...prev,
+                images: prev.images.map((u, i) => (i === index ? url : u)),
+            }));
+        } catch (err) {
+            alert((err as Error).message);
+        } finally {
+            setImageUploading(null);
+        }
     };
 
     const getFilterSpecValue = (specKey: string) =>
@@ -437,6 +540,59 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                         value={formData.description}
                         onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                     ></textarea>
+                </div>
+
+                {/* Product images (Cloudinary) */}
+                <div className="border-t border-border-soft pt-6">
+                    <h2 className="text-xl font-bold text-main mb-2">Product images</h2>
+                    <p className="text-sub text-sm mb-4">Upload images to Cloudinary. You can delete or replace any image.</p>
+                    <div className="flex flex-wrap gap-4">
+                        {formData.images.map((url, index) => (
+                            <div key={index} className="relative group">
+                                <div className="w-28 h-28 rounded-lg border border-border-soft bg-base overflow-hidden flex items-center justify-center">
+                                    {imageUploading === index ? (
+                                        <Loader2 className="w-8 h-8 text-accent animate-spin" />
+                                    ) : (
+                                        <img src={url} alt="" className="w-full h-full object-cover" />
+                                    )}
+                                </div>
+                                <div className="absolute inset-0 rounded-lg bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center gap-1 transition-opacity">
+                                    <label className="cursor-pointer p-1.5 rounded bg-white/20 hover:bg-white/30 text-white" title="Replace">
+                                        <Upload className="w-4 h-4" />
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            className="hidden"
+                                            onChange={(e) => handleReplaceImage(index, e)}
+                                            disabled={imageUploading !== null}
+                                        />
+                                    </label>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleRemoveImage(index)}
+                                        className="p-1.5 rounded bg-red-500/80 hover:bg-red-500 text-white"
+                                        title="Delete"
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                        <label className="w-28 h-28 rounded-lg border-2 border-dashed border-border-soft bg-base flex items-center justify-center cursor-pointer hover:border-accent hover:bg-accent/5 transition-colors">
+                            {imageUploading === "add" ? (
+                                <Loader2 className="w-8 h-8 text-accent animate-spin" />
+                            ) : (
+                                <ImagePlus className="w-8 h-8 text-sub" />
+                            )}
+                            <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={handleAddImage}
+                                disabled={imageUploading !== null}
+                            />
+                        </label>
+                    </div>
                 </div>
 
                 {/* Filter Specs — only featured spec keys for the selected category */}

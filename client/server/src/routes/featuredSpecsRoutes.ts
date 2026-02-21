@@ -1,4 +1,6 @@
 import express from 'express';
+import { requireAuth } from '../middleware/requireAuth';
+import { requireAdmin } from '../middleware/requireAdmin';
 import {
     getAvailableSpecKeys,
     getFeaturedSpecs,
@@ -7,6 +9,8 @@ import {
 } from '../controllers/featuredSpecsController';
 
 const router = express.Router({ mergeParams: true });
+
+router.use(requireAuth, requireAdmin);
 
 router.get('/:categoryKey/spec-keys', getAvailableSpecKeys);
 router.get('/:categoryKey/featured-specs', getFeaturedSpecs);

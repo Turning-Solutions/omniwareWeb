@@ -1,6 +1,7 @@
-import React from 'react';
-import Link from 'next/link';
-import { LayoutDashboard, ShoppingBag, Package, Settings, Filter } from 'lucide-react';
+import React from "react";
+import Link from "next/link";
+import { LayoutDashboard, ShoppingBag, Package, Settings, Filter } from "lucide-react";
+import AdminAuthGuard from "@/components/AdminAuthGuard";
 
 export default function AdminLayout({
     children,
@@ -8,6 +9,7 @@ export default function AdminLayout({
     children: React.ReactNode;
 }) {
     return (
+        <AdminAuthGuard>
         <div className="admin-theme flex min-h-screen bg-background">
             {/* Sidebar */}
             <aside className="w-64 bg-surface border-r border-border-soft hidden lg:block">
@@ -43,5 +45,6 @@ export default function AdminLayout({
                 {children}
             </main>
         </div>
+        </AdminAuthGuard>
     );
 }

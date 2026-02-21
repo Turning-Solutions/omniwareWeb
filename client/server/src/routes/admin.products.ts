@@ -10,7 +10,7 @@ import { buildProductMatchStage } from '../utils/productAggregation';
 
 const router = express.Router();
 
-// router.use(requireAuth, requireAdmin, adminRateLimit);
+router.use(requireAuth, requireAdmin, adminRateLimit);
 
 // GET /api/v1/admin/products
 router.get('/', async (req: Request, res: Response) => {

@@ -9,6 +9,7 @@ import builderRoutes from './routes/builderRoutes';
 import adminProductRoutes from './routes/admin.products';
 import analyticsRoutes from './routes/analyticsRoutes';
 import featuredSpecsRoutes from './routes/featuredSpecsRoutes';
+import uploadRoutes from './routes/uploadRoutes';
 import { errorHandler } from './middleware/errorMiddleware';
 import { requestIdMiddleware } from './middleware/requestId';
 
@@ -44,6 +45,7 @@ function createApp() {
     app.use('/api/v1/orders', orderRoutes);
     app.use('/api/v1/admin/products', adminProductRoutes);
     app.use('/api/v1/admin/categories', featuredSpecsRoutes);
+    app.use('/api/v1/admin/upload', uploadRoutes);
     app.use('/api/v1/admin', adminRoutes);
     app.use('/api/v1/builder', builderRoutes);
     app.use('/api/v1/analytics', analyticsRoutes);
