@@ -7,7 +7,8 @@ import api from "@/lib/api";
 export default function LoginPage() {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const redirectTo = searchParams.get("redirect")?.startsWith("/") ? searchParams.get("redirect") : null;
+    const redirect = searchParams?.get("redirect") ?? null;
+    const redirectTo = redirect?.startsWith("/") ? redirect : null;
     const [formData, setFormData] = useState({ email: "", password: "" });
     const [error, setError] = useState("");
 
