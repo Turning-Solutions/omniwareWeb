@@ -36,6 +36,7 @@ export default function ProductsPage() {
     const [selectedCategory, setSelectedCategory] = useState("");
     const [selectedBrand, setSelectedBrand] = useState("");
 
+    // Load categories and brands once on mount (for filter dropdowns)
     useEffect(() => {
         const fetchFilters = async () => {
             try {
@@ -50,12 +51,12 @@ export default function ProductsPage() {
             }
         };
         fetchFilters();
-        fetchProducts();
     }, []);
 
+    // Single effect: fetch products on mount and when filters/search change (avoids duplicate calls on load)
     useEffect(() => {
         fetchProducts();
-    }, [selectedCategory, selectedBrand, searchTerm]); // Refetch when filters or search term change
+    }, [selectedCategory, selectedBrand, searchTerm]);
 
     const fetchProducts = async () => {
         try {

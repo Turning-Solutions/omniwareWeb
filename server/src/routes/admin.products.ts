@@ -79,7 +79,7 @@ router.patch('/:id', async (req: Request, res: Response) => {
 
     try {
         const updated = await Product.findByIdAndUpdate(req.params.id, req.body, {
-            new: true,
+            returnDocument: 'after',
             runValidators: true,
         }).lean();
 
@@ -127,7 +127,7 @@ router.post('/brands', async (req: Request, res: Response) => {
 
 router.put('/brands/:id', async (req: Request, res: Response) => {
     try {
-        const brand = await Brand.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        const brand = await Brand.findByIdAndUpdate(req.params.id, req.body, { returnDocument: 'after' });
         if (!brand) return res.status(404).json({ message: 'Brand not found' });
         res.json(brand);
     } catch (error) {
@@ -148,7 +148,7 @@ router.post('/categories', async (req: Request, res: Response) => {
 
 router.put('/categories/:id', async (req: Request, res: Response) => {
     try {
-        const category = await Category.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        const category = await Category.findByIdAndUpdate(req.params.id, req.body, { returnDocument: 'after' });
         if (!category) return res.status(404).json({ message: 'Category not found' });
         res.json(category);
     } catch (error) {

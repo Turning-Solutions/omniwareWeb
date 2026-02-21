@@ -97,7 +97,7 @@ export const updateFeaturedSpecs = async (req: Request, res: Response, next: any
                 categoryKey,
                 featuredSpecKeys: normalizedKeys
             },
-            { new: true, upsert: true, setDefaultsOnInsert: true }
+            { returnDocument: 'after', upsert: true, setDefaultsOnInsert: true }
         );
 
         let mode = 'default_all';
