@@ -326,7 +326,7 @@ function isValidObjectIdString(s: string): boolean {
 
 export const getProductBySlug = async (req: Request, res: Response) => {
     try {
-        const slugOrId = req.params.slug;
+        const slugOrId = Array.isArray(req.params.slug) ? req.params.slug[0] ?? '' : (req.params.slug ?? '');
         const byId = isValidObjectIdString(slugOrId);
         const product = byId
             ? await Product.findOne({ _id: slugOrId, isActive: true })
