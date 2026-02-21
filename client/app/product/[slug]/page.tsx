@@ -156,7 +156,24 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
                         </div>
                     )}
 
-                    {/* Specs Map */}
+                    {/* Product details (attributes) — order from admin */}
+                    {product.attributes && Array.isArray(product.attributes) && product.attributes.length > 0 && (
+                        <div className="mb-8 p-4 bg-white/5 rounded-xl">
+                            <h3 className="text-sm font-medium text-white mb-3 flex items-center gap-2">
+                                <AlertCircle className="h-4 w-4" /> Product details
+                            </h3>
+                            <div className="grid grid-cols-2 gap-4 text-sm">
+                                {product.attributes.map((attr: { name: string; value: string }, idx: number) => (
+                                    <div key={idx}>
+                                        <span className="block text-gray-500 text-xs uppercase">{attr.name}</span>
+                                        <span className="text-gray-300">{attr.value}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Specs Map (filter specs) */}
                     {product.specs && Object.keys(product.specs).length > 0 && (
                         <div className="mb-8 p-4 bg-white/5 rounded-xl">
                             <h3 className="text-sm font-medium text-white mb-3 flex items-center gap-2">

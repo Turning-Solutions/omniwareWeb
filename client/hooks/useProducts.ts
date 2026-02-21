@@ -33,6 +33,7 @@ export interface Product {
     stock?: { qty: number };
     variants?: any[];
     specs?: Record<string, string>;
+    attributes?: { name: string; value: string }[];
 }
 
 interface ProductsResponse {

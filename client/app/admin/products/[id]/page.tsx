@@ -2,7 +2,7 @@
 
 import { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
-import { Save, ArrowLeft, Trash2, Edit2, Plus } from "lucide-react";
+import { Save, ArrowLeft, Trash2, Edit2, Plus, ChevronUp, ChevronDown } from "lucide-react";
 import Link from "next/link";
 
 interface Brand {
@@ -201,6 +201,20 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
 
     const removeAttribute = (index: number) => {
         setFormData({ ...formData, attributes: formData.attributes.filter((_, i) => i !== index) });
+    };
+
+    const moveAttributeUp = (index: number) => {
+        if (index <= 0) return;
+        const newAttrs = [...formData.attributes];
+        [newAttrs[index - 1], newAttrs[index]] = [newAttrs[index], newAttrs[index - 1]];
+        setFormData({ ...formData, attributes: newAttrs });
+    };
+
+    const moveAttributeDown = (index: number) => {
+        if (index >= formData.attributes.length - 1) return;
+        const newAttrs = [...formData.attributes];
+        [newAttrs[index], newAttrs[index + 1]] = [newAttrs[index + 1], newAttrs[index]];
+        setFormData({ ...formData, attributes: newAttrs });
     };
 
     const getFilterSpecValue = (specKey: string) =>
@@ -495,34 +509,55 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                     </div>
 
                     {formData.attributes.length > 0 && (
-                        <div className="flex gap-4 mb-2 px-1">
+                        <div className="flex gap-2 mb-2 px-1">
+                            <span className="w-16 text-xs text-sub uppercase tracking-wider shrink-0">Order</span>
                             <span className="flex-1 text-xs text-sub uppercase tracking-wider">Name</span>
                             <span className="flex-1 text-xs text-sub uppercase tracking-wider">Value</span>
-                            <span className="w-8" />
+                            <span className="w-8 shrink-0" />
                         </div>
                     )}
 
                     <div className="space-y-3">
                         {formData.attributes.map((attr, index) => (
-                            <div key={index} className="flex gap-4 items-center">
+                            <div key={index} className="flex gap-2 items-center">
+                                <div className="flex flex-col w-16 shrink-0 gap-0.5">
+                                    <button
+                                        type="button"
+                                        onClick={() => moveAttributeUp(index)}
+                                        disabled={index === 0}
+                                        className="p-1.5 text-sub hover:text-main hover:bg-white/5 rounded disabled:opacity-40 disabled:pointer-events-none"
+                                        title="Move up"
+                                    >
+                                        <ChevronUp className="h-4 w-4" />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => moveAttributeDown(index)}
+                                        disabled={index === formData.attributes.length - 1}
+                                        className="p-1.5 text-sub hover:text-main hover:bg-white/5 rounded disabled:opacity-40 disabled:pointer-events-none"
+                                        title="Move down"
+                                    >
+                                        <ChevronDown className="h-4 w-4" />
+                                    </button>
+                                </div>
                                 <input
                                     type="text"
                                     placeholder="Name (e.g. Color)"
-                                    className="flex-1 bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent"
+                                    className="flex-1 bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent min-w-0"
                                     value={attr.name}
                                     onChange={(e) => updateAttribute(index, 'name', e.target.value)}
                                 />
                                 <input
                                     type="text"
                                     placeholder="Value (e.g. Red)"
-                                    className="flex-1 bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent"
+                                    className="flex-1 bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent min-w-0"
                                     value={attr.value}
                                     onChange={(e) => updateAttribute(index, 'value', e.target.value)}
                                 />
                                 <button
                                     type="button"
                                     onClick={() => removeAttribute(index)}
-                                    className="p-2 text-red-400 hover:bg-red-400/10 rounded"
+                                    className="p-2 text-red-400 hover:bg-red-400/10 rounded shrink-0"
                                 >
                                     <Trash2 className="h-5 w-5" />
                                 </button>
