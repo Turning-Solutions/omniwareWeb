@@ -54,10 +54,18 @@ router.get('/:id', async (req: Request, res: Response) => {
     res.json(product);
 });
 
+function normalizeProductBody(body: Record<string, unknown>): Record<string, unknown> {
+    const b = { ...body };
+    if (b.sku === '' || (typeof b.sku === 'string' && !b.sku.trim())) {
+        delete b.sku;
+    }
+    return b;
+}
+
 // POST /api/v1/admin/products
 router.post('/', async (req: Request, res: Response) => {
     try {
-        const product = await Product.create(req.body);
+        const product = await Product.create(normalizeProductBody(req.body));
 
         await createAuditLog(req, {
             action: 'CREATE_PRODUCT',
@@ -78,7 +86,7 @@ router.patch('/:id', async (req: Request, res: Response) => {
     if (!before) return res.status(404).json({ message: 'Product not found' });
 
     try {
-        const updated = await Product.findByIdAndUpdate(req.params.id, req.body, {
+        const updated = await Product.findByIdAndUpdate(req.params.id, normalizeProductBody(req.body), {
             returnDocument: 'after',
             runValidators: true,
         }).lean();

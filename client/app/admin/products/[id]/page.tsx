@@ -453,10 +453,9 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                         />
                     </div>
                     <div className="space-y-2">
-                        <label className="text-sub text-sm">SKU</label>
+                        <label className="text-sub text-sm">SKU (Optional)</label>
                         <input
                             type="text"
-                            required
                             className="w-full bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent"
                             value={formData.sku}
                             onChange={(e) => setFormData({ ...formData, sku: e.target.value })}

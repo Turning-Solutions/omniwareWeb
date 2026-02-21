@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 const productSchema = new mongoose.Schema({
     title: { type: String, required: true },
     slug: { type: String, required: true, unique: true },
-    sku: { type: String, required: true, unique: true },
+    sku: { type: String, required: false },
     brandId: { type: mongoose.Schema.Types.ObjectId, ref: 'Brand', index: true },
     categoryIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Category', index: true }],
     price: { type: Number, required: true, index: true },
@@ -49,6 +49,7 @@ productSchema.index({ isActive: 1, price: 1 });
 productSchema.index({ availability: 1 });
 // Wildcard index for dynamic specs used in faceted filters
 productSchema.index({ 'specs.$**': 1 });
+productSchema.index({ sku: 1 }, { unique: true, sparse: true });
 
 const Product = mongoose.models.Product ?? mongoose.model('Product', productSchema);
 export default Product;
