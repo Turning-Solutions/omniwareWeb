@@ -20,9 +20,12 @@ api.interceptors.request.use((config) => {
     }
     // When sending FormData (e.g. file upload), do not set Content-Type so the browser sets multipart/form-data with boundary
     if (config.data && typeof FormData !== 'undefined' && config.data instanceof FormData) {
-        const headers = { ...config.headers };
-        delete headers['Content-Type'];
-        config.headers = headers;
+        const h = config.headers as { set?: (k: string, v: unknown) => void };
+        if (typeof h?.set === 'function') {
+            h.set('Content-Type', false);
+        } else {
+            delete (config.headers as Record<string, unknown>)['Content-Type'];
+        }
     }
     return config;
 });
