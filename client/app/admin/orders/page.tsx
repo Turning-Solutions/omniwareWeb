@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Search, Filter, Eye, ArrowUpDown } from "lucide-react";
+import api from "@/lib/api";
 
 interface Order {
     _id: string;
@@ -43,12 +44,7 @@ export default function AdminOrdersPage() {
                 ...(sort && { sort })
             });
 
-            const res = await fetch(`/api/v1/admin/orders?${params}`, {
-                headers: {
-                    // "Authorization": ... // Auth disabled
-                }
-            });
-            const data = await res.json();
+            const { data } = await api.get(`/admin/orders?${params}`);
 
             if (data.data) {
                 setOrders(data.data);

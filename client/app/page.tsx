@@ -138,7 +138,7 @@ export default function Home() {
                             Don&apos;t settle for pre-builts. customize every aspect of your PC to match your needs and style.
                         </p>
                         <Link
-                            href="/build"
+                            href="/shop"
                             className="inline-flex px-8 py-3 rounded-xl bg-white text-black font-bold hover:bg-gray-200 transition-colors"
                         >
                             Launch PC Builder

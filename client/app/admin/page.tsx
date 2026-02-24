@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Users, ShoppingBag, DollarSign, Activity, TrendingUp, Eye } from "lucide-react";
+import api from "@/lib/api";
 
 interface DashboardSummary {
     revenue: number;
@@ -38,8 +39,7 @@ export default function AdminPage() {
     const fetchAnalytics = async () => {
         setLoading(true);
         try {
-            const res = await fetch(`/api/v1/admin/analytics/summary?range=${range}`);
-            const data = await res.json();
+            const { data } = await api.get(`/admin/analytics/summary?range=${range}`);
 
             if (data.summary) {
                 setSummary(data.summary);

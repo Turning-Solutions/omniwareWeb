@@ -3,6 +3,7 @@
 import { useState, useEffect, use } from "react";
 import Link from "next/link";
 import { ArrowLeft, Package, User, MapPin, CreditCard, Calendar } from "lucide-react";
+import api from "@/lib/api";
 
 interface OrderDetails {
     _id: string;
@@ -51,11 +52,8 @@ export default function AdminOrderDetailsPage({ params }: PageProps) {
 
     const fetchOrder = async () => {
         try {
-            const res = await fetch(`/api/v1/admin/orders/${id}`);
-            if (res.ok) {
-                const data = await res.json();
-                setOrder(data);
-            }
+            const { data } = await api.get(`/admin/orders/${id}`);
+            setOrder(data);
         } catch (error) {
             console.error("Failed to fetch order", error);
         } finally {
@@ -68,17 +66,8 @@ export default function AdminOrderDetailsPage({ params }: PageProps) {
 
         setUpdating(true);
         try {
-            const res = await fetch(`/api/v1/admin/orders/${id}/status`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status: newStatus })
-            });
-
-            if (res.ok) {
-                fetchOrder(); // Refresh
-            } else {
-                alert("Failed to update status");
-            }
+            await api.patch(`/admin/orders/${id}/status`, { status: newStatus });
+            fetchOrder(); // Refresh
         } catch (error) {
             alert("Error updating status");
         } finally {

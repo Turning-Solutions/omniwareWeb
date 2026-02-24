@@ -34,7 +34,7 @@ export default function ServicesPage() {
                         <p className="text-gray-400 mb-6 leading-relaxed">
                             We do custom PC builds to meet your exact requirements. Whether it&apos;s for gaming, content creation, or professional workstation use, we select and assemble the perfect components for you.
                         </p>
-                        <Link href="/build" className="text-primary font-medium hover:underline">
+                        <Link href="/shop" className="text-primary font-medium hover:underline">
                             Start Your Build &rarr;
                         </Link>
                     </motion.div>

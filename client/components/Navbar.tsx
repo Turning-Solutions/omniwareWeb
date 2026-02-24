@@ -30,7 +30,7 @@ export default function Navbar() {
                         <Link href="/services" className="text-sub hover:text-main transition-colors font-medium">
                             Services
                         </Link>
-                        <Link href="/build" className="text-sub hover:text-main transition-colors font-medium">
+                        <Link href="/shop" className="text-sub hover:text-main transition-colors font-medium">
                             PC Builder
                         </Link>
                         <Link href="/about" className="text-sub hover:text-main transition-colors font-medium">
@@ -84,7 +84,7 @@ export default function Navbar() {
                                 Shop
                             </Link>
                             <Link
-                                href="/build"
+                                href="/shop"
                                 className="block px-3 py-2 rounded-md text-base font-medium text-sub hover:text-main hover:bg-white/5"
                                 onClick={() => setIsOpen(false)}
                             >

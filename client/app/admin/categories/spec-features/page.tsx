@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Save, RefreshCw, Search, Plus, Trash2 } from "lucide-react";
+import api from "@/lib/api";
 
 interface Category {
     _id: string;
@@ -23,9 +24,8 @@ export default function FeaturedSpecsAdmin() {
     const [searchQuery, setSearchQuery] = useState("");
 
     useEffect(() => {
-        fetch(`/api/v1/products/categories`)
-            .then(res => res.json())
-            .then(data => setCategories(data))
+        api.get("/products/categories")
+            .then(({ data }) => setCategories(data))
             .catch(err => console.error("Failed to fetch categories", err));
     }, []);
 
@@ -40,14 +40,14 @@ export default function FeaturedSpecsAdmin() {
         const fetchSpecs = async () => {
             setLoading(true);
             try {
-                const availRes = await fetch(`/api/v1/admin/categories/${selectedCategory}/spec-keys`);
-                const availData = await availRes.json();
-                const confRes = await fetch(`/api/v1/admin/categories/${selectedCategory}/featured-specs`);
-                const confData = await confRes.json();
+                const [availRes, confRes] = await Promise.all([
+                    api.get(`/admin/categories/${selectedCategory}/spec-keys`),
+                    api.get(`/admin/categories/${selectedCategory}/featured-specs`)
+                ]);
 
-                setAvailableSpecKeys(availData.availableSpecKeys || []);
-                setFeaturedSpecKeys(confData.featuredSpecKeys || []);
-                setMode(confData.mode || "default_all");
+                setAvailableSpecKeys(availRes.data.availableSpecKeys || []);
+                setFeaturedSpecKeys(confRes.data.featuredSpecKeys || []);
+                setMode(confRes.data.mode || "default_all");
             } catch (err) {
                 console.error("Failed to fetch specs for category", err);
             } finally {
@@ -90,23 +90,9 @@ export default function FeaturedSpecsAdmin() {
         if (!selectedCategory) return;
         setLoading(true);
         try {
-            const token = JSON.parse(localStorage.getItem('userInfo') || '{}').token;
-            const res = await fetch(`/api/v1/admin/categories/${selectedCategory}/featured-specs`, {
-                method: "PUT",
-                headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${token}`
-                },
-                body: JSON.stringify({ featuredSpecKeys })
-            });
-
-            if (res.ok) {
-                const updated = await res.json();
-                setMode(updated.mode || "none");
-                alert("Featured specs updated successfully");
-            } else {
-                alert("Failed to save configuration");
-            }
+            const { data: updated } = await api.put(`/admin/categories/${selectedCategory}/featured-specs`, { featuredSpecKeys });
+            setMode(updated.mode || "none");
+            alert("Featured specs updated successfully");
         } catch (error) {
             console.error("Save error", error);
             alert("An error occurred while saving.");
@@ -119,19 +105,10 @@ export default function FeaturedSpecsAdmin() {
         if (!selectedCategory || !confirm("Are you sure you want to delete this configuration and revert to default behavior?")) return;
         setLoading(true);
         try {
-            const token = JSON.parse(localStorage.getItem('userInfo') || '{}').token;
-            const res = await fetch(`/api/v1/admin/categories/${selectedCategory}/featured-specs`, {
-                method: "DELETE",
-                headers: { Authorization: `Bearer ${token}` }
-            });
-
-            if (res.ok) {
-                setFeaturedSpecKeys([]);
-                setMode("default_all");
-                alert("Configuration deleted. Reverted to default behavior.");
-            } else {
-                alert("Failed to delete configuration");
-            }
+            await api.delete(`/admin/categories/${selectedCategory}/featured-specs`);
+            setFeaturedSpecKeys([]);
+            setMode("default_all");
+            alert("Configuration deleted. Reverted to default behavior.");
         } catch (error) {
             console.error("Delete error", error);
             alert("An error occurred while deleting.");

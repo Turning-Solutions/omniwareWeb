@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Search, Edit, Trash2 } from "lucide-react";
 import Link from "next/link";
+import api from "@/lib/api";
 
 interface Product {
     _id: string;
@@ -41,11 +42,11 @@ export default function ProductsPage() {
         const fetchFilters = async () => {
             try {
                 const [catsRes, brandsRes] = await Promise.all([
-                    fetch(`/api/v1/products/categories`),
-                    fetch(`/api/v1/products/brands`)
+                    api.get("/products/categories"),
+                    api.get("/products/brands")
                 ]);
-                setCategories(await catsRes.json());
-                setBrands(await brandsRes.json());
+                setCategories(catsRes.data);
+                setBrands(brandsRes.data);
             } catch (err) {
                 console.error("Failed to fetch filters", err);
             }
@@ -67,18 +68,7 @@ export default function ProductsPage() {
                 ...(selectedBrand && { brand: selectedBrand })
             });
 
-            const res = await fetch(
-                `/api/v1/admin/products?${queryParams}`,
-                {
-                    headers: {
-                        "Content-Type": "application/json",
-                        Authorization: `Bearer ${JSON.parse(localStorage.getItem("userInfo") || "{}").token || ""
-                            }`,
-                    },
-                    credentials: "include",
-                }
-            );
-            const data = await res.json();
+            const { data } = await api.get(`/admin/products?${queryParams}`);
             // Admin products endpoint returns { data: Product[], pagination: {...} }
             const list = Array.isArray(data) ? data : data.data || [];
             setProducts(list);
@@ -93,25 +83,8 @@ export default function ProductsPage() {
         if (!confirm("Are you sure you want to delete this product?")) return;
 
         try {
-            // Note: In a real app we might soft delete or use a specific delete endpoint
-            // For now, toggle isActive to false if no delete endpoint exists, or assume there is one.
-            // Based on task, we need CRUD. Let's assume we need to implement DELETE if not present.
-            // Checking routes, I saw 'updateProduct', 'createProduct'. I didn't see explicit DELETE.
-            // I'll implement soft delete by toggling isActive via update.
-            const res = await fetch(`/api/v1/admin/products/${id}`, {
-                method: 'PATCH',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${JSON.parse(localStorage.getItem('userInfo') || '{}').token}`
-                },
-                body: JSON.stringify({ isActive: false })
-            });
-
-            if (res.ok) {
-                fetchProducts();
-            } else {
-                alert("Failed to delete product");
-            }
+            await api.patch(`/admin/products/${id}`, { isActive: false });
+            fetchProducts();
         } catch (error) {
             console.error("Error deleting product", error);
         }

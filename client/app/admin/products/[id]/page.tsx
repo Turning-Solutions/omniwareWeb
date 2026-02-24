@@ -4,6 +4,7 @@ import { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
 import { Save, ArrowLeft, Trash2, Edit2, Plus, ChevronUp, ChevronDown, ImagePlus, Upload, Loader2 } from "lucide-react";
 import Link from "next/link";
+import api from "@/lib/api";
 
 interface Brand {
     _id: string;
@@ -70,11 +71,11 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
         const fetchData = async () => {
             try {
                 const [brandsRes, categoriesRes] = await Promise.all([
-                    fetch(`/api/v1/products/brands`),
-                    fetch(`/api/v1/products/categories`)
+                    api.get("/products/brands"),
+                    api.get("/products/categories")
                 ]);
-                setBrands(await brandsRes.json());
-                setCategories(await categoriesRes.json());
+                setBrands(brandsRes.data);
+                setCategories(categoriesRes.data);
             } catch (error) {
                 console.error("Error fetching data", error);
             } finally {
@@ -88,32 +89,29 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
         if (isNew) return;
         const fetchProduct = async () => {
             try {
-                const res = await fetch(`/api/v1/products/id/${id}`);
-                if (res.ok) {
-                    const data = await res.json();
-                    const specsObj = data.specs;
-                    const filterSpecs: FilterSpec[] = specsObj && typeof specsObj === 'object' && !Array.isArray(specsObj)
-                        ? Object.entries(specsObj).map(([k, v]) => ({ key: normalizeSpecKey(k), value: String(v) }))
-                        : [];
-                    setFormData({
-                        title: data.title,
-                        price: data.price,
-                        sku: data.sku || "",
-                        slug: data.slug,
-                        stock: data.stock?.qty || 0,
-                        description: data.description || "",
-                        brandId: data.brandId?._id || data.brandId || "",
-                        categoryIds: data.categoryIds?.map((c: any) => c._id || c) || [], // eslint-disable-line @typescript-eslint/no-explicit-any
-                        attributes: (data.attributes || []).map((a: any) => ({ // eslint-disable-line @typescript-eslint/no-explicit-any
-                            name: a.name,
-                            value: a.value,
-                            filterable: a.filterable ?? false
-                        })),
-                        filterSpecs,
-                        images: Array.isArray(data.images) ? data.images : [],
-                        isActive: data.isActive
-                    });
-                }
+                const { data } = await api.get(`/products/id/${id}`);
+                const specsObj = data.specs;
+                const filterSpecs: FilterSpec[] = specsObj && typeof specsObj === 'object' && !Array.isArray(specsObj)
+                    ? Object.entries(specsObj).map(([k, v]) => ({ key: normalizeSpecKey(k), value: String(v) }))
+                    : [];
+                setFormData({
+                    title: data.title,
+                    price: data.price,
+                    sku: data.sku || "",
+                    slug: data.slug,
+                    stock: data.stock?.qty || 0,
+                    description: data.description || "",
+                    brandId: data.brandId?._id || data.brandId || "",
+                    categoryIds: data.categoryIds?.map((c: any) => c._id || c) || [], // eslint-disable-line @typescript-eslint/no-explicit-any
+                    attributes: (data.attributes || []).map((a: any) => ({ // eslint-disable-line @typescript-eslint/no-explicit-any
+                        name: a.name,
+                        value: a.value,
+                        filterable: a.filterable ?? false
+                    })),
+                    filterSpecs,
+                    images: Array.isArray(data.images) ? data.images : [],
+                    isActive: data.isActive
+                });
             } catch (err) {
                 console.error(err);
             }
@@ -135,12 +133,8 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
             return;
         }
         setFeaturedSpecsLoading(true);
-        const token = JSON.parse(localStorage.getItem('userInfo') || '{}').token;
-        fetch(`/api/v1/admin/categories/${encodeURIComponent(slug)}/featured-specs`, {
-            headers: token ? { 'Authorization': `Bearer ${token}` } : {}
-        })
-            .then(res => res.ok ? res.json() : { featuredSpecKeys: [] })
-            .then((data: { featuredSpecKeys?: string[] }) => setFeaturedSpecKeys(data.featuredSpecKeys || []))
+        api.get(`/admin/categories/${encodeURIComponent(slug)}/featured-specs`)
+            .then(({ data }: { data: { featuredSpecKeys?: string[] } }) => setFeaturedSpecKeys(data.featuredSpecKeys || []))
             .catch(() => setFeaturedSpecKeys([]))
             .finally(() => setFeaturedSpecsLoading(false));
     }, [formData.categoryIds[0], categories]);
@@ -162,25 +156,12 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                 specs: Object.keys(specsRecord).length ? specsRecord : undefined,
             };
 
-            const url = isNew
-                ? `/api/v1/admin/products`
-                : `/api/v1/admin/products/${id}`;
-
-            const res = await fetch(url, {
-                method: isNew ? 'POST' : 'PATCH',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${JSON.parse(localStorage.getItem('userInfo') || '{}').token}`
-                },
-                body: JSON.stringify(payload)
-            });
-
-            if (res.ok) {
-                router.push('/admin/products');
+            if (isNew) {
+                await api.post("/admin/products", payload);
             } else {
-                const error = await res.json();
-                alert(`Error: ${error.message}`);
+                await api.patch(`/admin/products/${id}`, payload);
             }
+            router.push('/admin/products');
         } catch (error) {
             console.error("Error saving product", error);
             alert("Failed to save product");
@@ -220,49 +201,32 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
         setFormData({ ...formData, attributes: newAttrs });
     };
 
-    const getUploadAuthHeaders = (): Record<string, string> => {
-        try {
-            const token = JSON.parse(localStorage.getItem("userInfo") || "{}").token;
-            if (token) return { Authorization: `Bearer ${token}` };
-        } catch {
-            // ignore
-        }
-        return {};
-    };
-
     const uploadImage = async (file: File): Promise<{ url: string }> => {
         const formDataUpload = new FormData();
         formDataUpload.append("image", file);
-        const headers = getUploadAuthHeaders();
-        const res = await fetch("/api/v1/admin/upload/image", {
-            method: "POST",
-            headers,
-            body: formDataUpload,
-            credentials: "include",
-        });
-        if (res.status === 401) {
-            throw new Error("Please log in to upload images. Go to Login and sign in as admin.");
+        try {
+            const { data } = await api.post("/admin/upload/image", formDataUpload);
+            return data;
+        } catch (err: unknown) {
+            const status = (err as { response?: { status?: number } })?.response?.status;
+            if (status === 401) {
+                throw new Error("Please log in to upload images. Go to Login and sign in as admin.");
+            }
+            const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+            throw new Error(msg || "Upload failed");
         }
-        if (!res.ok) {
-            const err = await res.json().catch(() => ({ message: res.statusText }));
-            throw new Error(err.message || "Upload failed");
-        }
-        return res.json();
     };
 
     const deleteImageFromCloud = async (url: string): Promise<void> => {
-        const res = await fetch("/api/v1/admin/upload/delete-image", {
-            method: "POST",
-            headers: { "Content-Type": "application/json", ...getUploadAuthHeaders() },
-            body: JSON.stringify({ url }),
-            credentials: "include",
-        });
-        if (res.status === 401) {
-            throw new Error("Please log in to delete images.");
-        }
-        if (!res.ok) {
-            const err = await res.json().catch(() => ({ message: res.statusText }));
-            throw new Error(err.message || "Delete failed");
+        try {
+            await api.post("/admin/upload/delete-image", { url });
+        } catch (err: unknown) {
+            const status = (err as { response?: { status?: number } })?.response?.status;
+            if (status === 401) {
+                throw new Error("Please log in to delete images.");
+            }
+            const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+            throw new Error(msg || "Delete failed");
         }
     };
 
@@ -338,18 +302,9 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
         if (!name) return;
         const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
         try {
-            const res = await fetch(`/api/v1/admin/products/brands`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${JSON.parse(localStorage.getItem('userInfo') || '{}').token}` },
-                body: JSON.stringify({ name, slug })
-            });
-            if (res.ok) {
-                const newBrand = await res.json();
-                setBrands([...brands, newBrand]);
-                setFormData({ ...formData, brandId: newBrand._id });
-            } else {
-                alert("Failed to create brand");
-            }
+            const { data: newBrand } = await api.post("/admin/products/brands", { name, slug });
+            setBrands([...brands, newBrand]);
+            setFormData({ ...formData, brandId: newBrand._id });
         } catch (e) {
             console.error(e);
             alert("Failed to create brand");
@@ -364,17 +319,8 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
         if (!newName || newName === brand.name) return;
         const slug = newName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
         try {
-            const res = await fetch(`/api/v1/admin/products/brands/${brand._id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${JSON.parse(localStorage.getItem('userInfo') || '{}').token}` },
-                body: JSON.stringify({ name: newName, slug })
-            });
-            if (res.ok) {
-                const updated = await res.json();
-                setBrands(brands.map(b => b._id === updated._id ? updated : b));
-            } else {
-                alert("Failed to update brand");
-            }
+            const { data: updated } = await api.put(`/admin/products/brands/${brand._id}`, { name: newName, slug });
+            setBrands(brands.map(b => b._id === updated._id ? updated : b));
         } catch (e) {
             console.error(e);
             alert("Failed to update brand");
@@ -386,18 +332,9 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
         if (!name) return;
         const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
         try {
-            const res = await fetch(`/api/v1/admin/products/categories`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${JSON.parse(localStorage.getItem('userInfo') || '{}').token}` },
-                body: JSON.stringify({ name, slug })
-            });
-            if (res.ok) {
-                const newCategory = await res.json();
-                setCategories([...categories, newCategory]);
-                setFormData({ ...formData, categoryIds: [newCategory._id] });
-            } else {
-                alert("Failed to create category");
-            }
+            const { data: newCategory } = await api.post("/admin/products/categories", { name, slug });
+            setCategories([...categories, newCategory]);
+            setFormData({ ...formData, categoryIds: [newCategory._id] });
         } catch (e) {
             console.error(e);
             alert("Failed to create category");
@@ -412,17 +349,8 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
         if (!newName || newName === category.name) return;
         const slug = newName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
         try {
-            const res = await fetch(`/api/v1/admin/products/categories/${category._id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${JSON.parse(localStorage.getItem('userInfo') || '{}').token}` },
-                body: JSON.stringify({ name: newName, slug })
-            });
-            if (res.ok) {
-                const updated = await res.json();
-                setCategories(categories.map(c => c._id === updated._id ? updated : c));
-            } else {
-                alert("Failed to update category");
-            }
+            const { data: updated } = await api.put(`/admin/products/categories/${category._id}`, { name: newName, slug });
+            setCategories(categories.map(c => c._id === updated._id ? updated : c));
         } catch (e) {
             console.error(e);
             alert("Failed to update category");
