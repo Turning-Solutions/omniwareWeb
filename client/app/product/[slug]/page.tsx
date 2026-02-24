@@ -159,7 +159,7 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
                         </div>
                     )}
 
-                    {/* Product details (attributes by category) — collapsible */}
+                    {/* Product details (attributes by category) — one box, categories divided inside */}
                     {(() => {
                         const groups: { category: string; attributes: { name?: string; value: string }[] }[] =
                             product.attributeGroups?.length
@@ -177,16 +177,13 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
                                 <h3 className="text-base font-semibold text-white mb-4 flex items-center gap-2">
                                     <AlertCircle className="h-4 w-4 text-primary" /> Product details
                                 </h3>
-                                <div className="space-y-3">
+                                <div className="rounded-xl border border-white/15 bg-white/5 overflow-hidden">
                                     {groups.map((group, idx) => (
-                                        <div
-                                            key={idx}
-                                            className="rounded-xl border border-white/15 bg-white/5 overflow-hidden"
-                                        >
+                                        <div key={idx}>
                                             <button
                                                 type="button"
                                                 onClick={() => setExpanded(idx, !isExpanded(idx))}
-                                                className="w-full flex items-center justify-between gap-3 px-4 py-3.5 text-left bg-white/10 hover:bg-white/15 border-b border-white/10 transition-colors"
+                                                className="w-full flex items-center justify-between gap-3 px-4 py-3.5 text-left bg-white/10 hover:bg-white/15 transition-colors"
                                             >
                                                 <span className="font-semibold text-white uppercase tracking-wide">
                                                     {group.category}
@@ -225,6 +222,9 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
                                                     </div>
                                                 </div>
                                             </motion.div>
+                                            {idx < groups.length - 1 && (
+                                                <div className="border-b border-white/10" aria-hidden />
+                                            )}
                                         </div>
                                     ))}
                                 </div>
