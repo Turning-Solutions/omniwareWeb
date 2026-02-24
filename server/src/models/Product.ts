@@ -18,6 +18,13 @@ const productSchema = new mongoose.Schema({
     specs: { type: Map, of: String },
     badges: [{ type: String }],
     images: [{ type: String }],
+    attributeGroups: [{
+        category: { type: String, required: true, default: 'General' },
+        attributes: [{
+            name: { type: String, required: true },
+            value: { type: String, required: true }
+        }]
+    }],
     attributes: [{
         name: { type: String, required: true },
         value: { type: String, required: true }

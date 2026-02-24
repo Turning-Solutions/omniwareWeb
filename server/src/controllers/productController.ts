@@ -285,7 +285,7 @@ export const getProductBySlug = async (req: Request, res: Response) => {
             .populate('categoryIds', 'name slug');
 
         if (product) {
-            res.json(product);
+            res.json(normalizeProductAttributeGroups(product));
         } else {
             res.status(404).json({ message: 'Product not found' });
         }
@@ -306,15 +306,34 @@ function normalizeProductSpecs(specs: Record<string, string> | undefined): Recor
     return Object.keys(out).length ? out : undefined;
 }
 
+/** Ensure attributeGroups is set for API response; use legacy attributes as "General" when needed */
+function normalizeProductAttributeGroups(doc: any): any {
+    const pojo = doc && typeof doc.toObject === 'function' ? doc.toObject() : doc;
+    if (!pojo) return pojo;
+    if (pojo.attributeGroups && Array.isArray(pojo.attributeGroups) && pojo.attributeGroups.length > 0) {
+        return pojo;
+    }
+    if (pojo.attributes && Array.isArray(pojo.attributes) && pojo.attributes.length > 0) {
+        pojo.attributeGroups = [{ category: 'General', attributes: pojo.attributes }];
+    } else {
+        pojo.attributeGroups = [];
+    }
+    return pojo;
+}
+
 // ... (getProducts)
 
 export const createProduct = async (req: Request, res: Response) => {
     try {
-        const validatedData = productSchema.parse(req.body);
+        const raw = req.body;
+        if (raw.attributeGroups == null && raw.attributes != null && Array.isArray(raw.attributes)) {
+            raw.attributeGroups = [{ category: 'General', attributes: raw.attributes }];
+        }
+        const validatedData = productSchema.parse(raw);
         if (validatedData.specs) validatedData.specs = normalizeProductSpecs(validatedData.specs);
         const product = new Product(validatedData);
         const createdProduct = await product.save();
-        res.status(201).json(createdProduct);
+        res.status(201).json(normalizeProductAttributeGroups(createdProduct));
     } catch (error) {
         if (error instanceof mongoose.Error.ValidationError) {
             res.status(400).json({ message: error.message });
@@ -328,13 +347,17 @@ export const createProduct = async (req: Request, res: Response) => {
 
 export const updateProduct = async (req: Request, res: Response) => {
     try {
-        const validatedData = productUpdateSchema.parse(req.body);
+        const raw = req.body;
+        if (raw.attributeGroups == null && raw.attributes != null && Array.isArray(raw.attributes)) {
+            raw.attributeGroups = [{ category: 'General', attributes: raw.attributes }];
+        }
+        const validatedData = productUpdateSchema.parse(raw);
         if (validatedData.specs) validatedData.specs = normalizeProductSpecs(validatedData.specs);
         const product = await Product.findById(req.params.id);
         if (product) {
             Object.assign(product, validatedData);
             const updatedProduct = await product.save();
-            res.json(updatedProduct);
+            res.json(normalizeProductAttributeGroups(updatedProduct));
         } else {
             res.status(404).json({ message: 'Product not found' });
         }
@@ -372,7 +395,7 @@ export const getProductById = async (req: Request, res: Response) => {
             .populate('categoryIds', 'name slug');
 
         if (product) {
-            res.json(product);
+            res.json(normalizeProductAttributeGroups(product));
         } else {
             res.status(404).json({ message: 'Product not found' });
         }

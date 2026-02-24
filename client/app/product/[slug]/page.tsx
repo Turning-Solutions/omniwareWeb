@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, use } from "react";
-import { ShoppingCart, Check, Shield, AlertCircle } from "lucide-react";
+import { ShoppingCart, Check, Shield, AlertCircle, ChevronDown, ChevronRight } from "lucide-react";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import { useCart } from "@/context/CartContext";
@@ -17,6 +17,8 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
     const [selectedVariant, setSelectedVariant] = useState<any>(null); // eslint-disable-line @typescript-eslint/no-explicit-any
     const { addToCart } = useCart();
     const [qty, setQty] = useState(1);
+    // Expanded state for product detail categories (default: all open)
+    const [expandedGroups, setExpandedGroups] = useState<Record<number, boolean>>({});
 
     // Reset local state when product changes
     useEffect(() => {
@@ -24,6 +26,7 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
         setSelectedImage(0);
         setSelectedVariant(null);
         setQty(1);
+        setExpandedGroups({});
     }, [product]);
 
     // Error UI
@@ -156,22 +159,72 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
                         </div>
                     )}
 
-                    {/* Product details (attributes) — order from admin */}
-                    {product.attributes && Array.isArray(product.attributes) && product.attributes.length > 0 && (
-                        <div className="mb-8 p-4 bg-white/5 rounded-xl">
-                            <h3 className="text-sm font-medium text-white mb-3 flex items-center gap-2">
-                                <AlertCircle className="h-4 w-4" /> Product details
-                            </h3>
-                            <div className="grid grid-cols-2 gap-4 text-sm">
-                                {product.attributes.map((attr: { name: string; value: string }, idx: number) => (
-                                    <div key={idx}>
-                                        <span className="block text-gray-500 text-xs uppercase">{attr.name}</span>
-                                        <span className="text-gray-300">{attr.value}</span>
-                                    </div>
-                                ))}
+                    {/* Product details (attributes by category) — collapsible */}
+                    {(() => {
+                        const groups: { category: string; attributes: { name: string; value: string }[] }[] =
+                            product.attributeGroups?.length
+                                ? product.attributeGroups
+                                : product.attributes?.length
+                                    ? [{ category: "General", attributes: product.attributes }]
+                                    : [];
+                        if (groups.length === 0) return null;
+                        const isExpanded = (idx: number) => expandedGroups[idx] !== false;
+                        const setExpanded = (idx: number, open: boolean) => {
+                            setExpandedGroups((prev) => ({ ...prev, [idx]: open }));
+                        };
+                        return (
+                            <div className="mb-8">
+                                <h3 className="text-base font-semibold text-white mb-4 flex items-center gap-2">
+                                    <AlertCircle className="h-4 w-4 text-primary" /> Product details
+                                </h3>
+                                <div className="space-y-3">
+                                    {groups.map((group, idx) => (
+                                        <div
+                                            key={idx}
+                                            className="rounded-xl border border-white/15 bg-white/5 overflow-hidden"
+                                        >
+                                            <button
+                                                type="button"
+                                                onClick={() => setExpanded(idx, !isExpanded(idx))}
+                                                className="w-full flex items-center justify-between gap-3 px-4 py-3.5 text-left bg-white/10 hover:bg-white/15 border-b border-white/10 transition-colors"
+                                            >
+                                                <span className="font-semibold text-white uppercase tracking-wide">
+                                                    {group.category}
+                                                </span>
+                                                <span className="text-white/80 shrink-0">
+                                                    {isExpanded(idx) ? (
+                                                        <ChevronDown className="h-5 w-5" />
+                                                    ) : (
+                                                        <ChevronRight className="h-5 w-5" />
+                                                    )}
+                                                </span>
+                                            </button>
+                                            <motion.div
+                                                initial={false}
+                                                animate={{
+                                                    height: isExpanded(idx) ? "auto" : 0,
+                                                    opacity: isExpanded(idx) ? 1 : 0,
+                                                }}
+                                                transition={{ duration: 0.2 }}
+                                                className="overflow-hidden"
+                                            >
+                                                <div className="px-4 py-4 border-t border-white/10">
+                                                    <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+                                                        {group.attributes.map((attr, i) => (
+                                                            <div key={i}>
+                                                                <span className="block text-gray-500 text-xs uppercase tracking-wider">{attr.name}</span>
+                                                                <span className="text-gray-300">{attr.value}</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            </motion.div>
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
-                        </div>
-                    )}
+                        );
+                    })()}
 
                     {/* Specs Map (filter specs) */}
                     {product.specs && Object.keys(product.specs).length > 0 && (

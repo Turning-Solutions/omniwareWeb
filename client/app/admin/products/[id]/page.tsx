@@ -22,6 +22,11 @@ interface Attribute {
     value: string;
 }
 
+interface AttributeGroup {
+    category: string;
+    attributes: Attribute[];
+}
+
 interface FilterSpec {
     key: string;
     value: string;
@@ -53,7 +58,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
         description: "",
         brandId: "",
         categoryIds: [] as string[],
-        attributes: [] as Attribute[],
+        attributeGroups: [] as AttributeGroup[],
         filterSpecs: [] as FilterSpec[],
         images: [] as string[],
         isActive: true
@@ -94,6 +99,16 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                 const filterSpecs: FilterSpec[] = specsObj && typeof specsObj === 'object' && !Array.isArray(specsObj)
                     ? Object.entries(specsObj).map(([k, v]) => ({ key: normalizeSpecKey(k), value: String(v) }))
                     : [];
+                const rawGroups = data.attributeGroups;
+                const attributeGroups: AttributeGroup[] =
+                    rawGroups && Array.isArray(rawGroups) && rawGroups.length > 0
+                        ? rawGroups.map((g: any) => ({
+                            category: g.category || 'General',
+                            attributes: (g.attributes || []).map((a: any) => ({ name: a.name || '', value: a.value || '' }))
+                        }))
+                        : (data.attributes && Array.isArray(data.attributes) && data.attributes.length > 0)
+                            ? [{ category: 'General', attributes: data.attributes.map((a: any) => ({ name: a.name || '', value: a.value || '' })) }]
+                            : [];
                 setFormData({
                     title: data.title,
                     price: data.price,
@@ -103,11 +118,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                     description: data.description || "",
                     brandId: data.brandId?._id || data.brandId || "",
                     categoryIds: data.categoryIds?.map((c: any) => c._id || c) || [], // eslint-disable-line @typescript-eslint/no-explicit-any
-                    attributes: (data.attributes || []).map((a: any) => ({ // eslint-disable-line @typescript-eslint/no-explicit-any
-                        name: a.name,
-                        value: a.value,
-                        filterable: a.filterable ?? false
-                    })),
+                    attributeGroups,
                     filterSpecs,
                     images: Array.isArray(data.images) ? data.images : [],
                     isActive: data.isActive
@@ -154,6 +165,12 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                 price: parseFloat(formData.price),
                 stock: { qty: parseInt(formData.stock) },
                 specs: Object.keys(specsRecord).length ? specsRecord : undefined,
+                attributeGroups: formData.attributeGroups.filter(
+                    g => g.category.trim() && g.attributes.some(a => a.name.trim() || a.value.trim())
+                ).map(g => ({
+                    category: g.category.trim(),
+                    attributes: g.attributes.filter(a => a.name.trim() || a.value.trim()).map(a => ({ name: a.name.trim(), value: a.value.trim() }))
+                })),
             };
 
             if (isNew) {
@@ -170,50 +187,115 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
         }
     };
 
-    const updateAttribute = (index: number, field: keyof Attribute, val: string | boolean) => {
-        const newAttrs = [...formData.attributes];
-        (newAttrs[index] as any)[field] = val; // eslint-disable-line @typescript-eslint/no-explicit-any
-        setFormData({ ...formData, attributes: newAttrs });
+    const updateAttribute = (groupIndex: number, attrIndex: number, field: keyof Attribute, val: string) => {
+        const newGroups = formData.attributeGroups.map((g, i) => {
+            if (i !== groupIndex) return g;
+            const newAttrs = g.attributes.map((a, j) => (j === attrIndex ? { ...a, [field]: val } : a));
+            return { ...g, attributes: newAttrs };
+        });
+        setFormData({ ...formData, attributeGroups: newGroups });
     };
 
-    const addAttribute = () => {
+    const addAttributeGroup = () => {
         setFormData({
             ...formData,
-            attributes: [...formData.attributes, { name: "", value: "" }]
+            attributeGroups: [...formData.attributeGroups, { category: "General", attributes: [] }]
         });
     };
 
-    const removeAttribute = (index: number) => {
-        setFormData({ ...formData, attributes: formData.attributes.filter((_, i) => i !== index) });
+    const removeAttributeGroup = (groupIndex: number) => {
+        setFormData({
+            ...formData,
+            attributeGroups: formData.attributeGroups.filter((_, i) => i !== groupIndex)
+        });
     };
 
-    const moveAttributeUp = (index: number) => {
-        if (index <= 0) return;
-        const newAttrs = [...formData.attributes];
-        [newAttrs[index - 1], newAttrs[index]] = [newAttrs[index], newAttrs[index - 1]];
-        setFormData({ ...formData, attributes: newAttrs });
+    const updateGroupCategory = (groupIndex: number, category: string) => {
+        const newGroups = formData.attributeGroups.map((g, i) => (i === groupIndex ? { ...g, category } : g));
+        setFormData({ ...formData, attributeGroups: newGroups });
     };
 
-    const moveAttributeDown = (index: number) => {
-        if (index >= formData.attributes.length - 1) return;
-        const newAttrs = [...formData.attributes];
-        [newAttrs[index], newAttrs[index + 1]] = [newAttrs[index + 1], newAttrs[index]];
-        setFormData({ ...formData, attributes: newAttrs });
+    const addAttributeToGroup = (groupIndex: number) => {
+        const newGroups = formData.attributeGroups.map((g, i) =>
+            i === groupIndex ? { ...g, attributes: [...g.attributes, { name: "", value: "" }] } : g
+        );
+        setFormData({ ...formData, attributeGroups: newGroups });
+    };
+
+    const removeAttribute = (groupIndex: number, attrIndex: number) => {
+        const newGroups = formData.attributeGroups.map((g, i) => {
+            if (i !== groupIndex) return g;
+            return { ...g, attributes: g.attributes.filter((_, j) => j !== attrIndex) };
+        });
+        setFormData({ ...formData, attributeGroups: newGroups });
+    };
+
+    const moveAttributeUp = (groupIndex: number, attrIndex: number) => {
+        if (attrIndex <= 0) return;
+        const newGroups = formData.attributeGroups.map((g, i) => {
+            if (i !== groupIndex) return g;
+            const arr = [...g.attributes];
+            [arr[attrIndex - 1], arr[attrIndex]] = [arr[attrIndex], arr[attrIndex - 1]];
+            return { ...g, attributes: arr };
+        });
+        setFormData({ ...formData, attributeGroups: newGroups });
+    };
+
+    const moveAttributeDown = (groupIndex: number, attrIndex: number) => {
+        const g = formData.attributeGroups[groupIndex];
+        if (!g || attrIndex >= g.attributes.length - 1) return;
+        const newGroups = formData.attributeGroups.map((gr, i) => {
+            if (i !== groupIndex) return gr;
+            const arr = [...gr.attributes];
+            [arr[attrIndex], arr[attrIndex + 1]] = [arr[attrIndex + 1], arr[attrIndex]];
+            return { ...gr, attributes: arr };
+        });
+        setFormData({ ...formData, attributeGroups: newGroups });
+    };
+
+    const moveGroupUp = (groupIndex: number) => {
+        if (groupIndex <= 0) return;
+        const arr = [...formData.attributeGroups];
+        [arr[groupIndex - 1], arr[groupIndex]] = [arr[groupIndex], arr[groupIndex - 1]];
+        setFormData({ ...formData, attributeGroups: arr });
+    };
+
+    const moveGroupDown = (groupIndex: number) => {
+        if (groupIndex >= formData.attributeGroups.length - 1) return;
+        const arr = [...formData.attributeGroups];
+        [arr[groupIndex], arr[groupIndex + 1]] = [arr[groupIndex + 1], arr[groupIndex]];
+        setFormData({ ...formData, attributeGroups: arr });
     };
 
     const uploadImage = async (file: File): Promise<{ url: string }> => {
         const formDataUpload = new FormData();
         formDataUpload.append("image", file);
+        const baseURL = process.env.NEXT_PUBLIC_API_BASE_URL || "/api/v1";
+        const url = `${baseURL}/admin/upload/image`;
         try {
-            const { data } = await api.post("/admin/upload/image", formDataUpload);
-            return data;
-        } catch (err: unknown) {
-            const status = (err as { response?: { status?: number } })?.response?.status;
-            if (status === 401) {
+            const token = typeof window !== "undefined" && (() => {
+                try {
+                    const raw = localStorage.getItem("userInfo");
+                    const data = raw ? JSON.parse(raw) : {};
+                    return data?.token;
+                } catch { return undefined; }
+            })();
+            const res = await fetch(url, {
+                method: "POST",
+                body: formDataUpload,
+                credentials: "include",
+                headers: token ? { Authorization: `Bearer ${token}` } : {},
+                // Do NOT set Content-Type: fetch will set multipart/form-data with boundary automatically
+            });
+            const data = await res.json().catch(() => ({}));
+            if (res.status === 401) {
                 throw new Error("Please log in to upload images. Go to Login and sign in as admin.");
             }
-            const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-            throw new Error(msg || "Upload failed");
+            if (!res.ok) throw new Error((data?.message as string) || "Upload failed");
+            return data;
+        } catch (err: unknown) {
+            if (err instanceof Error) throw err;
+            throw new Error("Upload failed");
         }
     };
 
@@ -576,79 +658,131 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                     )}
                 </div>
 
-                {/* Properties / Attributes */}
+                {/* Product details — attribute groups (e.g. General, Cable Specs) */}
                 <div className="border-t border-border-soft pt-6">
                     <div className="flex justify-between items-center mb-4">
                         <div>
-                            <h2 className="text-xl font-bold text-main">Properties / Attributes</h2>
+                            <h2 className="text-xl font-bold text-main">Product details (Attributes)</h2>
+                            <p className="text-sub text-sm mt-0.5">Group attributes by category (e.g. General, Cable Specs, General Specs).</p>
                         </div>
                         <button
                             type="button"
-                            onClick={addAttribute}
-                            className="text-sm bg-accent/20 text-accent px-3 py-1 rounded hover:bg-accent/30 transition-colors"
+                            onClick={addAttributeGroup}
+                            className="text-sm bg-accent/20 text-accent px-3 py-1.5 rounded hover:bg-accent/30 transition-colors flex items-center gap-1"
                         >
-                            + Add Property
+                            <Plus className="h-4 w-4" /> Add category
                         </button>
                     </div>
 
-                    {formData.attributes.length > 0 && (
-                        <div className="flex gap-2 mb-2 px-1">
-                            <span className="w-16 text-xs text-sub uppercase tracking-wider shrink-0">Order</span>
-                            <span className="flex-1 text-xs text-sub uppercase tracking-wider">Name</span>
-                            <span className="flex-1 text-xs text-sub uppercase tracking-wider">Value</span>
-                            <span className="w-8 shrink-0" />
-                        </div>
+                    {formData.attributeGroups.length === 0 && (
+                        <p className="text-sub text-sm italic">No attribute categories. Click &quot;Add category&quot; to add one (e.g. General, Cable Specs).</p>
                     )}
 
-                    <div className="space-y-3">
-                        {formData.attributes.map((attr, index) => (
-                            <div key={index} className="flex gap-2 items-center">
-                                <div className="flex flex-col w-16 shrink-0 gap-0.5">
+                    <div className="space-y-6">
+                        {formData.attributeGroups.map((group, groupIndex) => (
+                            <div key={groupIndex} className="bg-base rounded-xl border border-border-soft p-4">
+                                <div className="flex items-center gap-2 mb-3">
+                                    <div className="flex flex-col w-12 shrink-0 gap-0.5">
+                                        <button
+                                            type="button"
+                                            onClick={() => moveGroupUp(groupIndex)}
+                                            disabled={groupIndex === 0}
+                                            className="p-1 text-sub hover:text-main hover:bg-white/5 rounded disabled:opacity-40 disabled:pointer-events-none"
+                                            title="Move category up"
+                                        >
+                                            <ChevronUp className="h-4 w-4" />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => moveGroupDown(groupIndex)}
+                                            disabled={groupIndex === formData.attributeGroups.length - 1}
+                                            className="p-1 text-sub hover:text-main hover:bg-white/5 rounded disabled:opacity-40 disabled:pointer-events-none"
+                                            title="Move category down"
+                                        >
+                                            <ChevronDown className="h-4 w-4" />
+                                        </button>
+                                    </div>
+                                    <input
+                                        type="text"
+                                        placeholder="Category name (e.g. General, Cable Specs)"
+                                        className="flex-1 bg-white/5 border border-border-soft rounded-lg px-3 py-2 text-main font-medium focus:outline-none focus:border-accent"
+                                        value={group.category}
+                                        onChange={(e) => updateGroupCategory(groupIndex, e.target.value)}
+                                    />
                                     <button
                                         type="button"
-                                        onClick={() => moveAttributeUp(index)}
-                                        disabled={index === 0}
-                                        className="p-1.5 text-sub hover:text-main hover:bg-white/5 rounded disabled:opacity-40 disabled:pointer-events-none"
-                                        title="Move up"
+                                        onClick={() => removeAttributeGroup(groupIndex)}
+                                        className="p-2 text-red-400 hover:bg-red-400/10 rounded shrink-0"
+                                        title="Remove category"
                                     >
-                                        <ChevronUp className="h-4 w-4" />
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => moveAttributeDown(index)}
-                                        disabled={index === formData.attributes.length - 1}
-                                        className="p-1.5 text-sub hover:text-main hover:bg-white/5 rounded disabled:opacity-40 disabled:pointer-events-none"
-                                        title="Move down"
-                                    >
-                                        <ChevronDown className="h-4 w-4" />
+                                        <Trash2 className="h-5 w-5" />
                                     </button>
                                 </div>
-                                <input
-                                    type="text"
-                                    placeholder="Name (e.g. Color)"
-                                    className="flex-1 bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent min-w-0"
-                                    value={attr.name}
-                                    onChange={(e) => updateAttribute(index, 'name', e.target.value)}
-                                />
-                                <input
-                                    type="text"
-                                    placeholder="Value (e.g. Red)"
-                                    className="flex-1 bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent min-w-0"
-                                    value={attr.value}
-                                    onChange={(e) => updateAttribute(index, 'value', e.target.value)}
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => removeAttribute(index)}
-                                    className="p-2 text-red-400 hover:bg-red-400/10 rounded shrink-0"
-                                >
-                                    <Trash2 className="h-5 w-5" />
-                                </button>
+
+                                <div className="pl-4 space-y-2">
+                                    {group.attributes.length > 0 && (
+                                        <div className="flex gap-2 mb-2 px-1 text-xs text-sub uppercase tracking-wider">
+                                            <span className="w-16 shrink-0">Order</span>
+                                            <span className="flex-1">Name</span>
+                                            <span className="flex-1">Value</span>
+                                            <span className="w-8 shrink-0" />
+                                        </div>
+                                    )}
+                                    {group.attributes.map((attr, attrIndex) => (
+                                        <div key={attrIndex} className="flex gap-2 items-center">
+                                            <div className="flex flex-col w-16 shrink-0 gap-0.5">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => moveAttributeUp(groupIndex, attrIndex)}
+                                                    disabled={attrIndex === 0}
+                                                    className="p-1.5 text-sub hover:text-main hover:bg-white/5 rounded disabled:opacity-40 disabled:pointer-events-none"
+                                                    title="Move up"
+                                                >
+                                                    <ChevronUp className="h-4 w-4" />
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => moveAttributeDown(groupIndex, attrIndex)}
+                                                    disabled={attrIndex === group.attributes.length - 1}
+                                                    className="p-1.5 text-sub hover:text-main hover:bg-white/5 rounded disabled:opacity-40 disabled:pointer-events-none"
+                                                    title="Move down"
+                                                >
+                                                    <ChevronDown className="h-4 w-4" />
+                                                </button>
+                                            </div>
+                                            <input
+                                                type="text"
+                                                placeholder="Name (e.g. Color)"
+                                                className="flex-1 bg-base border border-border-soft rounded-lg px-3 py-2 text-main text-sm focus:outline-none focus:border-accent min-w-0"
+                                                value={attr.name}
+                                                onChange={(e) => updateAttribute(groupIndex, attrIndex, "name", e.target.value)}
+                                            />
+                                            <input
+                                                type="text"
+                                                placeholder="Value (e.g. Red)"
+                                                className="flex-1 bg-base border border-border-soft rounded-lg px-3 py-2 text-main text-sm focus:outline-none focus:border-accent min-w-0"
+                                                value={attr.value}
+                                                onChange={(e) => updateAttribute(groupIndex, attrIndex, "value", e.target.value)}
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => removeAttribute(groupIndex, attrIndex)}
+                                                className="p-2 text-red-400 hover:bg-red-400/10 rounded shrink-0"
+                                            >
+                                                <Trash2 className="h-5 w-5" />
+                                            </button>
+                                        </div>
+                                    ))}
+                                    <button
+                                        type="button"
+                                        onClick={() => addAttributeToGroup(groupIndex)}
+                                        className="text-sm text-accent hover:bg-accent/10 px-3 py-1.5 rounded transition-colors"
+                                    >
+                                        + Add property to this category
+                                    </button>
+                                </div>
                             </div>
                         ))}
-                        {formData.attributes.length === 0 && (
-                            <p className="text-sub text-sm italic">No properties added.</p>
-                        )}
                     </div>
                 </div>
 

@@ -13,6 +13,13 @@ export const productSchema = z.object({
     description: z.string().optional(),
     specs: z.record(z.string(), z.string()).optional(),
     images: z.array(z.string()).optional(),
+    attributeGroups: z.array(z.object({
+        category: z.string(),
+        attributes: z.array(z.object({
+            name: z.string(),
+            value: z.string()
+        }))
+    })).optional(),
     attributes: z.array(z.object({
         name: z.string(),
         value: z.string()
