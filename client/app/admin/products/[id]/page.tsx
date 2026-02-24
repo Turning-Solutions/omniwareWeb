@@ -2,7 +2,7 @@
 
 import { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
-import { Save, ArrowLeft, Trash2, Edit2, Plus, ChevronUp, ChevronDown, ImagePlus, Upload, Loader2 } from "lucide-react";
+import { Save, ArrowLeft, Trash2, Edit2, Plus, ChevronUp, ChevronDown, ImagePlus, Upload, Loader2, ArrowRightLeft } from "lucide-react";
 import Link from "next/link";
 import api from "@/lib/api";
 
@@ -71,6 +71,8 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
     const [loading, setLoading] = useState(false);
     const [initialLoading, setInitialLoading] = useState(true);
     const [imageUploading, setImageUploading] = useState<string | number | null>(null); // 'add' or index when replacing
+    // Selected attributes for "move to category": Set of "groupIndex-attrIndex"
+    const [selectedAttributeKeys, setSelectedAttributeKeys] = useState<Set<string>>(new Set());
 
     useEffect(() => {
         const fetchData = async () => {
@@ -123,6 +125,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                     images: Array.isArray(data.images) ? data.images : [],
                     isActive: data.isActive
                 });
+                setSelectedAttributeKeys(new Set());
             } catch (err) {
                 console.error(err);
             }
@@ -265,6 +268,62 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
         const arr = [...formData.attributeGroups];
         [arr[groupIndex], arr[groupIndex + 1]] = [arr[groupIndex + 1], arr[groupIndex]];
         setFormData({ ...formData, attributeGroups: arr });
+    };
+
+    const attrKey = (groupIndex: number, attrIndex: number) => `${groupIndex}-${attrIndex}`;
+    const isAttributeSelected = (groupIndex: number, attrIndex: number) => selectedAttributeKeys.has(attrKey(groupIndex, attrIndex));
+    const toggleAttributeSelection = (groupIndex: number, attrIndex: number) => {
+        const key = attrKey(groupIndex, attrIndex);
+        setSelectedAttributeKeys((prev) => {
+            const next = new Set(prev);
+            if (next.has(key)) next.delete(key);
+            else next.add(key);
+            return next;
+        });
+    };
+    const selectAllInGroup = (groupIndex: number) => {
+        const g = formData.attributeGroups[groupIndex];
+        if (!g) return;
+        setSelectedAttributeKeys((prev) => {
+            const next = new Set(prev);
+            g.attributes.forEach((_, attrIndex) => next.add(attrKey(groupIndex, attrIndex)));
+            return next;
+        });
+    };
+    const deselectAllInGroup = (groupIndex: number) => {
+        const g = formData.attributeGroups[groupIndex];
+        if (!g) return;
+        setSelectedAttributeKeys((prev) => {
+            const next = new Set(prev);
+            g.attributes.forEach((_, attrIndex) => next.delete(attrKey(groupIndex, attrIndex)));
+            return next;
+        });
+    };
+    const clearAttributeSelection = () => setSelectedAttributeKeys(new Set());
+
+    const moveSelectedAttributesToGroup = (targetGroupIndex: number) => {
+        const keys = Array.from(selectedAttributeKeys);
+        if (keys.length === 0) return;
+        const toMove: { groupIndex: number; attrIndex: number }[] = keys.map((k) => {
+            const [g, a] = k.split("-").map(Number);
+            return { groupIndex: g, attrIndex: a };
+        });
+        const groups = formData.attributeGroups.map((g) => ({ ...g, attributes: [...g.attributes] }));
+        const targetGroup = groups[targetGroupIndex];
+        if (!targetGroup) return;
+        const toAdd: Attribute[] = [];
+        toMove
+            .sort((a, b) => (a.groupIndex !== b.groupIndex ? a.groupIndex - b.groupIndex : a.attrIndex - b.attrIndex))
+            .reverse()
+            .forEach(({ groupIndex, attrIndex }) => {
+                const gr = groups[groupIndex];
+                if (!gr || attrIndex < 0 || attrIndex >= gr.attributes.length) return;
+                toAdd.unshift(gr.attributes[attrIndex]);
+                gr.attributes.splice(attrIndex, 1);
+            });
+        targetGroup.attributes.push(...toAdd);
+        setFormData({ ...formData, attributeGroups: groups });
+        setSelectedAttributeKeys(new Set());
     };
 
     const uploadImage = async (file: File): Promise<{ url: string }> => {
@@ -678,6 +737,44 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                         <p className="text-sub text-sm italic">No attribute categories. Click &quot;Add category&quot; to add one (e.g. General, Cable Specs).</p>
                     )}
 
+                    {selectedAttributeKeys.size > 0 && formData.attributeGroups.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-3 p-3 rounded-lg bg-accent/10 border border-accent/30 mb-4">
+                            <span className="text-sm font-medium text-main">
+                                {selectedAttributeKeys.size} attribute{selectedAttributeKeys.size !== 1 ? "s" : ""} selected
+                            </span>
+                            <select
+                                id="move-target-category"
+                                className="bg-base border border-border-soft rounded-lg px-3 py-1.5 text-sm text-main focus:outline-none focus:border-accent [&>option]:text-black"
+                            >
+                                <option value="">Move to category…</option>
+                                {formData.attributeGroups.map((g, i) => (
+                                    <option key={i} value={i}>
+                                        {g.category || `Category ${i + 1}`}
+                                    </option>
+                                ))}
+                            </select>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    const sel = document.getElementById("move-target-category") as HTMLSelectElement | null;
+                                    const val = sel?.value;
+                                    if (val === "" || val == null) return;
+                                    moveSelectedAttributesToGroup(Number(val));
+                                }}
+                                className="text-sm bg-accent text-white px-3 py-1.5 rounded hover:bg-accent/90 flex items-center gap-1.5"
+                            >
+                                <ArrowRightLeft className="h-4 w-4" /> Move
+                            </button>
+                            <button
+                                type="button"
+                                onClick={clearAttributeSelection}
+                                className="text-sm text-sub hover:text-main"
+                            >
+                                Clear selection
+                            </button>
+                        </div>
+                    )}
+
                     <div className="space-y-6">
                         {formData.attributeGroups.map((group, groupIndex) => (
                             <div key={groupIndex} className="bg-base rounded-xl border border-border-soft p-4">
@@ -718,10 +815,30 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                                         <Trash2 className="h-5 w-5" />
                                     </button>
                                 </div>
+                                {group.attributes.length > 0 && (
+                                    <div className="flex items-center gap-2 mb-2 pl-4">
+                                        <button
+                                            type="button"
+                                            onClick={() => selectAllInGroup(groupIndex)}
+                                            className="text-xs text-accent hover:underline"
+                                        >
+                                            Select all
+                                        </button>
+                                        <span className="text-sub">|</span>
+                                        <button
+                                            type="button"
+                                            onClick={() => deselectAllInGroup(groupIndex)}
+                                            className="text-xs text-sub hover:underline"
+                                        >
+                                            Deselect all
+                                        </button>
+                                    </div>
+                                )}
 
                                 <div className="pl-4 space-y-2">
                                     {group.attributes.length > 0 && (
                                         <div className="flex gap-2 mb-2 px-1 text-xs text-sub uppercase tracking-wider">
+                                            <span className="w-8 shrink-0">Select</span>
                                             <span className="w-16 shrink-0">Order</span>
                                             <span className="flex-1">Name</span>
                                             <span className="flex-1">Value</span>
@@ -729,7 +846,15 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                                         </div>
                                     )}
                                     {group.attributes.map((attr, attrIndex) => (
-                                        <div key={attrIndex} className="flex gap-2 items-center">
+                                        <div key={attrIndex} className={`flex gap-2 items-center rounded px-2 py-1 ${isAttributeSelected(groupIndex, attrIndex) ? "bg-accent/15" : ""}`}>
+                                            <label className="w-8 shrink-0 flex items-center cursor-pointer" title="Select to move to another category">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={isAttributeSelected(groupIndex, attrIndex)}
+                                                    onChange={() => toggleAttributeSelection(groupIndex, attrIndex)}
+                                                    className="w-4 h-4 rounded border-gray-500 text-accent focus:ring-accent"
+                                                />
+                                            </label>
                                             <div className="flex flex-col w-16 shrink-0 gap-0.5">
                                                 <button
                                                     type="button"
