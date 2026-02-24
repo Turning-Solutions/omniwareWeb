@@ -877,16 +877,16 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                                             </div>
                                             <input
                                                 type="text"
-                                                placeholder="Name (e.g. Color)"
+                                                placeholder="Name (optional, e.g. Color)"
                                                 className="flex-1 bg-base border border-border-soft rounded-lg px-3 py-2 text-main text-sm focus:outline-none focus:border-accent min-w-0"
-                                                value={attr.name}
+                                                value={attr.name ?? ''}
                                                 onChange={(e) => updateAttribute(groupIndex, attrIndex, "name", e.target.value)}
                                             />
                                             <input
                                                 type="text"
                                                 placeholder="Value (e.g. Red)"
                                                 className="flex-1 bg-base border border-border-soft rounded-lg px-3 py-2 text-main text-sm focus:outline-none focus:border-accent min-w-0"
-                                                value={attr.value}
+                                                value={attr.value ?? ''}
                                                 onChange={(e) => updateAttribute(groupIndex, attrIndex, "value", e.target.value)}
                                             />
                                             <button

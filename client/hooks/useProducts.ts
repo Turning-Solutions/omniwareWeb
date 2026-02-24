@@ -33,9 +33,9 @@ export interface Product {
     stock?: { qty: number };
     variants?: any[];
     specs?: Record<string, string>;
-    attributes?: { name: string; value: string }[];
+    attributes?: { name?: string; value: string }[];
     /** Grouped attributes for product details (e.g. General, Cable Specs). Falls back to attributes as one group. */
-    attributeGroups?: { category: string; attributes: { name: string; value: string }[] }[];
+    attributeGroups?: { category: string; attributes: { name?: string; value: string }[] }[];
 }
 
 interface ProductsResponse {

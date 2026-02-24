@@ -161,7 +161,7 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
 
                     {/* Product details (attributes by category) — collapsible */}
                     {(() => {
-                        const groups: { category: string; attributes: { name: string; value: string }[] }[] =
+                        const groups: { category: string; attributes: { name?: string; value: string }[] }[] =
                             product.attributeGroups?.length
                                 ? product.attributeGroups
                                 : product.attributes?.length
@@ -212,8 +212,14 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
                                                     <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
                                                         {group.attributes.map((attr, i) => (
                                                             <div key={i}>
-                                                                <span className="block text-gray-500 text-xs uppercase tracking-wider">{attr.name}</span>
-                                                                <span className="text-gray-300">{attr.value}</span>
+                                                                {attr.name ? (
+                                                                    <>
+                                                                        <span className="block text-gray-500 text-xs uppercase tracking-wider">{attr.name}</span>
+                                                                        <span className="text-gray-300">{attr.value}</span>
+                                                                    </>
+                                                                ) : (
+                                                                    <span className="text-gray-300">{attr.value}</span>
+                                                                )}
                                                             </div>
                                                         ))}
                                                     </div>

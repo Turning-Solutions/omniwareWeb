@@ -21,12 +21,12 @@ const productSchema = new mongoose.Schema({
     attributeGroups: [{
         category: { type: String, required: true, default: 'General' },
         attributes: [{
-            name: { type: String, required: true },
+            name: { type: String, required: false },
             value: { type: String, required: true }
         }]
     }],
     attributes: [{
-        name: { type: String, required: true },
+        name: { type: String, required: false },
         value: { type: String, required: true }
     }],
     variants: [{
@@ -34,7 +34,7 @@ const productSchema = new mongoose.Schema({
         price: { type: Number },
         stock: { qty: { type: Number, default: 0 } },
         attributes: [{
-            name: { type: String, required: true },
+            name: { type: String, required: false },
             value: { type: String, required: true }
         }]
     }],
