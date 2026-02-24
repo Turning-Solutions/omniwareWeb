@@ -2,10 +2,13 @@
 
 import { useState, useEffect, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { useProducts } from "@/hooks/useProducts";
 import ProductCard from "@/components/ProductCard";
 import DynamicFilterSidebar, { countActiveFilters } from "@/components/DynamicFilterSidebar";
-import { SlidersHorizontal, ArrowUpDown, X } from "lucide-react";
+import { SlidersHorizontal, ArrowUpDown, X, ChevronLeft, ChevronRight } from "lucide-react";
+
+const PRODUCTS_PER_PAGE = 15;
 
 interface ShopContentProps {
     basePath?: string;
@@ -25,8 +28,19 @@ export function ShopContent({ basePath = "/shop", initialFilters = {} }: ShopCon
 
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-    // Fetch products
-    const { data, isLoading, error } = useProducts(filters);
+    // Sync filters from URL when navigating (e.g. pagination links)
+    useEffect(() => {
+        const page = Number(searchParams?.get("page")) || 1;
+        const search = searchParams?.get("search") || "";
+        const sort = searchParams?.get("sort") || "newest";
+        setFilters((prev) => {
+            if (prev.page === page && prev.search === search && prev.sort === sort) return prev;
+            return { ...prev, page, search, sort };
+        });
+    }, [searchParams]);
+
+    // Fetch products with 15 per page
+    const { data, isLoading, error } = useProducts({ ...filters, limit: PRODUCTS_PER_PAGE });
     const products = data?.products || [];
     const facets = (data as any)?.facets || {};
 
@@ -91,6 +105,34 @@ export function ShopContent({ basePath = "/shop", initialFilters = {} }: ShopCon
         }));
     };
 
+    const buildPageUrl = (page: number) => {
+        const params = new URLSearchParams();
+        if (page > 1) params.set("page", String(page));
+        if (filters.search) params.set("search", String(filters.search));
+        if (filters.sort && filters.sort !== "newest") params.set("sort", String(filters.sort));
+        const qs = params.toString();
+        return qs ? `${basePath}?${qs}` : basePath;
+    };
+
+    const pagination = (data as { pagination?: { page: number; pages: number; total: number } })?.pagination;
+    const currentPage = pagination?.page ?? (data as { page?: number })?.page ?? 1;
+    const totalPages = pagination?.pages ?? (data as { pages?: number })?.pages ?? 1;
+    const totalProducts = pagination?.total ?? (data as { total?: number })?.total;
+    const showPagination = totalPages > 1 && !isLoading && !error;
+
+    const getPageNumbers = () => {
+        if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1);
+        const pages: (number | "ellipsis")[] = [];
+        if (currentPage <= 4) {
+            pages.push(1, 2, 3, 4, 5, "ellipsis", totalPages);
+        } else if (currentPage >= totalPages - 3) {
+            pages.push(1, "ellipsis", totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages);
+        } else {
+            pages.push(1, "ellipsis", currentPage - 1, currentPage, currentPage + 1, "ellipsis", totalPages);
+        }
+        return pages;
+    };
+
     return (
         <div className="flex flex-col lg:flex-row gap-8">
             {/* Sidebar Toggle (Mobile) */}
@@ -146,9 +188,9 @@ export function ShopContent({ basePath = "/shop", initialFilters = {} }: ShopCon
                             </button>
                         )}
                     </div>
-                    {!isLoading && !error && (
+                    {!isLoading && !error && totalProducts != null && (
                         <p className="text-sm text-sub">
-                            {data?.total != null ? `${data.total} product${data.total !== 1 ? "s" : ""}` : ""}
+                            {totalProducts} product{totalProducts !== 1 ? "s" : ""}
                         </p>
                     )}
                 </div>
@@ -164,11 +206,63 @@ export function ShopContent({ basePath = "/shop", initialFilters = {} }: ShopCon
                 ) : products.length === 0 ? (
                     <div className="text-center text-gray-500 py-12">No products found</div>
                 ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {products.map((product) => (
-                            <ProductCard key={product._id} product={product} />
-                        ))}
-                    </div>
+                    <>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {products.map((product) => (
+                                <ProductCard key={product._id} product={product} />
+                            ))}
+                        </div>
+
+                        {showPagination && (
+                            <nav className="mt-10 flex items-center justify-center gap-2" aria-label="Pagination">
+                                <Link
+                                    href={buildPageUrl(currentPage - 1)}
+                                    className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                                        currentPage <= 1
+                                            ? "text-white/30 cursor-not-allowed pointer-events-none"
+                                            : "text-main hover:bg-white/10"
+                                    }`}
+                                    aria-disabled={currentPage <= 1}
+                                >
+                                    <ChevronLeft className="h-4 w-4" />
+                                    Previous
+                                </Link>
+                                <div className="flex items-center gap-1">
+                                    {getPageNumbers().map((p, i) =>
+                                        p === "ellipsis" ? (
+                                            <span key={`ellipsis-${i}`} className="px-2 text-sub">
+                                                …
+                                            </span>
+                                        ) : (
+                                            <Link
+                                                key={p}
+                                                href={buildPageUrl(p)}
+                                                className={`min-w-[2.25rem] h-9 rounded-lg flex items-center justify-center text-sm font-medium transition-colors ${
+                                                    p === currentPage
+                                                        ? "bg-accent text-white"
+                                                        : "text-main hover:bg-white/10"
+                                                }`}
+                                            >
+                                                {p}
+                                            </Link>
+                                        )
+                                    )}
+                                </div>
+                                <Link
+                                    href={buildPageUrl(currentPage + 1)}
+                                    className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                                        currentPage >= totalPages
+                                            ? "text-white/30 cursor-not-allowed pointer-events-none"
+                                            : "text-main hover:bg-white/10"
+                                    }`}
+                                    aria-disabled={currentPage >= totalPages}
+                                >
+                                    Next
+                                    <ChevronRight className="h-4 w-4" />
+                                </Link>
+                            </nav>
+                        )}
+                    </>
                 )}
             </div>
         </div>

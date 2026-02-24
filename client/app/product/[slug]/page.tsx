@@ -122,7 +122,7 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
                     <div className="flex items-center space-x-4 mb-6">
                         <span className="text-2xl font-bold text-primary">LKR {currentPrice?.toLocaleString()}</span>
                         {currentStock > 0 ? (
-                            <span className="flex items-center text-green-400 text-sm font-medium"><Check className="h-4 w-4 mr-1" /> In Stock ({currentStock})</span>
+                            <span className="flex items-center text-green-400 text-sm font-medium"><Check className="h-4 w-4 mr-1" /> In Stock</span>
                         ) : (
                             <span className="text-red-400 text-sm font-medium">Out of Stock</span>
                         )}
