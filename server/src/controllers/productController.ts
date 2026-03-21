@@ -3,8 +3,21 @@ import Product from '../models/Product';
 import Brand from '../models/Brand';
 import Category from '../models/Category';
 import CategoryFeaturedSpecs from '../models/CategoryFeaturedSpecs';
-import { buildProductMatchStage } from '../utils/productAggregation';
+import { buildProductMatchStage, SPECS_OBJECT_TO_ARRAY_PROJECT } from '../utils/productAggregation';
 import { normalizeSpecKey } from '../utils/normalizeSpecKey';
+
+/** Maps shop URL values like price-asc to Mongo sort (also accepts price_asc). */
+function buildProductSortStage(sort: unknown): Record<string, 1 | -1> {
+    const key = String(sort ?? '')
+        .trim()
+        .toLowerCase()
+        .replace(/-/g, '_');
+    if (key === 'price_asc') return { price: 1 };
+    if (key === 'price_desc') return { price: -1 };
+    if (key === 'newest') return { createdAt: -1 };
+    if (key === 'name_asc') return { title: 1 };
+    return { createdAt: -1 };
+}
 
 export const getProducts = async (req: Request, res: Response) => {
     try {
@@ -22,11 +35,7 @@ export const getProducts = async (req: Request, res: Response) => {
         // For Price: Exclude 'price' filter so we see full range
         const priceMatchStage = await buildProductMatchStage(req, ['price']);
 
-        // --- Build Sort Stage ---
-        let sortStage: any = { createdAt: -1 };
-        if (sort === 'price_asc') sortStage = { price: 1 };
-        else if (sort === 'price_desc') sortStage = { price: -1 };
-        else if (sort === 'newest') sortStage = { createdAt: -1 };
+        const sortStage = buildProductSortStage(sort);
 
         const skip = (Number(page) - 1) * Number(limit);
 
@@ -97,8 +106,7 @@ export const getProducts = async (req: Request, res: Response) => {
                     // unless specifically requested.
                     specs: [
                         { $match: matchStage },
-                        // Convert specs Map/Object to Array of k/v pairs
-                        { $project: { specs: { $objectToArray: "$specs" } } },
+                        SPECS_OBJECT_TO_ARRAY_PROJECT,
                         { $unwind: "$specs" },
                         // Group by Key+Value to get counts
                         {
@@ -215,7 +223,7 @@ export const getProductFacets = async (req: Request, res: Response) => {
                         { $project: { value: "$_id", count: 1, _id: 0 } }
                     ],
                     specs: [
-                        { $project: { specs: { $objectToArray: "$specs" } } },
+                        SPECS_OBJECT_TO_ARRAY_PROJECT,
                         { $unwind: "$specs" },
                         {
                             $group: {

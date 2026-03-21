@@ -8,6 +8,21 @@ export interface MatchStageCache {
     categoryIds?: mongoose.Types.ObjectId[];
 }
 
+/** $objectToArray errors on null/missing/non-document specs; coerce to {} first. */
+export const SPECS_OBJECT_TO_ARRAY_PROJECT = {
+    $project: {
+        specs: {
+            $objectToArray: {
+                $cond: {
+                    if: { $eq: [{ $type: '$specs' }, 'object'] },
+                    then: '$specs',
+                    else: {},
+                },
+            },
+        },
+    },
+} as const;
+
 export const buildProductMatchStage = async (
     req: Request,
     exclude: string[] = [],

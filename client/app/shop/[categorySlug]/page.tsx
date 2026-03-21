@@ -1,7 +1,15 @@
 "use client";
 
 import { Suspense, use } from "react";
-import { ShopContent } from "../page";
+import { ShopContent, ShopSkeleton } from "../page";
+
+function titleFromSlug(slug: string) {
+    return slug
+        .split("-")
+        .filter(Boolean)
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+        .join(" ");
+}
 
 interface CategoryShopPageProps {
     params: Promise<{
@@ -11,14 +19,21 @@ interface CategoryShopPageProps {
 
 export default function CategoryShopPage({ params }: CategoryShopPageProps) {
     const { categorySlug } = use(params);
+    const heading = titleFromSlug(categorySlug);
 
     return (
-        <div className="min-h-screen bg-black pt-20 pb-12">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <Suspense fallback={<div className="text-main text-center pt-20">Loading Category...</div>}>
+        <div className="min-h-screen bg-[#121212] pb-16 pt-6 sm:pt-10">
+            <div
+                className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(ellipse_85%_55%_at_50%_-25%,rgba(209,43,40,0.16),transparent_55%)]"
+                aria-hidden
+            />
+            <div className="mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-10">
+                <Suspense fallback={<ShopSkeleton />}>
                     <ShopContent
                         basePath={`/shop/${categorySlug}`}
                         initialFilters={{ category: categorySlug }}
+                        heading={heading}
+                        subheading="Products in this category. Refine with filters on the left."
                     />
                 </Suspense>
             </div>

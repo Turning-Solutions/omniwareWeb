@@ -1,22 +1,44 @@
 "use client";
 
-import { useState, useEffect, useRef, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useState, useEffect, useRef, Suspense, useCallback } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useProducts } from "@/hooks/useProducts";
 import ProductCard from "@/components/ProductCard";
 import DynamicFilterSidebar, { countActiveFilters } from "@/components/DynamicFilterSidebar";
-import { SlidersHorizontal, ArrowUpDown, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { SlidersHorizontal, ArrowUpDown, X, ChevronLeft, ChevronRight, Search } from "lucide-react";
 
 const PRODUCTS_PER_PAGE = 15;
+const SEARCH_DEBOUNCE_MS = 380;
+
+function buildShopQueryString(f: Record<string, unknown>): string {
+    const params = new URLSearchParams();
+    const page = Number(f.page) || 1;
+    if (page > 1) params.set("page", String(page));
+    const search = String(f.search ?? "").trim();
+    if (search) params.set("search", search);
+    const sort = f.sort ?? "newest";
+    if (sort !== "newest") params.set("sort", String(sort));
+    return params.toString();
+}
 
 interface ShopContentProps {
     basePath?: string;
     initialFilters?: Record<string, any>;
+    /** Page title shown above filters + grid */
+    heading?: string;
+    /** Short line under the title */
+    subheading?: string;
 }
 
-export function ShopContent({ basePath = "/shop", initialFilters = {} }: ShopContentProps) {
+export function ShopContent({
+    basePath = "/shop",
+    initialFilters = {},
+    heading,
+    subheading,
+}: ShopContentProps) {
     const searchParams = useSearchParams();
+    const router = useRouter();
 
     // Initialize filters from URL or props
     const [filters, setFilters] = useState<Record<string, any>>({
@@ -27,6 +49,19 @@ export function ShopContent({ basePath = "/shop", initialFilters = {} }: ShopCon
     });
 
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const [searchDraft, setSearchDraft] = useState(() => String(searchParams?.get("search") || ""));
+    const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const filtersRef = useRef(filters);
+    filtersRef.current = filters;
+
+    const replaceShopUrl = useCallback(
+        (nextFilters: Record<string, unknown>) => {
+            const qs = buildShopQueryString(nextFilters);
+            const path = qs ? `${basePath}?${qs}` : basePath;
+            router.replace(path, { scroll: false });
+        },
+        [basePath, router]
+    );
 
     // Sync filters from URL when navigating (e.g. pagination links)
     useEffect(() => {
@@ -37,6 +72,7 @@ export function ShopContent({ basePath = "/shop", initialFilters = {} }: ShopCon
             if (prev.page === page && prev.search === search && prev.sort === sort) return prev;
             return { ...prev, page, search, sort };
         });
+        setSearchDraft(search);
     }, [searchParams]);
 
     // Fetch products with 15 per page
@@ -105,12 +141,42 @@ export function ShopContent({ basePath = "/shop", initialFilters = {} }: ShopCon
         }));
     };
 
+    const commitSearch = useCallback(
+        (raw: string) => {
+            const q = raw.trim();
+            const next = { ...filtersRef.current, search: q, page: 1 };
+            setFilters(next);
+            replaceShopUrl(next);
+        },
+        [replaceShopUrl]
+    );
+
+    const flushSearchDebounce = useCallback(() => {
+        if (searchDebounceRef.current) {
+            clearTimeout(searchDebounceRef.current);
+            searchDebounceRef.current = null;
+        }
+    }, []);
+
+    useEffect(() => () => flushSearchDebounce(), [flushSearchDebounce]);
+
+    const onSearchInputChange = (value: string) => {
+        setSearchDraft(value);
+        flushSearchDebounce();
+        searchDebounceRef.current = setTimeout(() => {
+            searchDebounceRef.current = null;
+            commitSearch(value);
+        }, SEARCH_DEBOUNCE_MS);
+    };
+
+    const clearSearch = () => {
+        flushSearchDebounce();
+        setSearchDraft("");
+        commitSearch("");
+    };
+
     const buildPageUrl = (page: number) => {
-        const params = new URLSearchParams();
-        if (page > 1) params.set("page", String(page));
-        if (filters.search) params.set("search", String(filters.search));
-        if (filters.sort && filters.sort !== "newest") params.set("sort", String(filters.sort));
-        const qs = params.toString();
+        const qs = buildShopQueryString({ ...filters, page });
         return qs ? `${basePath}?${qs}` : basePath;
     };
 
@@ -134,136 +200,277 @@ export function ShopContent({ basePath = "/shop", initialFilters = {} }: ShopCon
     };
 
     return (
-        <div className="flex flex-col lg:flex-row gap-8">
-            {/* Sidebar Toggle (Mobile) */}
-            <div className="lg:hidden flex items-center gap-3">
-                <button
-                    onClick={() => setIsSidebarOpen(true)}
-                    className="flex items-center gap-2 px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white hover:bg-white/10 transition-colors font-medium"
-                >
-                    <SlidersHorizontal className="h-4 w-4" />
-                    Filters
-                    {activeFilterCount > 0 && (
-                        <span className="min-w-[1.25rem] h-5 px-1.5 rounded-full bg-accent/20 text-accent text-xs font-semibold flex items-center justify-center">
-                            {activeFilterCount}
-                        </span>
-                    )}
-                </button>
-            </div>
-
-            {/* Sidebar */}
-            <DynamicFilterSidebar
-                facets={facets}
-                filters={filters}
-                setFilters={setFilters}
-                isOpen={isSidebarOpen}
-                onClose={() => setIsSidebarOpen(false)}
-            />
-
-            {/* Product Grid + Toolbar */}
-            <div className="flex-1 min-w-0">
-                {/* Toolbar: sort + active filters */}
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-                    <div className="flex flex-wrap items-center gap-2">
-                        <label className="flex items-center gap-2 text-sub text-sm">
-                            <ArrowUpDown className="h-4 w-4" />
-                            <span className="sr-only">Sort by</span>
-                            <select
-                                value={filters.sort}
-                                onChange={(e) => setFilters((prev: Record<string, unknown>) => ({ ...prev, sort: e.target.value, page: 1 }))}
-                                className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-main focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent/50"
+        <div className="space-y-8 sm:space-y-10">
+            <header className="space-y-5 sm:space-y-6">
+                {(heading || subheading) && (
+                    <div className="space-y-3">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#8E8E8E]">
+                            Catalog
+                        </p>
+                        {heading && (
+                            <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight text-[#F1F1F1]">
+                                {heading}
+                            </h1>
+                        )}
+                        {subheading && (
+                            <p
+                                className="max-w-2xl text-sm font-medium leading-relaxed text-[#B0B0B0] sm:text-base"
                             >
-                                {sortOptions.map((opt) => (
-                                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                                ))}
-                            </select>
-                        </label>
-                        {activeFilterCount > 0 && (
-                            <button
-                                onClick={clearFilters}
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-accent hover:bg-accent/10 transition-colors"
-                            >
-                                <X className="h-3.5 w-3.5" />
-                                Clear {activeFilterCount} filter{activeFilterCount !== 1 ? "s" : ""}
-                            </button>
+                                {subheading}
+                            </p>
                         )}
                     </div>
-                    {!isLoading && !error && totalProducts != null && (
-                        <p className="text-sm text-sub">
-                            {totalProducts} product{totalProducts !== 1 ? "s" : ""}
-                        </p>
-                    )}
+                )}
+                <form
+                    role="search"
+                    className="max-w-2xl"
+                    onSubmit={(e) => {
+                        e.preventDefault();
+                        flushSearchDebounce();
+                        commitSearch(searchDraft);
+                    }}
+                >
+                    <label className="sr-only" htmlFor="shop-search">
+                        Search products
+                    </label>
+                    <div className="group relative flex min-h-[3rem] items-center gap-3 rounded-2xl border border-[#5E5E5E]/50 bg-[#1a1a1a] px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition-[border-color,box-shadow] focus-within:border-[#D12B28]/60 focus-within:shadow-[0_0_0_3px_rgba(209,43,40,0.2),inset_0_1px_0_rgba(255,255,255,0.05)] sm:min-h-[3.25rem] sm:px-4 sm:py-2.5">
+                        <Search
+                            className="pointer-events-none h-5 w-5 shrink-0 text-[#8E8E8E] transition-colors group-focus-within:text-[#D12B28]"
+                            aria-hidden
+                        />
+                        <input
+                            id="shop-search"
+                            type="text"
+                            name="q"
+                            enterKeyHint="search"
+                            autoComplete="off"
+                            autoCorrect="off"
+                            spellCheck={false}
+                            placeholder="Search by name, brand, or specs…"
+                            value={searchDraft}
+                            onChange={(e) => onSearchInputChange(e.target.value)}
+                            className="min-w-0 flex-1 border-0 bg-transparent py-1 text-base text-[#F1F1F1] caret-[#D12B28] placeholder:text-[#8E8E8E] focus:outline-none focus:ring-0 sm:text-[1.05rem]"
+                        />
+                        {searchDraft ? (
+                            <button
+                                type="button"
+                                onClick={clearSearch}
+                                className="rounded-lg p-1.5 text-[#8E8E8E] transition-colors hover:bg-white/10 hover:text-[#F1F1F1]"
+                                aria-label="Clear search"
+                            >
+                                <X className="h-4 w-4" />
+                            </button>
+                        ) : null}
+                    </div>
+                </form>
+            </header>
+
+            <div className="flex flex-col lg:flex-row gap-8 lg:gap-10 lg:items-start">
+                {/* Sidebar Toggle (Mobile) */}
+                <div className="lg:hidden flex items-center gap-3">
+                    <button
+                        type="button"
+                        onClick={() => setIsSidebarOpen(true)}
+                        className="inline-flex items-center gap-2 rounded-full border border-[#5E5E5E]/55 bg-[#242424]/80 px-4 py-2.5 text-sm font-medium text-[#F1F1F1] transition-colors hover:border-[#D12B28]/45 hover:bg-[#2a2a2a]"
+                    >
+                        <SlidersHorizontal className="h-4 w-4 text-[#B0B0B0]" />
+                        Filters
+                        {activeFilterCount > 0 && (
+                            <span className="min-w-[1.25rem] h-5 px-1.5 rounded-full bg-accent/25 text-accent text-xs font-semibold flex items-center justify-center tabular-nums">
+                                {activeFilterCount}
+                            </span>
+                        )}
+                    </button>
                 </div>
 
-                {isLoading ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {[...Array(6)].map((_, i) => (
-                            <div key={i} className="bg-white/5 rounded-xl aspect-[3/4] animate-pulse" />
-                        ))}
+                <DynamicFilterSidebar
+                    facets={facets}
+                    filters={filters}
+                    setFilters={setFilters}
+                    isOpen={isSidebarOpen}
+                    onClose={() => setIsSidebarOpen(false)}
+                />
+
+                <div className="flex-1 min-w-0 space-y-6">
+                    <div className="sticky top-14 z-20 -mx-1 px-1 py-3 sm:static sm:z-0 sm:mx-0 sm:px-0 sm:py-0 bg-gradient-to-b from-[#121212] via-[#121212] to-transparent sm:bg-none">
+                        <div className="flex flex-col gap-3 rounded-2xl border border-[#5E5E5E]/35 bg-[#242424]/55 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5 backdrop-blur-sm">
+                            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                                {!isLoading && !error && totalProducts != null && (
+                                    <p className="text-sm text-[#8E8E8E]">
+                                        <span className="font-medium tabular-nums text-[#F1F1F1]">{totalProducts}</span>
+                                        <span className="text-[#8E8E8E]">
+                                            {" "}
+                                            product{totalProducts !== 1 ? "s" : ""}
+                                        </span>
+                                    </p>
+                                )}
+                                {activeFilterCount > 0 && (
+                                    <button
+                                        type="button"
+                                        onClick={clearFilters}
+                                        className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium text-accent transition-colors hover:bg-accent/10"
+                                    >
+                                        <X className="h-3 w-3" />
+                                        Clear {activeFilterCount} filter{activeFilterCount !== 1 ? "s" : ""}
+                                    </button>
+                                )}
+                            </div>
+                            <label className="flex items-center gap-2 text-[#8E8E8E] text-xs font-medium uppercase tracking-wider sm:text-sm sm:normal-case sm:tracking-normal sm:font-normal">
+                                <ArrowUpDown className="hidden h-4 w-4 sm:block text-[#8E8E8E]" />
+                                <span className="sr-only sm:not-sr-only sm:inline text-[#8E8E8E]">Sort</span>
+                                <select
+                                    aria-label="Sort products"
+                                    value={filters.sort}
+                                    onChange={(e) => {
+                                        const sort = e.target.value;
+                                        const next = { ...filtersRef.current, sort, page: 1 };
+                                        setFilters(next);
+                                        replaceShopUrl(next);
+                                    }}
+                                    className="min-w-0 flex-1 sm:flex-none cursor-pointer rounded-xl border border-[#5E5E5E]/45 bg-[#121212]/90 px-3 py-2 text-sm font-normal text-[#F1F1F1] shadow-inner shadow-black/25 focus:outline-none focus:ring-2 focus:ring-[#D12B28]/40 focus:border-[#D12B28]/50 sm:min-w-[13rem]"
+                                >
+                                    {sortOptions.map((opt) => (
+                                        <option key={opt.value} value={opt.value}>
+                                            {opt.label}
+                                        </option>
+                                    ))}
+                                </select>
+                            </label>
+                        </div>
                     </div>
-                ) : error ? (
-                    <div className="text-center text-red-400 py-12">Failed to load products</div>
-                ) : products.length === 0 ? (
-                    <div className="text-center text-gray-500 py-12">No products found</div>
-                ) : (
-                    <>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {products.map((product) => (
-                                <ProductCard key={product._id} product={product} />
+
+                    {isLoading ? (
+                        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3 xl:grid-cols-4">
+                            {[...Array(8)].map((_, i) => (
+                                <div
+                                    key={i}
+                                    className="overflow-hidden rounded-2xl border border-[#5E5E5E]/25 bg-[#1a1a1a]/80"
+                                >
+                                    <div className="aspect-square animate-pulse bg-gradient-to-br from-zinc-800/80 to-zinc-900/40" />
+                                    <div className="space-y-3 p-4">
+                                        <div className="h-3 w-1/3 animate-pulse rounded-full bg-zinc-800" />
+                                        <div className="h-4 w-full animate-pulse rounded-full bg-zinc-800/80" />
+                                        <div className="h-4 w-2/3 animate-pulse rounded-full bg-zinc-800/80" />
+                                        <div className="h-5 w-1/4 animate-pulse rounded-full bg-zinc-800" />
+                                    </div>
+                                </div>
                             ))}
                         </div>
+                    ) : error ? (
+                        <div className="rounded-2xl border border-red-500/20 bg-red-500/[0.06] px-6 py-14 text-center">
+                            <p className="text-base font-medium text-red-200">Couldn&apos;t load products</p>
+                            <p className="mt-2 text-sm text-red-300/80">Check your connection and try again.</p>
+                        </div>
+                    ) : products.length === 0 ? (
+                        <div className="rounded-2xl border border-[#5E5E5E]/35 bg-[#242424]/40 px-6 py-16 text-center">
+                            <p className="text-base font-medium text-[#F1F1F1]">No products match your filters</p>
+                            <p className="mt-2 text-sm text-[#8E8E8E] max-w-sm mx-auto">
+                                Try clearing filters or broadening your search.
+                            </p>
+                            {activeFilterCount > 0 && (
+                                <button
+                                    type="button"
+                                    onClick={clearFilters}
+                                    className="mt-6 inline-flex items-center gap-2 rounded-full border border-[#5E5E5E]/50 bg-[#242424]/80 px-4 py-2 text-sm font-medium text-[#F1F1F1] transition-colors hover:border-[#D12B28]/45"
+                                >
+                                    Reset filters
+                                </button>
+                            )}
+                        </div>
+                    ) : (
+                        <>
+                            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3 xl:grid-cols-4">
+                                {products.map((product) => (
+                                    <ProductCard key={product._id} product={product} />
+                                ))}
+                            </div>
 
-                        {showPagination && (
-                            <nav className="mt-10 flex items-center justify-center gap-2" aria-label="Pagination">
-                                <Link
-                                    href={buildPageUrl(currentPage - 1)}
-                                    className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                                        currentPage <= 1
-                                            ? "text-white/30 cursor-not-allowed pointer-events-none"
-                                            : "text-main hover:bg-white/10"
-                                    }`}
-                                    aria-disabled={currentPage <= 1}
+                            {showPagination && (
+                                <nav
+                                    className="flex flex-col items-center gap-4 border-t border-[#5E5E5E]/30 pt-10 sm:flex-row sm:justify-center"
+                                    aria-label="Pagination"
                                 >
-                                    <ChevronLeft className="h-4 w-4" />
-                                    Previous
-                                </Link>
-                                <div className="flex items-center gap-1">
-                                    {getPageNumbers().map((p, i) =>
-                                        p === "ellipsis" ? (
-                                            <span key={`ellipsis-${i}`} className="px-2 text-sub">
-                                                …
-                                            </span>
-                                        ) : (
-                                            <Link
-                                                key={p}
-                                                href={buildPageUrl(p)}
-                                                className={`min-w-[2.25rem] h-9 rounded-lg flex items-center justify-center text-sm font-medium transition-colors ${
-                                                    p === currentPage
-                                                        ? "bg-accent text-white"
-                                                        : "text-main hover:bg-white/10"
-                                                }`}
-                                            >
-                                                {p}
-                                            </Link>
-                                        )
-                                    )}
-                                </div>
-                                <Link
-                                    href={buildPageUrl(currentPage + 1)}
-                                    className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                                        currentPage >= totalPages
-                                            ? "text-white/30 cursor-not-allowed pointer-events-none"
-                                            : "text-main hover:bg-white/10"
-                                    }`}
-                                    aria-disabled={currentPage >= totalPages}
-                                >
-                                    Next
-                                    <ChevronRight className="h-4 w-4" />
-                                </Link>
-                            </nav>
-                        )}
-                    </>
-                )}
+                                    <div className="flex items-center gap-1 rounded-full border border-[#5E5E5E]/40 bg-[#242424]/60 p-1">
+                                        <Link
+                                            href={buildPageUrl(currentPage - 1)}
+                                            className={`inline-flex items-center gap-1 rounded-full px-3 py-2 text-sm font-medium transition-colors ${
+                                                currentPage <= 1
+                                                    ? "pointer-events-none text-[#5E5E5E]"
+                                                    : "text-[#F1F1F1] hover:bg-white/10"
+                                            }`}
+                                            aria-disabled={currentPage <= 1}
+                                        >
+                                            <ChevronLeft className="h-4 w-4" />
+                                            <span className="hidden sm:inline">Prev</span>
+                                        </Link>
+                                        <div className="flex items-center gap-0.5 px-1">
+                                            {getPageNumbers().map((p, i) =>
+                                                p === "ellipsis" ? (
+                                                    <span key={`ellipsis-${i}`} className="px-2 text-sm text-[#8E8E8E]">
+                                                        …
+                                                    </span>
+                                                ) : (
+                                                    <Link
+                                                        key={p}
+                                                        href={buildPageUrl(p)}
+                                                        className={`flex h-9 min-w-9 items-center justify-center rounded-full text-sm font-medium transition-colors ${
+                                                            p === currentPage
+                                                                ? "bg-[#D12B28] text-[#F1F1F1] shadow-sm shadow-[#D12B28]/25"
+                                                                : "text-[#B0B0B0] hover:bg-white/10"
+                                                        }`}
+                                                    >
+                                                        {p}
+                                                    </Link>
+                                                )
+                                            )}
+                                        </div>
+                                        <Link
+                                            href={buildPageUrl(currentPage + 1)}
+                                            className={`inline-flex items-center gap-1 rounded-full px-3 py-2 text-sm font-medium transition-colors ${
+                                                currentPage >= totalPages
+                                                    ? "pointer-events-none text-[#5E5E5E]"
+                                                    : "text-[#F1F1F1] hover:bg-white/10"
+                                            }`}
+                                            aria-disabled={currentPage >= totalPages}
+                                        >
+                                            <span className="hidden sm:inline">Next</span>
+                                            <ChevronRight className="h-4 w-4" />
+                                        </Link>
+                                    </div>
+                                    <p className="text-xs text-[#8E8E8E]">
+                                        Page {currentPage} of {totalPages}
+                                    </p>
+                                </nav>
+                            )}
+                        </>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+export function ShopSkeleton() {
+    return (
+        <div className="space-y-10 animate-pulse">
+            <div className="space-y-5">
+                <div className="space-y-3">
+                    <div className="h-3 w-24 rounded-full bg-zinc-800" />
+                    <div className="h-10 w-2/3 max-w-md rounded-xl bg-zinc-800" />
+                    <div className="h-4 w-full max-w-lg rounded-lg bg-zinc-800/60" />
+                </div>
+                <div className="h-12 max-w-2xl rounded-2xl bg-zinc-800/80" />
+            </div>
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {[...Array(8)].map((_, i) => (
+                    <div key={i} className="rounded-2xl border border-white/[0.05] bg-white/[0.03]">
+                        <div className="aspect-square bg-zinc-800/50" />
+                        <div className="space-y-2 p-4">
+                            <div className="h-3 w-1/3 rounded-full bg-zinc-800" />
+                            <div className="h-4 w-full rounded-full bg-zinc-800/80" />
+                        </div>
+                    </div>
+                ))}
             </div>
         </div>
     );
@@ -271,11 +478,16 @@ export function ShopContent({ basePath = "/shop", initialFilters = {} }: ShopCon
 
 export default function ShopPage() {
     return (
-        <div className="min-h-screen bg-black pt-20 pb-12">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <h1 className="text-3xl font-bold text-white mb-8">Shop All Products</h1>
-                <Suspense fallback={<div className="text-main text-center pt-20">Loading Shop...</div>}>
-                    <ShopContent />
+        <div className="min-h-screen bg-[#121212] pb-16 pt-6 sm:pt-10">
+            <div
+                className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(ellipse_85%_55%_at_50%_-25%,rgba(209,43,40,0.16),transparent_55%)]"
+                aria-hidden
+            />
+            <div className="mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-10">
+                <Suspense fallback={<ShopSkeleton />}>
+                    <ShopContent
+                        heading="Shop"
+                    />
                 </Suspense>
             </div>
         </div>

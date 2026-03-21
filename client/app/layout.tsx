@@ -10,6 +10,10 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
     title: "Omniware.lk | Premium PC Builds & Components",
     description: "Sri Lanka's premier destination for custom PC builds and high-end components.",
+    icons: {
+        icon: "/logo.svg",
+        apple: "/logo.svg",
+    },
 };
 
 export default function RootLayout({
@@ -22,7 +26,7 @@ export default function RootLayout({
             <body className={`${inter.className} min-h-screen flex flex-col bg-background text-foreground`}>
                 <Providers>
                     <Navbar />
-                    <main className="flex-grow pt-16">
+                    <main className="flex-grow pt-14">
                         {children}
                     </main>
                     <Footer />

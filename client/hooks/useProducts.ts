@@ -57,12 +57,17 @@ export interface Facets {
     };
 }
 
+/** Backend expects underscores (price_asc); shop UI / URLs use hyphens (price-asc). */
+function normalizeSortForApi(sort: string): string {
+    return sort.trim().toLowerCase().replace(/-/g, '_');
+}
+
 function buildProductsQueryString(options: UseProductsOptions): string {
     const params = new URLSearchParams();
     // Always send limit so server returns full facets when limit >= 20 (shop page)
     const limit = options.limit ?? 20;
     params.append('limit', limit.toString());
-    if (options.sort) params.append('sort', options.sort);
+    if (options.sort) params.append('sort', normalizeSortForApi(options.sort));
     if (options.search) params.append('search', options.search);
     if (options.category) params.append('category', options.category);
     if (options.brand) params.append('brand', options.brand);

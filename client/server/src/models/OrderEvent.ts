@@ -18,4 +18,6 @@ const orderEventSchema = new Schema<IOrderEvent>({
     note: { type: String }
 });
 
-export const OrderEvent = mongoose.model<IOrderEvent>('OrderEvent', orderEventSchema);
+export const OrderEvent =
+    (mongoose.models.OrderEvent as mongoose.Model<IOrderEvent>) ??
+    mongoose.model<IOrderEvent>('OrderEvent', orderEventSchema);

@@ -1,130 +1,154 @@
 "use client";
 
 import Link from "next/link";
-import { ShoppingCart, User, Menu, X, Cpu } from "lucide-react";
+import Image from "next/image";
+import { usePathname } from "next/navigation";
+import { ShoppingCart, User, Menu, X } from "lucide-react";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useCart } from "@/context/CartContext";
 
+const mainNav = [
+    { href: "/shop", label: "Shop" },
+    { href: "/services", label: "Services" },
+    //{ href: "/pc-builder", label: "PC Builder" },
+    { href: "/about", label: "About" },
+    { href: "/contact", label: "Contact" },
+] as const;
+
+function linkActive(pathname: string, href: string) {
+    if (href === "/shop") return pathname === "/shop" || pathname.startsWith("/shop/");
+    return pathname === href || pathname.startsWith(`${href}/`);
+}
+
 export default function Navbar() {
+    const pathname = usePathname();
+    const currentPath = pathname ?? "/";
     const [isOpen, setIsOpen] = useState(false);
     const { cartItems } = useCart();
     const cartCount = cartItems.reduce((acc, item) => acc + item.qty, 0);
 
     return (
-        <nav className="fixed w-full z-50 bg-surface/95 backdrop-blur-md border-b border-border-soft">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="flex items-center justify-between h-16">
-                    <Link href="/" className="flex items-center space-x-2">
-                        <Cpu className="h-8 w-8 text-accent" />
-                        <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-main to-sub">
-                            Omniware
-                        </span>
-                    </Link>
+        <nav className="fixed top-0 z-50 w-full border-b border-white/[0.07] bg-zinc-950/80 shadow-[0_1px_0_0_rgba(255,255,255,0.04)_inset] backdrop-blur-xl">
+            <div className="mx-auto flex h-14 max-w-[1440px] items-center gap-3 px-4 sm:gap-4 sm:px-6 lg:px-10">
+                <Link
+                    href="/"
+                    className="relative flex h-6 w-[min(118px,42vw)] shrink-0 items-center sm:w-[132px]"
+                >
+                    <Image
+                        src="/textLogo.svg"
+                        alt="Omniware"
+                        fill
+                        className="object-contain object-left"
+                        sizes="132px"
+                        priority
+                    />
+                </Link>
 
-                    {/* Desktop Menu */}
-                    <div className="hidden md:flex items-center space-x-8">
-                        <Link href="/shop" className="text-sub hover:text-main transition-colors font-medium">
-                            Shop
-                        </Link>
-                        <Link href="/services" className="text-sub hover:text-main transition-colors font-medium">
-                            Services
-                        </Link>
-                        <Link href="/shop" className="text-sub hover:text-main transition-colors font-medium">
-                            PC Builder
-                        </Link>
-                        <Link href="/about" className="text-sub hover:text-main transition-colors font-medium">
-                            About
-                        </Link>
-                        <Link href="/contact" className="text-sub hover:text-main transition-colors font-medium">
-                            Contact
-                        </Link>
-                        <div className="flex items-center space-x-4">
-                            <Link href="/cart" className="p-2 hover:bg-white/5 rounded-full transition-colors relative">
-                                <ShoppingCart className="h-5 w-5 text-sub hover:text-main" />
-                                {cartCount > 0 && (
-                                    <span className="absolute top-0 right-0 h-4 w-4 bg-accent text-white text-[10px] font-bold flex items-center justify-center rounded-full">
-                                        {cartCount}
-                                    </span>
-                                )}
+                <div className="hidden min-w-0 flex-1 items-center justify-center gap-0.5 md:flex">
+                    {mainNav.map(({ href, label }) => {
+                        const active = linkActive(currentPath, href);
+                        return (
+                            <Link
+                                key={`${href}-${label}`}
+                                href={href}
+                                className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                                    active
+                                        ? "bg-white/[0.08] text-white"
+                                        : "text-zinc-400 hover:bg-white/[0.05] hover:text-zinc-100"
+                                }`}
+                            >
+                                {label}
                             </Link>
-                            <Link href="/account" className="p-2 hover:bg-white/5 rounded-full transition-colors">
-                                <User className="h-5 w-5 text-sub hover:text-main" />
-                            </Link>
-                        </div>
-                    </div>
+                        );
+                    })}
+                </div>
 
-                    {/* Mobile Menu Button */}
-                    <div className="md:hidden">
-                        <button
-                            onClick={() => setIsOpen(!isOpen)}
-                            className="text-sub hover:text-main focus:outline-none"
+                <div className="hidden shrink-0 items-center gap-2 md:flex">
+                    <div className="flex items-center rounded-full border border-white/[0.1] bg-white/[0.04] p-0.5 pl-1">
+                        <Link
+                            href="/cart"
+                            className="relative flex h-9 w-9 items-center justify-center rounded-full text-zinc-400 transition-colors hover:bg-white/[0.08] hover:text-white"
+                            aria-label={`Shopping cart${cartCount > 0 ? `, ${cartCount} items` : ""}`}
                         >
-                            {isOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-                        </button>
+                            <ShoppingCart className="h-[1.125rem] w-[1.125rem]" strokeWidth={1.75} />
+                            {cartCount > 0 && (
+                                <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-bold text-zinc-950">
+                                    {cartCount > 99 ? "99+" : cartCount}
+                                </span>
+                            )}
+                        </Link>
+                        <Link
+                            href="/account"
+                            className="flex h-9 w-9 items-center justify-center rounded-full text-zinc-400 transition-colors hover:bg-white/[0.08] hover:text-white"
+                            aria-label="Account"
+                        >
+                            <User className="h-[1.125rem] w-[1.125rem]" strokeWidth={1.75} />
+                        </Link>
                     </div>
+                </div>
+
+                <div className="ml-auto flex shrink-0 items-center gap-2 md:hidden">
+                    <Link
+                        href="/cart"
+                        className="relative flex h-9 w-9 items-center justify-center rounded-lg text-zinc-400 transition-colors hover:bg-white/[0.08] hover:text-white"
+                        aria-label="Cart"
+                    >
+                        <ShoppingCart className="h-5 w-5" strokeWidth={1.75} />
+                        {cartCount > 0 && (
+                            <span className="absolute right-0 top-0 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-accent px-1 text-[9px] font-bold text-zinc-950">
+                                {cartCount > 9 ? "9+" : cartCount}
+                            </span>
+                        )}
+                    </Link>
+                    <button
+                        type="button"
+                        onClick={() => setIsOpen(!isOpen)}
+                        className="flex h-9 w-9 items-center justify-center rounded-lg text-zinc-300 transition-colors hover:bg-white/[0.08] hover:text-white"
+                        aria-expanded={isOpen}
+                        aria-label={isOpen ? "Close menu" : "Open menu"}
+                    >
+                        {isOpen ? <X className="h-5 w-5" strokeWidth={1.75} /> : <Menu className="h-5 w-5" strokeWidth={1.75} />}
+                    </button>
                 </div>
             </div>
 
-            {/* Mobile Menu */}
             <AnimatePresence>
                 {isOpen && (
                     <motion.div
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: "auto" }}
                         exit={{ opacity: 0, height: 0 }}
-                        className="md:hidden bg-surface border-t border-border-soft"
+                        transition={{ duration: 0.2 }}
+                        className="border-t border-white/[0.07] bg-zinc-950/95 backdrop-blur-xl md:hidden"
                     >
-                        <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
-                            <Link
-                                href="/shop"
-                                className="block px-3 py-2 rounded-md text-base font-medium text-sub hover:text-main hover:bg-white/5"
-                                onClick={() => setIsOpen(false)}
-                            >
-                                Shop
-                            </Link>
-                            <Link
-                                href="/shop"
-                                className="block px-3 py-2 rounded-md text-base font-medium text-sub hover:text-main hover:bg-white/5"
-                                onClick={() => setIsOpen(false)}
-                            >
-                                PC Builder
-                            </Link>
-                            <Link
-                                href="/services"
-                                className="block px-3 py-2 rounded-md text-base font-medium text-sub hover:text-main hover:bg-white/5"
-                                onClick={() => setIsOpen(false)}
-                            >
-                                Services
-                            </Link>
-                            <Link
-                                href="/about"
-                                className="block px-3 py-2 rounded-md text-base font-medium text-sub hover:text-main hover:bg-white/5"
-                                onClick={() => setIsOpen(false)}
-                            >
-                                About
-                            </Link>
-                            <Link
-                                href="/contact"
-                                className="block px-3 py-2 rounded-md text-base font-medium text-sub hover:text-main hover:bg-white/5"
-                                onClick={() => setIsOpen(false)}
-                            >
-                                Contact
-                            </Link>
-                            <Link
-                                href="/cart"
-                                className="block px-3 py-2 rounded-md text-base font-medium text-sub hover:text-main hover:bg-white/5"
-                                onClick={() => setIsOpen(false)}
-                            >
-                                Cart
-                            </Link>
-                            <Link
-                                href="/account"
-                                className="block px-3 py-2 rounded-md text-base font-medium text-sub hover:text-main hover:bg-white/5"
-                                onClick={() => setIsOpen(false)}
-                            >
-                                Account
-                            </Link>
+                        <div className="mx-auto max-w-[1440px] space-y-0.5 px-3 py-3 sm:px-6">
+                            {mainNav.map(({ href, label }) => {
+                                const active = linkActive(currentPath, href);
+                                return (
+                                    <Link
+                                        key={`m-${href}-${label}`}
+                                        href={href}
+                                        className={`block rounded-xl px-3 py-2.5 text-[15px] font-medium transition-colors ${
+                                            active
+                                                ? "bg-white/[0.1] text-white"
+                                                : "text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-100"
+                                        }`}
+                                        onClick={() => setIsOpen(false)}
+                                    >
+                                        {label}
+                                    </Link>
+                                );
+                            })}
+                            <div className="my-2 border-t border-white/[0.06] pt-2">
+                                <Link
+                                    href="/account"
+                                    className="block rounded-xl px-3 py-2.5 text-[15px] font-medium text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-100"
+                                    onClick={() => setIsOpen(false)}
+                                >
+                                    Account
+                                </Link>
+                            </div>
                         </div>
                     </motion.div>
                 )}

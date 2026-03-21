@@ -31,6 +31,8 @@ const auditLogSchema = new mongoose.Schema<AuditLogDocument>(
 auditLogSchema.index({ entityType: 1, entityId: 1, createdAt: -1 });
 auditLogSchema.index({ actorUserId: 1, createdAt: -1 });
 
-const AuditLog = mongoose.model<AuditLogDocument>('AuditLog', auditLogSchema);
+const AuditLog =
+    (mongoose.models.AuditLog as mongoose.Model<AuditLogDocument>) ??
+    mongoose.model<AuditLogDocument>('AuditLog', auditLogSchema);
 export default AuditLog;
 

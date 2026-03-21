@@ -4,6 +4,7 @@ import Product from '../models/Product';
 import CategoryFeaturedSpecs from '../models/CategoryFeaturedSpecs';
 import Category from '../models/Category';
 import { normalizeSpecKey } from '../utils/normalizeSpecKey';
+import { SPECS_OBJECT_TO_ARRAY_PROJECT } from '../utils/productAggregation';
 import { AppError } from '../middleware/errorMiddleware';
 
 const updateFeaturedSpecsSchema = z.object({
@@ -24,7 +25,7 @@ export const getAvailableSpecKeys = async (req: Request, res: Response, next: an
 
         const pipeline = [
             { $match: { categoryIds: category._id } },
-            { $project: { specs: { $objectToArray: "$specs" } } },
+            SPECS_OBJECT_TO_ARRAY_PROJECT,
             { $unwind: "$specs" },
             { $group: { _id: "$specs.k" } },
             { $sort: { _id: 1 } }

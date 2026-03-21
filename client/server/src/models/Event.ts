@@ -38,4 +38,6 @@ eventSchema.index({ productId: 1, ts: -1 });
 eventSchema.index({ sessionId: 1, ts: -1 });
 eventSchema.index({ category: 1, ts: -1 });
 
-export const Event = mongoose.model<IEvent>('Event', eventSchema);
+export const Event =
+    (mongoose.models.Event as mongoose.Model<IEvent>) ??
+    mongoose.model<IEvent>('Event', eventSchema);

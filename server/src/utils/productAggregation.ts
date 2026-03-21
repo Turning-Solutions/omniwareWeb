@@ -3,6 +3,21 @@ import mongoose from 'mongoose';
 import Brand from '../models/Brand';
 import Category from '../models/Category';
 
+/** $objectToArray errors on null/missing/non-document specs; coerce to {} first. */
+export const SPECS_OBJECT_TO_ARRAY_PROJECT = {
+    $project: {
+        specs: {
+            $objectToArray: {
+                $cond: {
+                    if: { $eq: [{ $type: '$specs' }, 'object'] },
+                    then: '$specs',
+                    else: {},
+                },
+            },
+        },
+    },
+} as const;
+
 export const buildProductMatchStage = async (req: Request, exclude: string[] = []) => {
     // console.log('DEBUG QUERY:', JSON.stringify(req.query, null, 2));
     const { search, minPrice, maxPrice, brand, category, availability, inStock, ...dynamicFilters } = req.query;

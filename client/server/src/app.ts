@@ -10,6 +10,7 @@ import adminProductRoutes from './routes/admin.products';
 import analyticsRoutes from './routes/analyticsRoutes';
 import featuredSpecsRoutes from './routes/featuredSpecsRoutes';
 import uploadRoutes from './routes/uploadRoutes';
+import contactRoutes from './routes/contactRoutes';
 import { errorHandler } from './middleware/errorMiddleware';
 import { requestIdMiddleware } from './middleware/requestId';
 
@@ -38,6 +39,10 @@ function createApp() {
     );
     app.use(express.json());
     app.use(requestIdMiddleware);
+
+    // Public contact form — no MongoDB required (SMTP only)
+    app.use('/api/v1/contact', contactRoutes);
+
     app.use(ensureDbMiddleware);
 
     app.use('/api/v1/auth', authRoutes);
