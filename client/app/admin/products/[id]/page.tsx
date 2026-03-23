@@ -2,9 +2,10 @@
 
 import { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
-import { Save, ArrowLeft, Trash2, Edit2, Plus, ChevronUp, ChevronDown, ImagePlus, Upload, Loader2, ArrowRightLeft } from "lucide-react";
+import { Save, ArrowLeft, Trash2, Edit2, Plus, ChevronUp, ChevronDown, ImagePlus, Upload, Loader2, ArrowRightLeft, ExternalLink } from "lucide-react";
 import Link from "next/link";
 import api from "@/lib/api";
+import toast from "react-hot-toast";
 
 interface Brand {
     _id: string;
@@ -108,8 +109,11 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
     const [loading, setLoading] = useState(false);
     const [initialLoading, setInitialLoading] = useState(true);
     const [imageUploading, setImageUploading] = useState<string | number | null>(null); // 'add' or index when replacing
+    const [previewRefreshKey, setPreviewRefreshKey] = useState(0);
     // Selected attributes for "move to category": Set of "groupIndex-attrIndex"
     const [selectedAttributeKeys, setSelectedAttributeKeys] = useState<Set<string>>(new Set());
+    const previewTarget = !isNew ? (formData.slug?.trim() || id) : "";
+    const previewPath = previewTarget ? `/product/${previewTarget}?preview=${previewRefreshKey}` : "";
 
     useEffect(() => {
         const fetchData = async () => {
@@ -234,13 +238,16 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
 
             if (isNew) {
                 await api.post("/admin/products", payload);
+                toast.success("Product saved successfully");
+                router.push('/admin/products');
             } else {
                 await api.patch(`/admin/products/${id}`, payload);
+                toast.success("Product saved successfully");
+                setPreviewRefreshKey((prev) => prev + 1);
             }
-            router.push('/admin/products');
         } catch (error) {
             console.error("Error saving product", error);
-            alert("Failed to save product");
+            toast.error("Failed to save product");
         } finally {
             setLoading(false);
         }
@@ -436,7 +443,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
             const { url } = await uploadImage(file);
             setFormData((prev) => ({ ...prev, images: [...prev.images, url] }));
         } catch (err) {
-            alert((err as Error).message);
+            toast.error((err as Error).message);
         } finally {
             setImageUploading(null);
         }
@@ -450,7 +457,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
             try {
                 await deleteImageFromCloud(url);
             } catch (err) {
-                alert((err as Error).message);
+                toast.error((err as Error).message);
                 return;
             }
         }
@@ -475,7 +482,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                 images: prev.images.map((u, i) => (i === index ? url : u)),
             }));
         } catch (err) {
-            alert((err as Error).message);
+            toast.error((err as Error).message);
         } finally {
             setImageUploading(null);
         }
@@ -486,7 +493,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
 
     const updateFilterSpecValue = (specKey: string, value: string) => {
         const next = formData.filterSpecs.filter(s => s.key !== specKey);
-        if (value.trim()) next.push({ key: specKey, value: value.trim() });
+        if (value.length > 0) next.push({ key: specKey, value });
         setFormData({ ...formData, filterSpecs: next });
     };
 
@@ -504,12 +511,15 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
             setFormData({ ...formData, brandId: newBrand._id });
         } catch (e) {
             console.error(e);
-            alert("Failed to create brand");
+            toast.error("Failed to create brand");
         }
     };
 
     const handleEditBrand = async () => {
-        if (!formData.brandId) return alert("Select a brand first");
+        if (!formData.brandId) {
+            toast("Select a brand first");
+            return;
+        }
         const brand = brands.find(b => b._id === formData.brandId);
         if (!brand) return;
         const newName = window.prompt("Edit brand name:", brand.name);
@@ -520,7 +530,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
             setBrands(brands.map(b => b._id === updated._id ? updated : b));
         } catch (e) {
             console.error(e);
-            alert("Failed to update brand");
+            toast.error("Failed to update brand");
         }
     };
 
@@ -534,12 +544,15 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
             setFormData({ ...formData, categoryIds: [newCategory._id] });
         } catch (e) {
             console.error(e);
-            alert("Failed to create category");
+            toast.error("Failed to create category");
         }
     };
 
     const handleEditCategory = async () => {
-        if (!formData.categoryIds[0]) return alert("Select a category first");
+        if (!formData.categoryIds[0]) {
+            toast("Select a category first");
+            return;
+        }
         const category = categories.find(c => c._id === formData.categoryIds[0]);
         if (!category) return;
         const newName = window.prompt("Edit category name:", category.name);
@@ -550,7 +563,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
             setCategories(categories.map(c => c._id === updated._id ? updated : c));
         } catch (e) {
             console.error(e);
-            alert("Failed to update category");
+            toast.error("Failed to update category");
         }
     };
 
@@ -590,7 +603,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
     if (initialLoading && !isNew) return <div className="p-10 text-center text-main">Loading...</div>;
 
     return (
-        <div className="max-w-4xl mx-auto px-4 py-12">
+        <div className="max-w-7xl mx-auto px-4 py-12">
             <div className="flex items-center gap-4 mb-8">
                 <Link href="/admin/products" className="p-2 admin-card rounded-lg hover:bg-base text-main transition-colors">
                     <ArrowLeft className="h-5 w-5" />
@@ -599,119 +612,152 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
             </div>
 
             <form onSubmit={handleSubmit} className="admin-card rounded-xl p-8 space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                        <label className="text-sub text-sm">Product Title</label>
-                        <input
-                            type="text"
-                            required
-                            className="w-full bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent"
-                            value={formData.title}
-                            onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                        />
-                    </div>
-                    <div className="space-y-2">
-                        <label className="text-sub text-sm">SKU (Optional)</label>
-                        <input
-                            type="text"
-                            className="w-full bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent"
-                            value={formData.sku}
-                            onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
-                        />
-                    </div>
-                    <div className="space-y-2">
-                        <label className="text-sub text-sm">Slug (Optional/Auto)</label>
-                        <input
-                            type="text"
-                            className="w-full bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent"
-                            value={formData.slug}
-                            onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
-                        />
-                    </div>
-                    <div className="space-y-2">
-                        <label className="text-sub text-sm">Price (LKR)</label>
-                        <input
-                            type="number"
-                            required
-                            className="w-full bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent"
-                            value={formData.price}
-                            onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                        />
-                    </div>
-                    <div className="space-y-2">
-                        <label className="text-sub text-sm">Stock Quantity</label>
-                        <input
-                            type="number"
-                            required
-                            className="w-full bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent"
-                            value={formData.stock}
-                            onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
-                        />
-                    </div>
-                    <div className="space-y-2">
-                        <label className="text-sub text-sm">Warranty (Optional)</label>
-                        <input
-                            type="text"
-                            placeholder="e.g. 12 Months"
-                            className="w-full bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent"
-                            value={formData.warranty}
-                            onChange={(e) => setFormData({ ...formData, warranty: e.target.value })}
-                        />
+                <div className={`grid grid-cols-1 gap-6 ${!isNew ? "xl:grid-cols-2" : ""}`}>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                            <label className="text-sub text-sm">Product Title</label>
+                            <input
+                                type="text"
+                                required
+                                className="w-full bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent"
+                                value={formData.title}
+                                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-sub text-sm">SKU (Optional)</label>
+                            <input
+                                type="text"
+                                className="w-full bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent"
+                                value={formData.sku}
+                                onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-sub text-sm">Slug (Optional/Auto)</label>
+                            <input
+                                type="text"
+                                className="w-full bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent"
+                                value={formData.slug}
+                                onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-sub text-sm">Price (LKR)</label>
+                            <input
+                                type="number"
+                                required
+                                className="w-full bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent"
+                                value={formData.price}
+                                onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-sub text-sm">Stock Quantity</label>
+                            <input
+                                type="number"
+                                required
+                                className="w-full bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent"
+                                value={formData.stock}
+                                onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-sub text-sm">Warranty (Optional)</label>
+                            <input
+                                type="text"
+                                placeholder="e.g. 12 Months"
+                                className="w-full bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent"
+                                value={formData.warranty}
+                                onChange={(e) => setFormData({ ...formData, warranty: e.target.value })}
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-sub text-sm">Availability Status</label>
+                            <select
+                                className="w-full bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent [&>option]:text-black"
+                                value={formData.availability}
+                                onChange={(e) => setFormData({ ...formData, availability: e.target.value as typeof formData.availability })}
+                            >
+                                <option value="in_stock">In Stock</option>
+                                <option value="out_of_stock">Out of Stock</option>
+                                <option value="pre_order">Pre-Order</option>
+                                <option value="coming_soon">Coming Soon</option>
+                            </select>
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-sub text-sm flex justify-between">
+                                Brand
+                                <div className="space-x-2">
+                                    <button type="button" onClick={handleEditBrand} title="Edit Brand" className="text-sub hover:text-main"><Edit2 className="w-4 h-4 inline" /></button>
+                                    <button type="button" onClick={handleAddBrand} title="Add Brand" className="text-blue-500 hover:text-blue-400"><Plus className="w-4 h-4 inline" /></button>
+                                </div>
+                            </label>
+                            <select
+                                className="w-full bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent [&>option]:text-black"
+                                value={formData.brandId}
+                                onChange={(e) => setFormData({ ...formData, brandId: e.target.value })}
+                            >
+                                <option value="">Select Brand</option>
+                                {brands.map(b => (
+                                    <option key={b._id} value={b._id}>{b.name}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-sub text-sm flex justify-between">
+                                Category
+                                <div className="space-x-2">
+                                    <button type="button" onClick={handleEditCategory} title="Edit Category" className="text-sub hover:text-main"><Edit2 className="w-4 h-4 inline" /></button>
+                                    <button type="button" onClick={handleAddCategory} title="Add Category" className="text-blue-500 hover:text-blue-400"><Plus className="w-4 h-4 inline" /></button>
+                                </div>
+                            </label>
+                            <select
+                                className="w-full bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent [&>option]:text-black"
+                                value={formData.categoryIds[0] || ""}
+                                onChange={(e) => setFormData({ ...formData, categoryIds: [e.target.value] })}
+                            >
+                                <option value="">Select Category</option>
+                                {categories.map(c => (
+                                    <option key={c._id} value={c._id}>{c.name}</option>
+                                ))}
+                            </select>
+                        </div>
                     </div>
 
-                    <div className="space-y-2">
-                        <label className="text-sub text-sm">Availability Status</label>
-                        <select
-                            className="w-full bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent [&>option]:text-black"
-                            value={formData.availability}
-                            onChange={(e) => setFormData({ ...formData, availability: e.target.value as typeof formData.availability })}
-                        >
-                            <option value="in_stock">In Stock</option>
-                            <option value="out_of_stock">Out of Stock</option>
-                            <option value="pre_order">Pre-Order</option>
-                            <option value="coming_soon">Coming Soon</option>
-                        </select>
-                    </div>
-
-                    <div className="space-y-2">
-                        <label className="text-sub text-sm flex justify-between">
-                            Brand
-                            <div className="space-x-2">
-                                <button type="button" onClick={handleEditBrand} title="Edit Brand" className="text-sub hover:text-main"><Edit2 className="w-4 h-4 inline" /></button>
-                                <button type="button" onClick={handleAddBrand} title="Add Brand" className="text-blue-500 hover:text-blue-400"><Plus className="w-4 h-4 inline" /></button>
+                    {!isNew && (
+                        <div className="border border-border-soft rounded-xl p-4 bg-base/40">
+                            <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+                                <div>
+                                    <h2 className="text-lg font-bold text-main">Shop page preview</h2>
+                                    <p className="text-sub text-sm">Compact preview of the public product page.</p>
+                                </div>
+                                {previewPath && (
+                                    <Link
+                                        href={previewPath}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-2 text-sm bg-accent/20 text-accent px-3 py-1.5 rounded hover:bg-accent/30 transition-colors"
+                                    >
+                                        <ExternalLink className="h-4 w-4" />
+                                        Open full preview
+                                    </Link>
+                                )}
                             </div>
-                        </label>
-                        <select
-                            className="w-full bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent [&>option]:text-black"
-                            value={formData.brandId}
-                            onChange={(e) => setFormData({ ...formData, brandId: e.target.value })}
-                        >
-                            <option value="">Select Brand</option>
-                            {brands.map(b => (
-                                <option key={b._id} value={b._id}>{b.name}</option>
-                            ))}
-                        </select>
-                    </div>
-
-                    <div className="space-y-2">
-                        <label className="text-sub text-sm flex justify-between">
-                            Category
-                            <div className="space-x-2">
-                                <button type="button" onClick={handleEditCategory} title="Edit Category" className="text-sub hover:text-main"><Edit2 className="w-4 h-4 inline" /></button>
-                                <button type="button" onClick={handleAddCategory} title="Add Category" className="text-blue-500 hover:text-blue-400"><Plus className="w-4 h-4 inline" /></button>
-                            </div>
-                        </label>
-                        <select
-                            className="w-full bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent [&>option]:text-black"
-                            value={formData.categoryIds[0] || ""}
-                            onChange={(e) => setFormData({ ...formData, categoryIds: [e.target.value] })}
-                        >
-                            <option value="">Select Category</option>
-                            {categories.map(c => (
-                                <option key={c._id} value={c._id}>{c.name}</option>
-                            ))}
-                        </select>
-                    </div>
+                            {previewPath ? (
+                                <iframe
+                                    title="Product shop preview"
+                                    src={previewPath}
+                                    className="w-full h-[420px] rounded-lg border border-border-soft bg-black"
+                                />
+                            ) : (
+                                <p className="text-sub text-sm italic">Set a slug or save the product first to load preview.</p>
+                            )}
+                        </div>
+                    )}
                 </div>
 
                 <div className="space-y-2">

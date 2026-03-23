@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useEffect, use } from "react";
-import { ShoppingCart, Check, Shield, AlertCircle, ChevronDown, ChevronRight, Clock, Package, MessageCircle } from "lucide-react";
+import { ShoppingCart, Check, Shield, AlertCircle, Clock, Package, MessageCircle, ArrowLeft } from "lucide-react";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import { useCart } from "@/context/CartContext";
+import { useRouter } from "next/navigation";
 
 import { useProduct } from "@/hooks/useProducts";
 import { buildProductWhatsAppUrl } from "@/lib/whatsapp";
@@ -27,6 +28,7 @@ interface ProductColorVariant {
 
 export default function ProductPage({ params }: { params: Promise<{ slug: string }> }) {
     const { slug } = use(params);
+    const router = useRouter();
     const { data: product, isLoading: loading, error } = useProduct(slug);
 
     // Local state for image and variants (only when product loads)
@@ -34,8 +36,6 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
     const [selectedVariant, setSelectedVariant] = useState<ProductVariant | ProductColorVariant | null>(null);
     const { addToCart } = useCart();
     const [qty, setQty] = useState(1);
-    // Expanded state for product detail categories (default: all open)
-    const [expandedGroups, setExpandedGroups] = useState<Record<number, boolean>>({});
 
     // Reset local state when product changes
     useEffect(() => {
@@ -43,7 +43,6 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
         setSelectedImage(0);
         setSelectedVariant(null);
         setQty(1);
-        setExpandedGroups({});
     }, [product]);
 
     // Error UI
@@ -101,6 +100,16 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
 
     return (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+            <div className="mb-6">
+                <button
+                    type="button"
+                    onClick={() => router.back()}
+                    className="inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/5 px-4 py-2 text-sm text-gray-200 transition-colors hover:bg-white/10"
+                >
+                    <ArrowLeft className="h-4 w-4" />
+                    Back
+                </button>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
                 {/* Image Gallery */}
                 <div>
@@ -308,10 +317,6 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
                                     ? [{ category: "General", attributes: product.attributes }]
                                     : [];
                         if (groups.length === 0) return null;
-                        const isExpanded = (idx: number) => expandedGroups[idx] !== false;
-                        const setExpanded = (idx: number, open: boolean) => {
-                            setExpandedGroups((prev) => ({ ...prev, [idx]: open }));
-                        };
                         return (
                             <div className="mb-8">
                                 <h3 className="text-base font-semibold text-white mb-4 flex items-center gap-2">
@@ -319,51 +324,26 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
                                 </h3>
                                 <div className="rounded-xl border border-white/15 bg-white/5 overflow-hidden">
                                     {groups.map((group, idx) => (
-                                        <div key={idx}>
-                                            <button
-                                                type="button"
-                                                onClick={() => setExpanded(idx, !isExpanded(idx))}
-                                                className="w-full flex items-center justify-between gap-3 px-4 py-3.5 text-left bg-white/10 hover:bg-white/15 transition-colors"
-                                            >
-                                                <span className="font-semibold text-white uppercase tracking-wide">
-                                                    {group.category}
-                                                </span>
-                                                <span className="text-white/80 shrink-0">
-                                                    {isExpanded(idx) ? (
-                                                        <ChevronDown className="h-5 w-5" />
-                                                    ) : (
-                                                        <ChevronRight className="h-5 w-5" />
-                                                    )}
-                                                </span>
-                                            </button>
-                                            <motion.div
-                                                initial={false}
-                                                animate={{
-                                                    height: isExpanded(idx) ? "auto" : 0,
-                                                    opacity: isExpanded(idx) ? 1 : 0,
-                                                }}
-                                                transition={{ duration: 0.2 }}
-                                                className="overflow-hidden"
-                                            >
-                                                <div className="px-4 py-4 border-t border-white/10">
-                                                    <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
-                                                        {group.attributes.map((attr, i) => (
-                                                            <div key={i}>
-                                                                {attr.name ? (
-                                                                    <>
-                                                                        <span className="block text-gray-500 text-xs uppercase tracking-wider">{attr.name}</span>
-                                                                        <span className="text-gray-300">{attr.value}</span>
-                                                                    </>
-                                                                ) : (
-                                                                    <span className="text-gray-300">{attr.value}</span>
-                                                                )}
-                                                            </div>
-                                                        ))}
+                                        <div key={idx} className="px-4 py-4">
+                                            <div className="font-semibold text-white uppercase tracking-wide mb-3">
+                                                {group.category}
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+                                                {group.attributes.map((attr, i) => (
+                                                    <div key={i}>
+                                                        {attr.name ? (
+                                                            <>
+                                                                <span className="block text-gray-500 text-xs uppercase tracking-wider">{attr.name}</span>
+                                                                <span className="text-gray-300">{attr.value}</span>
+                                                            </>
+                                                        ) : (
+                                                            <span className="text-gray-300">{attr.value}</span>
+                                                        )}
                                                     </div>
-                                                </div>
-                                            </motion.div>
+                                                ))}
+                                            </div>
                                             {idx < groups.length - 1 && (
-                                                <div className="border-b border-white/10" aria-hidden />
+                                                <div className="border-b border-white/10 mt-4" aria-hidden />
                                             )}
                                         </div>
                                     ))}

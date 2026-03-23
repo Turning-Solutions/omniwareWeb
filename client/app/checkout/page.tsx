@@ -137,7 +137,7 @@ export default function CheckoutPage() {
                                     <div>
                                         <span className="font-medium text-white block">Third-party delivery (Uber / PickMe)</span>
                                         <span className="text-sm text-gray-400">
-                                            You arrange pickup; use the address or notes below so we can hand off your order.
+                                            You arrange pickup, and the customer pays the courier amount (Uber / PickMe fee).
                                         </span>
                                     </div>
                                 </div>
