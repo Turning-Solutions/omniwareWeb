@@ -516,29 +516,6 @@ export default function DynamicFilterSidebar({
                                 onToggle={() => toggleSection("price")}
                             >
                                 <div className="space-y-3">
-                                    <div className="rounded-xl border border-[#5E5E5E]/35 bg-[#1a1a1a]/90 px-3 py-3">
-                                        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#8E8E8E]">
-                                            Current range
-                                        </p>
-                                        <div className="mt-2.5 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                                            <div className="rounded-lg border border-[#5E5E5E]/25 bg-black/25 px-3 py-2.5">
-                                                <span className="block text-[10px] font-semibold uppercase tracking-wider text-[#8E8E8E]">
-                                                    From
-                                                </span>
-                                                <span className="mt-1 block text-sm font-semibold tabular-nums leading-snug text-[#F1F1F1]">
-                                                    {formatPriceLkr(priceRange.min)}
-                                                </span>
-                                            </div>
-                                            <div className="rounded-lg border border-[#5E5E5E]/25 bg-black/25 px-3 py-2.5">
-                                                <span className="block text-[10px] font-semibold uppercase tracking-wider text-[#8E8E8E]">
-                                                    To
-                                                </span>
-                                                <span className="mt-1 block text-sm font-semibold tabular-nums leading-snug text-[#F1F1F1]">
-                                                    {formatPriceLkr(priceRange.max)}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </div>
                                     <div className="flex gap-2">
                                         <label className="min-w-0 flex-1">
                                             <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-[#8E8E8E]">
