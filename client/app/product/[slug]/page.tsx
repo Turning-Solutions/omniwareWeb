@@ -60,7 +60,7 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
     if (!product) return <div className="min-h-screen pt-20 text-center text-white">Product not found</div>;
 
     const currentPrice = selectedVariant?.price ?? product.price;
-    const currentStock = selectedVariant?.stock?.qty ?? product.stock?.qty;
+    const currentStock = selectedVariant?.stock?.qty ?? product.stock?.qty ?? 0;
     const availability = product.availability ?? (currentStock > 0 ? 'in_stock' : 'out_of_stock');
 
     const availabilityConfig = {
