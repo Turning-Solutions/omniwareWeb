@@ -6,7 +6,6 @@ import { requireAuth } from '../middleware/requireAuth';
 import { requireAdmin } from '../middleware/requireAdmin';
 import { adminRateLimit } from '../middleware/adminRateLimit';
 import { createAuditLog } from '../utils/audit';
-import { buildProductMatchStage } from '../utils/productAggregation';
 
 const router = express.Router();
 
@@ -15,15 +14,23 @@ router.use(requireAuth, requireAdmin, adminRateLimit);
 // GET /api/v1/admin/products
 router.get('/', async (req: Request, res: Response) => {
     const { q, category, brand, page = '1', limit = '20' } = req.query;
+    res.set('Cache-Control', 'private, max-age=30, stale-while-revalidate=60');
+    res.vary('Authorization');
 
     const pageNum = Math.max(parseInt(page as string, 10) || 1, 1);
     const limitNum = Math.min(Math.max(parseInt(limit as string, 10) || 20, 1), 100);
     const skip = (pageNum - 1) * limitNum;
 
-    // Map 'q' to 'search' for the helper
-    if (q) req.query.search = q as string;
-
-    const match = await buildProductMatchStage(req);
+    const match: Record<string, unknown> = { isActive: true };
+    if (q && String(q).trim()) {
+        match.title = { $regex: String(q).trim(), $options: 'i' };
+    }
+    if (brand && String(brand).trim()) {
+        match.brandId = String(brand).trim();
+    }
+    if (category && String(category).trim()) {
+        match.categoryIds = String(category).trim();
+    }
 
     const [items, total] = await Promise.all([
         Product.find(match)

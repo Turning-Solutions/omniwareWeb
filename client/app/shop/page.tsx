@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, Suspense, useCallback } from "react";
-import { useProducts } from "@/hooks/useProducts";
+import { useProducts, useProductFacets } from "@/hooks/useProducts";
 import ProductCard from "@/components/ProductCard";
 import DynamicFilterSidebar, { countActiveFilters } from "@/components/DynamicFilterSidebar";
 import LoadingAnimation from "@/components/LoadingAnimation";
@@ -58,10 +58,16 @@ export function ShopContent({
         window.sessionStorage.setItem(`${returnStateStorageKey}:pending`, "1");
     }, [returnStateStorageKey]);
 
-    // Fetch products with 15 per page
-    const { data, isLoading, isFetching, error } = useProducts({ ...filters, limit: PRODUCTS_PER_PAGE });
+    // Fetch products first (fast path without expensive facets aggregation)
+    const { data, isLoading, isFetching, error } = useProducts({
+        ...filters,
+        limit: PRODUCTS_PER_PAGE,
+        includeFacets: false,
+    });
+    // Fetch facets asynchronously so grid can render sooner
+    const { data: facetsData } = useProductFacets(filters);
     const products = data?.products || [];
-    const facets = (data as any)?.facets || {};
+    const facets = (facetsData as any)?.facets || {};
 
     // Track previous category to detect changes
     const prevCategoryRef = useRef(filters.category);

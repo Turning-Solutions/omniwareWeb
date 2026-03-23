@@ -32,15 +32,48 @@ export const getProducts = async (req: Request, res: Response) => {
         // This helps absorb repeated traffic while keeping data reasonably fresh.
         res.set('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=120');
 
-        const { search, minPrice, maxPrice, brand, category, sort, page = 1, limit = 20, ...dynamicFilters } = req.query;
+        const { search, minPrice, maxPrice, brand, category, sort, page = 1, limit = 20, facets = 'true', ...dynamicFilters } = req.query;
+        const includeFacets = String(facets).toLowerCase() !== 'false';
         const limitNum = Math.min(Number(limit) || 20, 100);
         const pageNum = Math.max(Number(page) || 1, 1);
         const skip = (pageNum - 1) * limitNum;
+        const sortStage = buildProductSortStage(sort);
+
+        // Fast path for initial list rendering: skip facet aggregation entirely.
+        if (!includeFacets) {
+            const lookupCache: MatchStageCache = {};
+            const matchStage = await buildProductMatchStage(req, [], lookupCache);
+            const [products, total] = await Promise.all([
+                Product.aggregate([
+                    { $match: matchStage },
+                    { $sort: sortStage },
+                    { $skip: skip },
+                    { $limit: limitNum },
+                    { $lookup: { from: 'brands', localField: 'brandId', foreignField: '_id', as: 'brand' } },
+                    { $unwind: { path: '$brand', preserveNullAndEmptyArrays: true } },
+                    { $lookup: { from: 'categories', localField: 'categoryIds', foreignField: '_id', as: 'categories' } },
+                ]),
+                Product.countDocuments(matchStage),
+            ]);
+
+            return res.json({
+                products,
+                pagination: {
+                    total,
+                    page: pageNum,
+                    limit: limitNum,
+                    pages: Math.ceil(total / limitNum),
+                },
+                categoryKey: category || null,
+                featuredMode: 'none',
+                featuredSpecKeys: [],
+                facets: { price: { min: 0, max: 0 }, categories: [], brands: [], availability: [], specs: {} },
+            });
+        }
 
         // Lightweight path: no filters + small limit (e.g. homepage featured only) — skip facets.
         // Shop page uses limit 20 and needs facets for the filter sidebar, so only use when limit <= 8.
         if (!hasFilters(req) && limitNum <= 8) {
-            const sortStage = buildProductSortStage(sort);
             const [products, total] = await Promise.all([
                 Product.aggregate([
                     { $match: { isActive: true } },
@@ -71,8 +104,6 @@ export const getProducts = async (req: Request, res: Response) => {
         const categoryMatchStage = await buildProductMatchStage(req, ['category'], lookupCache);
         const brandMatchStage = await buildProductMatchStage(req, ['brand'], lookupCache);
         const priceMatchStage = await buildProductMatchStage(req, ['price'], lookupCache);
-
-        const sortStage = buildProductSortStage(sort);
 
         // --- Aggregation Pipeline ---
         // Note: We cannot start with a common $match because facets need DIFFERENT matches.

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Search, Edit, Trash2 } from "lucide-react";
+import { Plus, Search, Edit, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import api from "@/lib/api";
 import { isAxiosError } from "axios";
@@ -28,15 +28,31 @@ interface Brand {
     name: string;
 }
 
+interface PaginationState {
+    page: number;
+    pages: number;
+    total: number;
+    limit: number;
+}
+
 export default function ProductsPage() {
     const router = useRouter();
     const [products, setProducts] = useState<Product[]>([]);
     const [loading, setLoading] = useState(true);
+    const [isFetching, setIsFetching] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
     const [categories, setCategories] = useState<Category[]>([]);
     const [brands, setBrands] = useState<Brand[]>([]);
     const [selectedCategory, setSelectedCategory] = useState("");
     const [selectedBrand, setSelectedBrand] = useState("");
+    const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pagination, setPagination] = useState<PaginationState>({
+        page: 1,
+        pages: 1,
+        total: 0,
+        limit: 20,
+    });
 
     // Load categories and brands once on mount (for filter dropdowns)
     useEffect(() => {
@@ -55,16 +71,27 @@ export default function ProductsPage() {
         fetchFilters();
     }, []);
 
+    useEffect(() => {
+        const handle = window.setTimeout(() => setDebouncedSearchTerm(searchTerm.trim()), 350);
+        return () => window.clearTimeout(handle);
+    }, [searchTerm]);
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [debouncedSearchTerm, selectedCategory, selectedBrand]);
+
     // Single effect: fetch products on mount and when filters/search change (avoids duplicate calls on load)
     useEffect(() => {
         fetchProducts();
-    }, [selectedCategory, selectedBrand, searchTerm]);
+    }, [selectedCategory, selectedBrand, debouncedSearchTerm, currentPage]);
 
     const fetchProducts = async () => {
+        setIsFetching(true);
         try {
             const queryParams = new URLSearchParams({
-                limit: '1000',
-                q: searchTerm,
+                limit: '20',
+                page: String(currentPage),
+                ...(debouncedSearchTerm && { q: debouncedSearchTerm }),
                 ...(selectedCategory && { category: selectedCategory }),
                 ...(selectedBrand && { brand: selectedBrand })
             });
@@ -73,6 +100,7 @@ export default function ProductsPage() {
             // Admin products endpoint returns { data: Product[], pagination: {...} }
             const list = Array.isArray(data) ? data : data.data || [];
             setProducts(list);
+            if (data?.pagination) setPagination(data.pagination);
         } catch (error) {
             if (isAxiosError(error) && error.response?.status === 401) {
                 // Prevent repeated unauthorized requests with a stale token.
@@ -83,6 +111,7 @@ export default function ProductsPage() {
             console.error("Failed to fetch products", error);
         } finally {
             setLoading(false);
+            setIsFetching(false);
         }
     };
 
@@ -118,7 +147,12 @@ export default function ProductsPage() {
                         className="w-full bg-base border border-border-soft rounded-lg pl-10 pr-4 py-2 text-main focus:outline-none focus:border-accent transition-colors"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === 'Enter') fetchProducts(); }}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                                setCurrentPage(1);
+                                setDebouncedSearchTerm(searchTerm.trim());
+                            }
+                        }}
                     />
                 </div>
             </div>
@@ -127,7 +161,10 @@ export default function ProductsPage() {
                 <select
                     className="admin-card border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent [&>option]:text-black"
                     value={selectedCategory}
-                    onChange={(e) => setSelectedCategory(e.target.value)}
+                    onChange={(e) => {
+                        setCurrentPage(1);
+                        setSelectedCategory(e.target.value);
+                    }}
                 >
                     <option value="">All Categories</option>
                     {categories.map(c => (
@@ -137,7 +174,10 @@ export default function ProductsPage() {
                 <select
                     className="admin-card border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent [&>option]:text-black"
                     value={selectedBrand}
-                    onChange={(e) => setSelectedBrand(e.target.value)}
+                    onChange={(e) => {
+                        setCurrentPage(1);
+                        setSelectedBrand(e.target.value);
+                    }}
                 >
                     <option value="">All Brands</option>
                     {brands.map(b => (
@@ -147,6 +187,11 @@ export default function ProductsPage() {
             </div>
 
             <div className="admin-card rounded-xl overflow-hidden">
+                {isFetching && !loading ? (
+                    <div className="px-6 py-3 text-xs text-sub border-b border-border-soft">
+                        Updating...
+                    </div>
+                ) : null}
                 <div className="overflow-x-auto">
                     <table className="w-full text-left">
                         <thead className="bg-base text-sub uppercase text-xs">
@@ -193,6 +238,32 @@ export default function ProductsPage() {
                             )}
                         </tbody>
                     </table>
+                </div>
+            </div>
+
+            <div className="mt-5 flex items-center justify-between">
+                <p className="text-sm text-sub">
+                    Showing page {pagination.page} of {pagination.pages} ({pagination.total} products)
+                </p>
+                <div className="flex items-center gap-2">
+                    <button
+                        type="button"
+                        onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                        disabled={currentPage <= 1 || isFetching}
+                        className="inline-flex items-center gap-1 rounded-lg border border-border-soft px-3 py-2 text-sm text-main disabled:opacity-50"
+                    >
+                        <ChevronLeft className="h-4 w-4" />
+                        Prev
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setCurrentPage((p) => Math.min(pagination.pages, p + 1))}
+                        disabled={currentPage >= pagination.pages || isFetching}
+                        className="inline-flex items-center gap-1 rounded-lg border border-border-soft px-3 py-2 text-sm text-main disabled:opacity-50"
+                    >
+                        Next
+                        <ChevronRight className="h-4 w-4" />
+                    </button>
                 </div>
             </div>
         </div>

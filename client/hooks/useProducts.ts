@@ -14,6 +14,7 @@ export interface UseProductsOptions {
     spec?: Record<string, string>;
     availability?: string;
     inStock?: string;
+    includeFacets?: boolean;
 }
 
 export interface Product {
@@ -90,6 +91,7 @@ function buildProductsQueryString(options: UseProductsOptions): string {
     if (options.page) params.append('page', options.page.toString());
     if (options.availability) params.append('availability', options.availability);
     if (options.inStock) params.append('inStock', options.inStock);
+    if (options.includeFacets === false) params.append('facets', 'false');
     // Spec filters: API expects spec[key]=value (e.g. spec[vram]=16GB)
     if (options.spec && typeof options.spec === 'object') {
         for (const [key, value] of Object.entries(options.spec)) {
@@ -109,6 +111,32 @@ export const useProducts = (options: UseProductsOptions = {}) => {
         },
         staleTime: 2 * 60 * 1000, // 2 minutes — avoid refetch on every mount
         placeholderData: (previousData) => previousData, // show previous list while refetching
+    });
+};
+
+export const useProductFacets = (options: UseProductsOptions = {}) => {
+    return useQuery<{ facets: Facets }>({
+        queryKey: ['product-facets', options],
+        queryFn: async () => {
+            const params = new URLSearchParams();
+            if (options.search) params.append('search', options.search);
+            if (options.category) params.append('category', options.category);
+            if (options.brand) params.append('brand', options.brand);
+            if (options.minPrice != null) params.append('minPrice', options.minPrice.toString());
+            if (options.maxPrice != null) params.append('maxPrice', options.maxPrice.toString());
+            if (options.availability) params.append('availability', options.availability);
+            if (options.inStock) params.append('inStock', options.inStock);
+            if (options.spec && typeof options.spec === 'object') {
+                for (const [key, value] of Object.entries(options.spec)) {
+                    if (value != null && value !== '') params.append(`spec[${key}]`, value);
+                }
+            }
+            const query = params.toString();
+            const { data } = await api.get(`/products/facets${query ? `?${query}` : ''}`);
+            return data;
+        },
+        staleTime: 2 * 60 * 1000,
+        placeholderData: (previousData) => previousData,
     });
 };
 
