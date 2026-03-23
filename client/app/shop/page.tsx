@@ -1,30 +1,23 @@
 "use client";
 
 import { useState, useEffect, useRef, Suspense, useCallback } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
-import Link from "next/link";
 import { useProducts } from "@/hooks/useProducts";
 import ProductCard from "@/components/ProductCard";
 import DynamicFilterSidebar, { countActiveFilters } from "@/components/DynamicFilterSidebar";
+import LoadingAnimation from "@/components/LoadingAnimation";
 import { SlidersHorizontal, ArrowUpDown, X, ChevronLeft, ChevronRight, Search } from "lucide-react";
 
 const PRODUCTS_PER_PAGE = 15;
 const SEARCH_DEBOUNCE_MS = 380;
+const SHOP_RETURN_STATE_PREFIX = "shop:return-state:";
 
-function buildShopQueryString(f: Record<string, unknown>): string {
-    const params = new URLSearchParams();
-    const page = Number(f.page) || 1;
-    if (page > 1) params.set("page", String(page));
-    const search = String(f.search ?? "").trim();
-    if (search) params.set("search", search);
-    const sort = f.sort ?? "newest";
-    if (sort !== "newest") params.set("sort", String(sort));
-    return params.toString();
-}
+type Filters = Record<string, any>;
+
+const DEFAULT_FILTERS: Filters = { search: "", sort: "newest", page: 1 };
 
 interface ShopContentProps {
     basePath?: string;
-    initialFilters?: Record<string, any>;
+    initialFilters?: Filters;
     /** Page title shown above filters + grid */
     heading?: string;
     /** Short line under the title */
@@ -33,50 +26,40 @@ interface ShopContentProps {
 
 export function ShopContent({
     basePath = "/shop",
-    initialFilters = {},
+    initialFilters,
     heading,
     subheading,
 }: ShopContentProps) {
-    const searchParams = useSearchParams();
-    const router = useRouter();
+    const returnStateStorageKey = `${SHOP_RETURN_STATE_PREFIX}${basePath}`;
 
-    // Initialize filters from URL or props
-    const [filters, setFilters] = useState<Record<string, any>>({
-        search: searchParams?.get("search") || "",
-        sort: searchParams?.get("sort") || "newest",
-        page: Number(searchParams?.get("page")) || 1,
-        ...initialFilters
+    // Compute the starting filter state exactly once on mount.
+    const [filters, setFilters] = useState<Filters>(() => {
+        // If we are returning from a product page, restore the saved state.
+        if (typeof window !== "undefined") {
+            const pending = window.sessionStorage.getItem(`${returnStateStorageKey}:pending`);
+            const raw = window.sessionStorage.getItem(returnStateStorageKey);
+            if (pending === "1" && raw) {
+                window.sessionStorage.removeItem(`${returnStateStorageKey}:pending`);
+                try { return JSON.parse(raw) as Filters; } catch { /* fall through */ }
+            }
+        }
+        return { ...DEFAULT_FILTERS, ...(initialFilters ?? {}) };
     });
 
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-    const [searchDraft, setSearchDraft] = useState(() => String(searchParams?.get("search") || ""));
+    const [searchDraft, setSearchDraft] = useState(() => String(filters.search ?? ""));
     const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const filtersRef = useRef(filters);
     filtersRef.current = filters;
 
-    const replaceShopUrl = useCallback(
-        (nextFilters: Record<string, unknown>) => {
-            const qs = buildShopQueryString(nextFilters);
-            const path = qs ? `${basePath}?${qs}` : basePath;
-            router.replace(path, { scroll: false });
-        },
-        [basePath, router]
-    );
-
-    // Sync filters from URL when navigating (e.g. pagination links)
-    useEffect(() => {
-        const page = Number(searchParams?.get("page")) || 1;
-        const search = searchParams?.get("search") || "";
-        const sort = searchParams?.get("sort") || "newest";
-        setFilters((prev) => {
-            if (prev.page === page && prev.search === search && prev.sort === sort) return prev;
-            return { ...prev, page, search, sort };
-        });
-        setSearchDraft(search);
-    }, [searchParams]);
+    const rememberCurrentShopState = useCallback(() => {
+        if (typeof window === "undefined") return;
+        window.sessionStorage.setItem(returnStateStorageKey, JSON.stringify(filtersRef.current));
+        window.sessionStorage.setItem(`${returnStateStorageKey}:pending`, "1");
+    }, [returnStateStorageKey]);
 
     // Fetch products with 15 per page
-    const { data, isLoading, error } = useProducts({ ...filters, limit: PRODUCTS_PER_PAGE });
+    const { data, isLoading, isFetching, error } = useProducts({ ...filters, limit: PRODUCTS_PER_PAGE });
     const products = data?.products || [];
     const facets = (data as any)?.facets || {};
 
@@ -123,7 +106,7 @@ export function ShopContent({
                 return next;
             });
         }
-    }, [data, facets.specs]);
+    }, [data, facets.specs, filters.spec]);
 
     const activeFilterCount = countActiveFilters(filters);
     const sortOptions = [
@@ -146,9 +129,8 @@ export function ShopContent({
             const q = raw.trim();
             const next = { ...filtersRef.current, search: q, page: 1 };
             setFilters(next);
-            replaceShopUrl(next);
         },
-        [replaceShopUrl]
+        []
     );
 
     const flushSearchDebounce = useCallback(() => {
@@ -175,16 +157,18 @@ export function ShopContent({
         commitSearch("");
     };
 
-    const buildPageUrl = (page: number) => {
-        const qs = buildShopQueryString({ ...filters, page });
-        return qs ? `${basePath}?${qs}` : basePath;
-    };
+    const goToPage = (page: number) => setFilters((prev: Filters) => ({ ...prev, page }));
 
     const pagination = (data as { pagination?: { page: number; pages: number; total: number } })?.pagination;
     const currentPage = pagination?.page ?? (data as { page?: number })?.page ?? 1;
     const totalPages = pagination?.pages ?? (data as { pages?: number })?.pages ?? 1;
     const totalProducts = pagination?.total ?? (data as { total?: number })?.total;
     const showPagination = totalPages > 1 && !isLoading && !error;
+    const shopProductCardProps = {
+        showWhatsAppButton: false,
+        showOrderNowButton: true,
+        onNavigateToProduct: rememberCurrentShopState,
+    } as const;
 
     const getPageNumbers = () => {
         if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1);
@@ -304,6 +288,12 @@ export function ShopContent({
                                         </span>
                                     </p>
                                 )}
+                                {isFetching && !isLoading && (
+                                    <div className="inline-flex items-center gap-2 rounded-full border border-[#D12B28]/30 bg-[#D12B28]/10 px-2.5 py-1 text-xs text-[#F4C5C5]">
+                                        <span className="h-2 w-2 animate-pulse rounded-full bg-[#D12B28]" />
+                                        Updating...
+                                    </div>
+                                )}
                                 {activeFilterCount > 0 && (
                                     <button
                                         type="button"
@@ -325,7 +315,6 @@ export function ShopContent({
                                         const sort = e.target.value;
                                         const next = { ...filtersRef.current, sort, page: 1 };
                                         setFilters(next);
-                                        replaceShopUrl(next);
                                     }}
                                     className="min-w-0 flex-1 sm:flex-none cursor-pointer rounded-xl border border-[#5E5E5E]/45 bg-[#121212]/90 px-3 py-2 text-sm font-normal text-[#F1F1F1] shadow-inner shadow-black/25 focus:outline-none focus:ring-2 focus:ring-[#D12B28]/40 focus:border-[#D12B28]/50 sm:min-w-[13rem]"
                                 >
@@ -379,10 +368,25 @@ export function ShopContent({
                         </div>
                     ) : (
                         <>
-                            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3 xl:grid-cols-4">
+                            <div className="relative">
+                                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3 xl:grid-cols-4">
                                 {products.map((product) => (
-                                    <ProductCard key={product._id} product={product} />
+                                    <ProductCard
+                                        key={product._id}
+                                        product={product}
+                                        {...shopProductCardProps}
+                                    />
                                 ))}
+                                </div>
+                                {isFetching && (
+                                    <div className="pointer-events-none absolute inset-0 z-10 rounded-2xl bg-[#121212]/55 backdrop-blur-[1px]">
+                                        <LoadingAnimation
+                                            size="sm"
+                                            label="Refreshing products..."
+                                            className="h-full"
+                                        />
+                                    </div>
+                                )}
                             </div>
 
                             {showPagination && (
@@ -391,18 +395,19 @@ export function ShopContent({
                                     aria-label="Pagination"
                                 >
                                     <div className="flex items-center gap-1 rounded-full border border-[#5E5E5E]/40 bg-[#242424]/60 p-1">
-                                        <Link
-                                            href={buildPageUrl(currentPage - 1)}
+                                        <button
+                                            type="button"
+                                            onClick={() => goToPage(currentPage - 1)}
+                                            disabled={currentPage <= 1}
                                             className={`inline-flex items-center gap-1 rounded-full px-3 py-2 text-sm font-medium transition-colors ${
                                                 currentPage <= 1
-                                                    ? "pointer-events-none text-[#5E5E5E]"
+                                                    ? "cursor-not-allowed text-[#5E5E5E]"
                                                     : "text-[#F1F1F1] hover:bg-white/10"
                                             }`}
-                                            aria-disabled={currentPage <= 1}
                                         >
                                             <ChevronLeft className="h-4 w-4" />
                                             <span className="hidden sm:inline">Prev</span>
-                                        </Link>
+                                        </button>
                                         <div className="flex items-center gap-0.5 px-1">
                                             {getPageNumbers().map((p, i) =>
                                                 p === "ellipsis" ? (
@@ -410,9 +415,10 @@ export function ShopContent({
                                                         …
                                                     </span>
                                                 ) : (
-                                                    <Link
+                                                    <button
+                                                        type="button"
                                                         key={p}
-                                                        href={buildPageUrl(p)}
+                                                        onClick={() => goToPage(p as number)}
                                                         className={`flex h-9 min-w-9 items-center justify-center rounded-full text-sm font-medium transition-colors ${
                                                             p === currentPage
                                                                 ? "bg-[#D12B28] text-[#F1F1F1] shadow-sm shadow-[#D12B28]/25"
@@ -420,22 +426,23 @@ export function ShopContent({
                                                         }`}
                                                     >
                                                         {p}
-                                                    </Link>
+                                                    </button>
                                                 )
                                             )}
                                         </div>
-                                        <Link
-                                            href={buildPageUrl(currentPage + 1)}
+                                        <button
+                                            type="button"
+                                            onClick={() => goToPage(currentPage + 1)}
+                                            disabled={currentPage >= totalPages}
                                             className={`inline-flex items-center gap-1 rounded-full px-3 py-2 text-sm font-medium transition-colors ${
                                                 currentPage >= totalPages
-                                                    ? "pointer-events-none text-[#5E5E5E]"
+                                                    ? "cursor-not-allowed text-[#5E5E5E]"
                                                     : "text-[#F1F1F1] hover:bg-white/10"
                                             }`}
-                                            aria-disabled={currentPage >= totalPages}
                                         >
                                             <span className="hidden sm:inline">Next</span>
                                             <ChevronRight className="h-4 w-4" />
-                                        </Link>
+                                        </button>
                                     </div>
                                     <p className="text-xs text-[#8E8E8E]">
                                         Page {currentPage} of {totalPages}

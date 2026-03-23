@@ -18,6 +18,8 @@ import { useRouter } from "next/navigation";
 import { useProducts } from "@/hooks/useProducts";
 import ProductCard from "@/components/ProductCard";
 import ImageSlider from "@/components/ImageSlider";
+import PromotionStripe from "@/components/PromotionStripe";
+import LoadingAnimation from "@/components/LoadingAnimation";
 
 export default function Home() {
     const router = useRouter();
@@ -25,7 +27,7 @@ export default function Home() {
 
     // Fetch featured products (assuming we can filter by isFeatured or just take latest)
     // For now, let's take latest products as "featured" or "special offers"
-    const { data: featuredData, isLoading: loadingFeatured } = useProducts({ limit: 4, sort: 'newest' });
+    const { data: featuredData, isLoading: loadingFeatured, isFetching: fetchingFeatured } = useProducts({ limit: 4, sort: 'newest' });
     const featuredProducts = featuredData?.products || [];
 
     const handleSearch = (e: FormEvent) => {
@@ -181,6 +183,9 @@ export default function Home() {
                 </div>
             </section>
 
+            {/* Promotion Stripe — only renders when there are active promotions */}
+            <PromotionStripe />
+
             {/* Featured Shelf */}
             <section className="border-y border-[#5E5E5E]/30 bg-[#181818] py-14">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -202,10 +207,17 @@ export default function Home() {
                                 ))}
                             </div>
                         ) : (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                                {featuredProducts.map((product) => (
-                                    <ProductCard key={product._id} product={product} />
-                                ))}
+                            <div className="relative">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                                    {featuredProducts.map((product) => (
+                                        <ProductCard key={product._id} product={product} />
+                                    ))}
+                                </div>
+                                {fetchingFeatured && (
+                                    <div className="pointer-events-none absolute inset-0 rounded-2xl bg-[#121212]/50">
+                                        <LoadingAnimation size="sm" label="Updating featured..." className="h-full" />
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>

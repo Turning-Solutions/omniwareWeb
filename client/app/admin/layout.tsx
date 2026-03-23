@@ -1,6 +1,6 @@
 import React from "react";
 import Link from "next/link";
-import { LayoutDashboard, ShoppingBag, Package, Settings, Filter } from "lucide-react";
+import { LayoutDashboard, ShoppingBag, Package, Settings, Filter, Tag } from "lucide-react";
 import AdminAuthGuard from "@/components/AdminAuthGuard";
 
 export default function AdminLayout({
@@ -32,6 +32,10 @@ export default function AdminLayout({
                     <Link href="/admin/categories/spec-features" className="flex items-center space-x-3 px-4 py-3 text-sub hover:bg-white/5 hover:text-main rounded-lg transition-colors">
                         <Filter className="w-5 h-5" />
                         <span>Featured Specs</span>
+                    </Link>
+                    <Link href="/admin/promotions" className="flex items-center space-x-3 px-4 py-3 text-sub hover:bg-white/5 hover:text-main rounded-lg transition-colors">
+                        <Tag className="w-5 h-5" />
+                        <span>Promotions</span>
                     </Link>
                     <Link href="/admin/settings" className="flex items-center space-x-3 px-4 py-3 text-sub hover:bg-white/5 hover:text-main rounded-lg transition-colors">
                         <Settings className="w-5 h-5" />

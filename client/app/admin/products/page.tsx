@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Plus, Search, Edit, Trash2 } from "lucide-react";
 import Link from "next/link";
 import api from "@/lib/api";
+import { isAxiosError } from "axios";
 
 interface Product {
     _id: string;
@@ -73,6 +74,12 @@ export default function ProductsPage() {
             const list = Array.isArray(data) ? data : data.data || [];
             setProducts(list);
         } catch (error) {
+            if (isAxiosError(error) && error.response?.status === 401) {
+                // Prevent repeated unauthorized requests with a stale token.
+                localStorage.removeItem("userInfo");
+                router.replace("/login");
+                return;
+            }
             console.error("Failed to fetch products", error);
         } finally {
             setLoading(false);

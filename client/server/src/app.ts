@@ -11,6 +11,7 @@ import analyticsRoutes from './routes/analyticsRoutes';
 import featuredSpecsRoutes from './routes/featuredSpecsRoutes';
 import uploadRoutes from './routes/uploadRoutes';
 import contactRoutes from './routes/contactRoutes';
+import promotionRoutes from './routes/promotionRoutes';
 import { errorHandler } from './middleware/errorMiddleware';
 import { requestIdMiddleware } from './middleware/requestId';
 
@@ -54,6 +55,7 @@ function createApp() {
     app.use('/api/v1/admin', adminRoutes);
     app.use('/api/v1/builder', builderRoutes);
     app.use('/api/v1/analytics', analyticsRoutes);
+    app.use('/api/v1/promotions', promotionRoutes);
 
     app.get('/api', (_req, res) => {
         res.send('Omniware API is running');

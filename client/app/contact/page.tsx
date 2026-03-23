@@ -73,7 +73,7 @@ export default function ContactPage() {
                         </span>
                     </h1>
                     <p className="mt-4 text-base leading-relaxed text-[#B0B0B0] sm:text-lg">
-                        Builds, upgrades, or bench service—send a note and we&apos;ll get back as soon as we can.
+                        Builds, upgrades, or bench service, send a note and we&apos;ll get back as soon as we can.
                     </p>
                 </motion.header>
 
@@ -113,26 +113,7 @@ export default function ContactPage() {
                             </div>
                         </div>
 
-                        <div className="rounded-2xl border border-[#5E5E5E]/35 bg-[#181818]/80 p-6 backdrop-blur-sm sm:p-8">
-                            <div className="flex items-center gap-3">
-                                <Clock className="h-5 w-5 text-[#D12B28]" aria-hidden />
-                                <h3 className="text-base font-semibold text-[#F1F1F1]">Opening hours</h3>
-                            </div>
-                            <ul className="mt-5 space-y-3 text-sm">
-                                <li className="flex justify-between gap-4 border-b border-[#5E5E5E]/20 pb-3 text-[#B0B0B0]">
-                                    <span>Mon – Fri</span>
-                                    <span className="tabular-nums text-[#F1F1F1]">9:00 – 19:00</span>
-                                </li>
-                                <li className="flex justify-between gap-4 border-b border-[#5E5E5E]/20 pb-3 text-[#B0B0B0]">
-                                    <span>Saturday</span>
-                                    <span className="tabular-nums text-[#F1F1F1]">10:00 – 17:00</span>
-                                </li>
-                                <li className="flex justify-between gap-4 text-[#B0B0B0]">
-                                    <span>Sunday</span>
-                                    <span className="font-medium text-[#8E8E8E]">Closed</span>
-                                </li>
-                            </ul>
-                        </div>
+                       
 
                         <div className="rounded-2xl border border-[#5E5E5E]/35 bg-[#181818]/60 px-6 py-5 sm:px-8">
                             <p className="text-xs font-semibold uppercase tracking-wider text-[#8E8E8E]">Quick links</p>
@@ -198,7 +179,7 @@ export default function ContactPage() {
                                         exit={{ opacity: 0, height: 0 }}
                                         className="mt-6 overflow-hidden rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200/95"
                                     >
-                                        Thanks—your message was sent. We&apos;ll get back to you as soon as we can.
+                                        Thanks,your message was sent. We&apos;ll get back to you as soon as we can.
                                     </motion.div>
                                 )}
                             </AnimatePresence>
@@ -261,7 +242,7 @@ export default function ContactPage() {
                                         value={formState.message}
                                         onChange={(e) => setFormState((s) => ({ ...s, message: e.target.value }))}
                                         className={`${inputClass} min-h-[120px] resize-y`}
-                                        placeholder="Tell us what you need—timeline, budget, current hardware if any."
+                                        placeholder="Tell us what you need, timeline, budget, current hardware if any."
                                     />
                                 </div>
                                 <button

@@ -31,7 +31,21 @@ export interface Product {
     rating: number;
     numReviews: number;
     stock?: { qty: number };
-    variants?: any[];
+    availability?: 'in_stock' | 'out_of_stock' | 'pre_order' | 'coming_soon';
+    variants?: {
+        sku?: string;
+        price?: number;
+        stock?: { qty?: number };
+        attributes?: { name?: string; value: string }[];
+    }[];
+    colorVariants?: {
+        name: string;
+        hex?: string;
+        sku?: string;
+        price?: number;
+        stock?: { qty?: number };
+    }[];
+    warranty?: string;
     specs?: Record<string, string>;
     attributes?: { name?: string; value: string }[];
     /** Grouped attributes for product details (e.g. General, Cable Specs). Falls back to attributes as one group. */

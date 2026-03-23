@@ -56,6 +56,27 @@ function visibleCollapsedOptions<T extends { value: string }>(
     return ordered.slice(0, limit);
 }
 
+function compareFilterValues(a: string, b: string): number {
+    const left = a.trim();
+    const right = b.trim();
+
+    const leftNum = Number.parseFloat(left);
+    const rightNum = Number.parseFloat(right);
+    const bothNumericPrefix = Number.isFinite(leftNum) && Number.isFinite(rightNum);
+
+    // Handle "3200MHz" style values in natural numeric order.
+    if (bothNumericPrefix) {
+        if (leftNum !== rightNum) return leftNum - rightNum;
+        return left.localeCompare(right, undefined, { numeric: true, sensitivity: "base" });
+    }
+
+    return left.localeCompare(right, undefined, { numeric: true, sensitivity: "base" });
+}
+
+function sortFacetOptions<T extends { value: string }>(items: T[]): T[] {
+    return [...items].sort((a, b) => compareFilterValues(a.value, b.value));
+}
+
 // Smooth expand/collapse using CSS grid row trick
 function FilterSection({
     id,
@@ -745,7 +766,8 @@ function SpecList({
         const specVal = filters.spec?.[filterKey];
         return typeof specVal === "string" && specVal.split(",").filter(Boolean).includes(value);
     };
-    const ordered = orderOptionsSelectedFirst(items, isSelected);
+    const sortedItems = sortFacetOptions(items);
+    const ordered = orderOptionsSelectedFirst(sortedItems, isSelected);
     const visible = expanded
         ? ordered
         : visibleCollapsedOptions(ordered, isSelected, LIST_PREVIEW);

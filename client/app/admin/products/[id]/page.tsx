@@ -32,6 +32,40 @@ interface FilterSpec {
     value: string;
 }
 
+interface ColorVariant {
+    name: string;
+    hex: string;
+    price: string;
+}
+
+const COLOR_NAME_TO_HEX: Record<string, string> = {
+    black: "#000000",
+    white: "#FFFFFF",
+    red: "#FF0000",
+    blue: "#0000FF",
+    green: "#008000",
+    yellow: "#FFFF00",
+    orange: "#FFA500",
+    purple: "#800080",
+    pink: "#FFC0CB",
+    gray: "#808080",
+    grey: "#808080",
+    silver: "#C0C0C0",
+    gold: "#FFD700",
+    brown: "#8B4513",
+    navy: "#000080",
+    maroon: "#800000",
+    cyan: "#00FFFF",
+    teal: "#008080",
+    olive: "#808000",
+    beige: "#F5F5DC",
+};
+
+function suggestHexFromColorName(name: string): string {
+    const key = name.trim().toLowerCase();
+    return COLOR_NAME_TO_HEX[key] || "";
+}
+
 /** Match server normalizeSpecKey so stored keys align with shop filter facet keys */
 function normalizeSpecKey(key: string): string {
     if (!key) return "";
@@ -56,11 +90,14 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
         slug: "",
         stock: "",
         description: "",
+        warranty: "",
         brandId: "",
         categoryIds: [] as string[],
         attributeGroups: [] as AttributeGroup[],
         filterSpecs: [] as FilterSpec[],
+        colorVariants: [] as ColorVariant[],
         images: [] as string[],
+        availability: "in_stock" as "in_stock" | "out_of_stock" | "pre_order" | "coming_soon",
         isActive: true
     });
 
@@ -102,6 +139,13 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                     ? Object.entries(specsObj).map(([k, v]) => ({ key: normalizeSpecKey(k), value: String(v) }))
                     : [];
                 const rawGroups = data.attributeGroups;
+                const colorVariants: ColorVariant[] = Array.isArray(data.colorVariants)
+                    ? data.colorVariants.map((v: { name?: string; hex?: string; price?: number }) => ({
+                        name: v.name || "",
+                        hex: v.hex || "",
+                        price: v.price != null ? String(v.price) : "",
+                    }))
+                    : [];
                 const attributeGroups: AttributeGroup[] =
                     rawGroups && Array.isArray(rawGroups) && rawGroups.length > 0
                         ? rawGroups.map((g: any) => ({
@@ -118,11 +162,14 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                     slug: data.slug,
                     stock: data.stock?.qty || 0,
                     description: data.description || "",
+                    warranty: data.warranty || "",
                     brandId: data.brandId?._id || data.brandId || "",
                     categoryIds: data.categoryIds?.map((c: any) => c._id || c) || [], // eslint-disable-line @typescript-eslint/no-explicit-any
                     attributeGroups,
                     filterSpecs,
+                    colorVariants,
                     images: Array.isArray(data.images) ? data.images : [],
+                    availability: data.availability || "in_stock",
                     isActive: data.isActive
                 });
                 setSelectedAttributeKeys(new Set());
@@ -167,7 +214,16 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                 ...rest,
                 price: parseFloat(formData.price),
                 stock: { qty: parseInt(formData.stock) },
+                availability: formData.availability,
+                warranty: formData.warranty?.trim() || undefined,
                 specs: Object.keys(specsRecord).length ? specsRecord : undefined,
+                colorVariants: formData.colorVariants
+                    .filter((variant) => variant.name.trim())
+                    .map((variant) => ({
+                        name: variant.name.trim(),
+                        hex: variant.hex.trim() || undefined,
+                        price: variant.price.trim() ? parseFloat(variant.price) : undefined,
+                    })),
                 attributeGroups: formData.attributeGroups.filter(
                     g => g.category.trim() && g.attributes.some(a => a.name.trim() || a.value.trim())
                 ).map(g => ({
@@ -498,6 +554,39 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
         }
     };
 
+    const addColorVariant = () => {
+        setFormData((prev) => ({
+            ...prev,
+            colorVariants: [...prev.colorVariants, { name: "", hex: "", price: "" }],
+        }));
+    };
+
+    const updateColorVariant = (index: number, field: keyof ColorVariant, value: string) => {
+        setFormData((prev) => ({
+            ...prev,
+            colorVariants: prev.colorVariants.map((variant, i) => {
+                if (i !== index) return variant;
+                if (field === "name") {
+                    const nextName = value;
+                    // Auto-fill hex when it's empty, so user gets a friendly default.
+                    const suggestedHex = suggestHexFromColorName(nextName);
+                    if (!variant.hex && suggestedHex) {
+                        return { ...variant, name: nextName, hex: suggestedHex };
+                    }
+                    return { ...variant, name: nextName };
+                }
+                return { ...variant, [field]: value };
+            }),
+        }));
+    };
+
+    const removeColorVariant = (index: number) => {
+        setFormData((prev) => ({
+            ...prev,
+            colorVariants: prev.colorVariants.filter((_, i) => i !== index),
+        }));
+    };
+
     if (initialLoading && !isNew) return <div className="p-10 text-center text-main">Loading...</div>;
 
     return (
@@ -559,6 +648,30 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                             onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
                         />
                     </div>
+                    <div className="space-y-2">
+                        <label className="text-sub text-sm">Warranty (Optional)</label>
+                        <input
+                            type="text"
+                            placeholder="e.g. 12 Months"
+                            className="w-full bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent"
+                            value={formData.warranty}
+                            onChange={(e) => setFormData({ ...formData, warranty: e.target.value })}
+                        />
+                    </div>
+
+                    <div className="space-y-2">
+                        <label className="text-sub text-sm">Availability Status</label>
+                        <select
+                            className="w-full bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent [&>option]:text-black"
+                            value={formData.availability}
+                            onChange={(e) => setFormData({ ...formData, availability: e.target.value as typeof formData.availability })}
+                        >
+                            <option value="in_stock">In Stock</option>
+                            <option value="out_of_stock">Out of Stock</option>
+                            <option value="pre_order">Pre-Order</option>
+                            <option value="coming_soon">Coming Soon</option>
+                        </select>
+                    </div>
 
                     <div className="space-y-2">
                         <label className="text-sub text-sm flex justify-between">
@@ -608,6 +721,69 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                         value={formData.description}
                         onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                     ></textarea>
+                </div>
+
+                <div className="border-t border-border-soft pt-6">
+                    <div className="flex items-center justify-between mb-4">
+                        <div>
+                            <h2 className="text-xl font-bold text-main">Color variants</h2>
+                            <p className="text-sub text-sm mt-0.5">Add available colors for this product.</p>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={addColorVariant}
+                            className="text-sm bg-accent/20 text-accent px-3 py-1.5 rounded hover:bg-accent/30 transition-colors flex items-center gap-1"
+                        >
+                            <Plus className="h-4 w-4" /> Add color
+                        </button>
+                    </div>
+                    {formData.colorVariants.length === 0 && (
+                        <p className="text-sub text-sm italic">No color variants yet.</p>
+                    )}
+                    <div className="space-y-3">
+                        {formData.colorVariants.map((variant, index) => (
+                            <div key={index} className="grid grid-cols-1 md:grid-cols-5 gap-3 bg-base border border-border-soft rounded-lg p-3">
+                                <input
+                                    type="text"
+                                    placeholder="Color name (e.g. Black)"
+                                    className="bg-base border border-border-soft rounded-lg px-3 py-2 text-main focus:outline-none focus:border-accent"
+                                    value={variant.name}
+                                    onChange={(e) => updateColorVariant(index, "name", e.target.value)}
+                                />
+                                <input
+                                    type="text"
+                                    placeholder="#000000"
+                                    className="bg-base border border-border-soft rounded-lg px-3 py-2 text-main focus:outline-none focus:border-accent"
+                                    value={variant.hex}
+                                    onChange={(e) => updateColorVariant(index, "hex", e.target.value)}
+                                />
+                                <input
+                                    type="color"
+                                    className="h-[42px] w-full cursor-pointer rounded-lg border border-border-soft bg-base px-1 py-1"
+                                    value={variant.hex && /^#[0-9A-Fa-f]{6}$/.test(variant.hex) ? variant.hex : "#000000"}
+                                    onChange={(e) => updateColorVariant(index, "hex", e.target.value.toUpperCase())}
+                                    title="Pick color"
+                                />
+                                <input
+                                    type="number"
+                                    placeholder="Variant price (optional)"
+                                    className="bg-base border border-border-soft rounded-lg px-3 py-2 text-main focus:outline-none focus:border-accent"
+                                    value={variant.price}
+                                    onChange={(e) => updateColorVariant(index, "price", e.target.value)}
+                                />
+                                <div className="flex gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => removeColorVariant(index)}
+                                        className="w-full p-2 text-red-400 hover:bg-red-400/10 rounded border border-border-soft"
+                                        title="Remove color"
+                                    >
+                                        <Trash2 className="h-5 w-5" />
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
                 </div>
 
                 {/* Product images (Cloudinary) */}

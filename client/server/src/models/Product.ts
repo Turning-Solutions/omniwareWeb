@@ -38,6 +38,14 @@ const productSchema = new mongoose.Schema({
             value: { type: String, required: true }
         }]
     }],
+    colorVariants: [{
+        name: { type: String, required: true },
+        hex: { type: String, required: false },
+        sku: { type: String, required: false },
+        price: { type: Number, required: false },
+        stock: { qty: { type: Number, default: 0 } }
+    }],
+    warranty: { type: String, required: false },
     description: { type: String },
     isFeatured: { type: Boolean, default: false },
     isActive: { type: Boolean, default: true }
@@ -59,5 +67,10 @@ productSchema.index({ 'specs.$**': 1 });
 productSchema.index({ sku: 1 }, { unique: true, sparse: true });
 productSchema.index({ slug: 1 }, { unique: true, sparse: true });
 
+// In Next.js dev HMR, mongoose model cache can keep an older schema.
+// Recreate the model in non-production so newly added fields persist immediately.
+if (process.env.NODE_ENV !== 'production' && mongoose.models.Product) {
+    delete mongoose.models.Product;
+}
 const Product = mongoose.models.Product ?? mongoose.model('Product', productSchema);
 export default Product;

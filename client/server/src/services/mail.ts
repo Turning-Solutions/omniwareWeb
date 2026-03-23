@@ -21,8 +21,8 @@ export function isMailConfigured(): boolean {
     return Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
 }
 
-/** Resend only allows verified domains; public inboxes cannot be the From address. */
-const RESEND_TEST_FROM = 'Omniware <onboarding@resend.dev>';
+/** Default verified sender for Resend. */
+const RESEND_DEFAULT_FROM = 'Omniware <support@omniware.lk>';
 
 const RESEND_BLOCKED_FROM_DOMAINS = new Set([
     'gmail.com',
@@ -47,10 +47,10 @@ function parseFromEmail(fromHeader: string): string | null {
     return addr.toLowerCase();
 }
 
-/** Use verified / Resend test From; never a random @gmail.com etc. */
+/** Use a verified From address; never a random @gmail.com etc. */
 function resolveResendFromHeader(): string {
     const raw = process.env.MAIL_FROM?.trim();
-    if (!raw) return RESEND_TEST_FROM;
+    if (!raw) return RESEND_DEFAULT_FROM;
 
     const email = parseFromEmail(raw);
     if (!email) return raw;
@@ -59,10 +59,10 @@ function resolveResendFromHeader(): string {
     if (RESEND_BLOCKED_FROM_DOMAINS.has(domain)) {
         console.warn(
             `[mail] MAIL_FROM (${email}) cannot be used with Resend without verifying that domain. ` +
-                `Using ${RESEND_TEST_FROM} for the From header. Replies still use the visitor's address (Reply-To). ` +
+                `Using ${RESEND_DEFAULT_FROM} for the From header. Replies still use the visitor's address (Reply-To). ` +
                 `For production, verify your domain at https://resend.com/domains and set MAIL_FROM to an address on that domain.`
         );
-        return RESEND_TEST_FROM;
+        return RESEND_DEFAULT_FROM;
     }
 
     return raw;
