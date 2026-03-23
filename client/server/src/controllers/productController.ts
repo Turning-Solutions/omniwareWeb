@@ -28,6 +28,10 @@ const hasFilters = (req: Request): boolean => {
 
 export const getProducts = async (req: Request, res: Response) => {
     try {
+        // Cache product listing responses at the CDN edge in production.
+        // This helps absorb repeated traffic while keeping data reasonably fresh.
+        res.set('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=120');
+
         const { search, minPrice, maxPrice, brand, category, sort, page = 1, limit = 20, ...dynamicFilters } = req.query;
         const limitNum = Math.min(Number(limit) || 20, 100);
         const pageNum = Math.max(Number(page) || 1, 1);
