@@ -72,9 +72,10 @@ export default function ProductCard({
                         <Link
                             href={productPath}
                             onClick={onNavigateToProduct}
-                            className="relative z-10 inline-flex shrink-0 whitespace-nowrap items-center gap-1.5 rounded-full bg-[#D12B28] px-4 py-2 text-xs font-semibold text-[#F1F1F1] transition-colors hover:bg-[#E53A36]"
+                            className="relative z-10 inline-flex shrink-0 whitespace-nowrap items-center gap-1.5 rounded-full bg-[#D12B28] px-4 py-2 text-xs font-semibold text-[#F1F1F1] transition-colors group-hover:bg-[#A61F1D] hover:bg-[#B32522]"
                         >
-                            Order Now
+                            <span className="group-hover:hidden">In Stock</span>
+                            <span className="hidden group-hover:inline">Pre-Order</span>
                         </Link>
                     ) : null}
                     {showWhatsAppButton ? (

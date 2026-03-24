@@ -13,7 +13,7 @@ const productSchema = new mongoose.Schema({
     availability: {
         type: String,
         enum: ['coming_soon', 'in_stock', 'out_of_stock', 'pre_order'],
-        default: 'in_stock'
+        default: 'pre_order'
     },
     specs: { type: Map, of: String },
     badges: [{ type: String }],
@@ -41,6 +41,7 @@ const productSchema = new mongoose.Schema({
     colorVariants: [{
         name: { type: String, required: true },
         hex: { type: String, required: false },
+        image: { type: String, required: false },
         sku: { type: String, required: false },
         price: { type: Number, required: false },
         stock: { qty: { type: Number, default: 0 } }

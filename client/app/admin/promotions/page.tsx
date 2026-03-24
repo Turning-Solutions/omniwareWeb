@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { Plus, Edit2, Trash2, X, Check, Tag, Image as ImageIcon, Upload } from "lucide-react";
 import api from "@/lib/api";
 import Image from "next/image";
+import PopupDialog from "@/components/PopupDialog";
 
 interface Promotion {
     _id: string;
@@ -51,6 +52,7 @@ export default function PromotionsPage() {
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
     const [uploading, setUploading] = useState(false);
+    const [promotionToDeleteId, setPromotionToDeleteId] = useState<string | null>(null);
     const fileRef = useRef<HTMLInputElement>(null);
 
     const load = async () => {
@@ -140,7 +142,6 @@ export default function PromotionsPage() {
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm("Delete this promotion?")) return;
         try {
             await api.delete(`/promotions/${id}`);
             load();
@@ -161,14 +162,14 @@ export default function PromotionsPage() {
     return (
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
             {/* Header */}
-            <div className="flex items-center justify-between mb-8">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-8">
                 <div>
                     <h1 className="text-3xl font-bold text-main">Promotions</h1>
                     <p className="text-sub mt-1 text-sm">Manage promotional banners shown on the home page.</p>
                 </div>
                 <button
                     onClick={openCreate}
-                    className="flex items-center gap-2 bg-accent hover:bg-accent/90 text-white px-4 py-2 rounded-lg transition-colors text-sm font-medium"
+                    className="flex items-center justify-center gap-2 bg-accent hover:bg-accent/90 text-white px-4 py-2 rounded-lg transition-colors text-sm font-medium w-full sm:w-auto"
                 >
                     <Plus className="h-4 w-4" />
                     New Promotion
@@ -419,7 +420,7 @@ export default function PromotionsPage() {
                                                     <Edit2 className="h-4 w-4" />
                                                 </button>
                                                 <button
-                                                    onClick={() => handleDelete(promo._id)}
+                                                    onClick={() => setPromotionToDeleteId(promo._id)}
                                                     className="p-2 hover:bg-base rounded-lg text-red-400 transition-colors"
                                                 >
                                                     <Trash2 className="h-4 w-4" />
@@ -433,6 +434,21 @@ export default function PromotionsPage() {
                     </div>
                 )}
             </div>
+            <PopupDialog
+                open={Boolean(promotionToDeleteId)}
+                title="Delete promotion"
+                message="Are you sure you want to delete this promotion?"
+                tone="danger"
+                confirmText="Delete"
+                cancelText="Cancel"
+                onClose={() => setPromotionToDeleteId(null)}
+                onConfirm={() => {
+                    if (!promotionToDeleteId) return;
+                    const id = promotionToDeleteId;
+                    setPromotionToDeleteId(null);
+                    void handleDelete(id);
+                }}
+            />
         </div>
     );
 }

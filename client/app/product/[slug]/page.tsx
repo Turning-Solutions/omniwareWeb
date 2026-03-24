@@ -10,6 +10,7 @@ import { useRouter } from "next/navigation";
 import { useProduct } from "@/hooks/useProducts";
 import { buildProductWhatsAppUrl } from "@/lib/whatsapp";
 import LoadingAnimation from "@/components/LoadingAnimation";
+import PopupDialog from "@/components/PopupDialog";
 
 interface ProductVariant {
     sku?: string;
@@ -21,6 +22,7 @@ interface ProductVariant {
 interface ProductColorVariant {
     name: string;
     hex?: string;
+    image?: string;
     sku?: string;
     price?: number;
     stock?: { qty?: number };
@@ -36,6 +38,7 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
     const [selectedVariant, setSelectedVariant] = useState<ProductVariant | ProductColorVariant | null>(null);
     const { addToCart } = useCart();
     const [qty, setQty] = useState(1);
+    const [cartPopupOpen, setCartPopupOpen] = useState(false);
 
     // Reset local state when product changes
     useEffect(() => {
@@ -58,6 +61,11 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
 
     if (!product) return <div className="min-h-screen pt-20 text-center text-white">Product not found</div>;
 
+    const selectedColorVariant = selectedVariant && "name" in selectedVariant && !("attributes" in selectedVariant)
+        ? selectedVariant as ProductColorVariant
+        : null;
+    const selectedColorImage = selectedColorVariant?.image?.trim() || "";
+    const currentImage = selectedColorImage || product.images?.[selectedImage] || "";
     const currentPrice = selectedVariant?.price ?? product.price;
     const currentStock = selectedVariant?.stock?.qty ?? product.stock?.qty ?? 0;
     const availability = product.availability ?? (currentStock > 0 ? 'in_stock' : 'out_of_stock');
@@ -95,7 +103,7 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
             _id: selectedVariant ? `${product._id}-${selectedVariant.sku ?? selectedLabel}` : product._id
         };
         addToCart(itemToAdd, qty);
-        alert("Added to cart!");
+        setCartPopupOpen(true);
     };
 
     return (
@@ -118,10 +126,10 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
                         animate={{ opacity: 1, x: 0 }}
                         className="bg-white/5 rounded-2xl aspect-square flex items-center justify-center border border-white/10 mb-4 overflow-hidden"
                     >
-                        {product.images && product.images[selectedImage] ? (
+                        {currentImage ? (
                             <div className="relative w-full h-full">
                                 <Image
-                                    src={product.images[selectedImage]}
+                                    src={currentImage}
                                     alt={product.title}
                                     fill
                                     className="object-contain"
@@ -353,6 +361,15 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
                     })()}
                 </motion.div>
             </div>
+            <PopupDialog
+                open={cartPopupOpen}
+                title="Added to cart"
+                message="The selected item was added to your cart."
+                tone="success"
+                confirmText="OK"
+                onClose={() => setCartPopupOpen(false)}
+                onConfirm={() => setCartPopupOpen(false)}
+            />
         </div>
     );
 }

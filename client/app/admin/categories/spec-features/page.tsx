@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Save, RefreshCw, Search, Plus, Trash2 } from "lucide-react";
 import api from "@/lib/api";
+import PopupDialog from "@/components/PopupDialog";
 
 interface Category {
     _id: string;
@@ -22,6 +23,8 @@ export default function FeaturedSpecsAdmin() {
     const [mode, setMode] = useState<"default_all" | "restricted" | "none">("default_all");
     const [loading, setLoading] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
+    const [showResetConfirm, setShowResetConfirm] = useState(false);
+    const [popupInfo, setPopupInfo] = useState<{ title: string; message: string; tone: "success" | "danger" } | null>(null);
 
     useEffect(() => {
         api.get("/products/categories")
@@ -92,26 +95,42 @@ export default function FeaturedSpecsAdmin() {
         try {
             const { data: updated } = await api.put(`/admin/categories/${selectedCategory}/featured-specs`, { featuredSpecKeys });
             setMode(updated.mode || "none");
-            alert("Featured specs updated successfully");
+            setPopupInfo({
+                title: "Saved",
+                message: "Featured specs updated successfully.",
+                tone: "success",
+            });
         } catch (error) {
             console.error("Save error", error);
-            alert("An error occurred while saving.");
+            setPopupInfo({
+                title: "Save failed",
+                message: "An error occurred while saving.",
+                tone: "danger",
+            });
         } finally {
             setLoading(false);
         }
     };
 
     const handleReset = async () => {
-        if (!selectedCategory || !confirm("Are you sure you want to delete this configuration and revert to default behavior?")) return;
+        if (!selectedCategory) return;
         setLoading(true);
         try {
             await api.delete(`/admin/categories/${selectedCategory}/featured-specs`);
             setFeaturedSpecKeys([]);
             setMode("default_all");
-            alert("Configuration deleted. Reverted to default behavior.");
+            setPopupInfo({
+                title: "Configuration reset",
+                message: "Configuration deleted. Reverted to default behavior.",
+                tone: "success",
+            });
         } catch (error) {
             console.error("Delete error", error);
-            alert("An error occurred while deleting.");
+            setPopupInfo({
+                title: "Reset failed",
+                message: "An error occurred while deleting.",
+                tone: "danger",
+            });
         } finally {
             setLoading(false);
         }
@@ -124,7 +143,7 @@ export default function FeaturedSpecsAdmin() {
             <div className="bg-surface border border-border-soft rounded-xl p-6 mb-8">
                 <label className="block text-sub mb-2">Select Category</label>
                 <select
-                    className="w-full bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:ring-accent focus:border-accent"
+                    className="w-full bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:ring-accent focus:border-accent [&>option]:text-white"
                     value={selectedCategory}
                     onChange={(e) => setSelectedCategory(e.target.value)}
                 >
@@ -152,18 +171,18 @@ export default function FeaturedSpecsAdmin() {
                                 </span>
                             </p>
                         </div>
-                        <div className="flex gap-3">
+                        <div className="flex w-full md:w-auto flex-col sm:flex-row gap-3">
                             <button
-                                onClick={handleReset}
+                                onClick={() => setShowResetConfirm(true)}
                                 disabled={loading || mode === 'default_all'}
-                                className="px-4 py-2 bg-red-500/10 text-red-400 hover:bg-red-500/20 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 flex items-center gap-2"
+                                className="px-4 py-2 bg-red-500/10 text-red-400 hover:bg-red-500/20 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                             >
                                 <RefreshCw className="h-4 w-4" /> Reset to Default
                             </button>
                             <button
                                 onClick={handleSave}
                                 disabled={loading}
-                                className="px-4 py-2 bg-accent text-white hover:bg-accent/90 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 flex items-center gap-2"
+                                className="px-4 py-2 bg-accent text-white hover:bg-accent/90 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                             >
                                 <Save className="h-4 w-4" /> Save Configuration
                             </button>
@@ -261,6 +280,28 @@ export default function FeaturedSpecsAdmin() {
                     )}
                 </div>
             )}
+            <PopupDialog
+                open={showResetConfirm}
+                title="Reset configuration"
+                message="Are you sure you want to delete this configuration and revert to default behavior?"
+                tone="danger"
+                confirmText="Reset"
+                cancelText="Cancel"
+                onClose={() => setShowResetConfirm(false)}
+                onConfirm={() => {
+                    setShowResetConfirm(false);
+                    void handleReset();
+                }}
+            />
+            <PopupDialog
+                open={Boolean(popupInfo)}
+                title={popupInfo?.title || ""}
+                message={popupInfo?.message || ""}
+                tone={popupInfo?.tone || "info"}
+                confirmText="OK"
+                onClose={() => setPopupInfo(null)}
+                onConfirm={() => setPopupInfo(null)}
+            />
         </div>
     );
 }

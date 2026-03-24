@@ -4,6 +4,7 @@ import { useState, useEffect, use } from "react";
 import Link from "next/link";
 import { ArrowLeft, Package, User, MapPin, CreditCard, Calendar } from "lucide-react";
 import api from "@/lib/api";
+import PopupDialog from "@/components/PopupDialog";
 
 interface OrderDetails {
     _id: string;
@@ -45,6 +46,8 @@ export default function AdminOrderDetailsPage({ params }: PageProps) {
     const [order, setOrder] = useState<OrderDetails | null>(null);
     const [loading, setLoading] = useState(true);
     const [updating, setUpdating] = useState(false);
+    const [pendingStatus, setPendingStatus] = useState<string | null>(null);
+    const [statusErrorOpen, setStatusErrorOpen] = useState(false);
 
     useEffect(() => {
         fetchOrder();
@@ -62,14 +65,13 @@ export default function AdminOrderDetailsPage({ params }: PageProps) {
     };
 
     const updateStatus = async (newStatus: string) => {
-        if (!confirm(`Are you sure you want to change status to ${newStatus}?`)) return;
-
         setUpdating(true);
         try {
             await api.patch(`/admin/orders/${id}/status`, { status: newStatus });
             fetchOrder(); // Refresh
         } catch (error) {
-            alert("Error updating status");
+            console.error("Error updating status", error);
+            setStatusErrorOpen(true);
         } finally {
             setUpdating(false);
         }
@@ -94,9 +96,9 @@ export default function AdminOrderDetailsPage({ params }: PageProps) {
                             <span className="text-sm text-sub mr-2">Status:</span>
                             <select
                                 value={order.status}
-                                onChange={(e) => updateStatus(e.target.value)}
+                                onChange={(e) => setPendingStatus(e.target.value)}
                                 disabled={updating}
-                                className="bg-transparent text-main font-medium py-2 focus:outline-none [&>option]:text-black"
+                                className="bg-transparent text-main font-medium py-2 focus:outline-none [&>option]:text-white"
                             >
                                 <option value="pending">Pending</option>
                                 <option value="paid">Paid</option>
@@ -225,6 +227,30 @@ export default function AdminOrderDetailsPage({ params }: PageProps) {
                     </div>
                 </div>
             </div>
+            <PopupDialog
+                open={Boolean(pendingStatus)}
+                title="Change order status"
+                message={pendingStatus ? `Are you sure you want to change status to ${pendingStatus}?` : ""}
+                tone="danger"
+                confirmText="Confirm"
+                cancelText="Cancel"
+                onClose={() => setPendingStatus(null)}
+                onConfirm={() => {
+                    if (!pendingStatus) return;
+                    const next = pendingStatus;
+                    setPendingStatus(null);
+                    void updateStatus(next);
+                }}
+            />
+            <PopupDialog
+                open={statusErrorOpen}
+                title="Update failed"
+                message="An error occurred while updating order status."
+                tone="danger"
+                confirmText="OK"
+                onClose={() => setStatusErrorOpen(false)}
+                onConfirm={() => setStatusErrorOpen(false)}
+            />
         </div>
     );
 }

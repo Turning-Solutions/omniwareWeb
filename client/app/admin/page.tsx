@@ -1,9 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Users, ShoppingBag, DollarSign, Activity, TrendingUp, Eye } from "lucide-react";
+import { ShoppingBag, DollarSign, Activity, Eye, ArrowRight, Package } from "lucide-react";
 import api from "@/lib/api";
 
 interface DashboardSummary {
@@ -26,7 +25,6 @@ interface RecentOrder {
 }
 
 export default function AdminPage() {
-    const router = useRouter();
     const [summary, setSummary] = useState<DashboardSummary | null>(null);
     const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
     const [loading, setLoading] = useState(true);
@@ -53,19 +51,30 @@ export default function AdminPage() {
     };
 
     if (loading && !summary) {
-        return <div className="p-12 text-center text-main">Loading Dashboard...</div>;
+        return <div className="p-12 text-center text-main">Loading dashboard...</div>;
     }
+
+    const rangeLabel = range === "today" ? "Today" : range === "7d" ? "Last 7 days" : "Last 30 days";
+    const conversionRate =
+        (summary?.orders && summary.orders > 0 && summary?.productViews && summary.productViews > 0)
+            ? ((summary.orders / summary.productViews) * 100).toFixed(2)
+            : "0.00";
+
+    const formatStatus = (status: string) => status.charAt(0).toUpperCase() + status.slice(1);
 
     return (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-            <div className="flex justify-between items-center mb-8">
-                <h1 className="text-3xl font-bold text-main">Dashboard</h1>
-                <div className="flex bg-base rounded-lg p-1 border border-border-soft">
+            <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center mb-8">
+                <div>
+                    <h1 className="text-3xl font-bold text-main">Dashboard</h1>
+                    <p className="text-sub mt-1 text-sm">A quick snapshot of sales and store activity for {rangeLabel.toLowerCase()}.</p>
+                </div>
+                <div className="flex w-full sm:w-auto bg-base rounded-lg p-1 border border-border-soft overflow-x-auto">
                     {['today', '7d', '30d'].map((r) => (
                         <button
                             key={r}
                             onClick={() => setRange(r)}
-                            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${range === r ? 'bg-accent text-white' : 'text-sub hover:text-main'}`}
+                            className={`px-3 sm:px-4 py-1.5 rounded-md text-sm font-medium transition-colors shrink-0 ${range === r ? 'bg-accent text-white' : 'text-sub hover:text-main'}`}
                         >
                             {r === 'today' ? 'Today' : r === '7d' ? '7 Days' : '30 Days'}
                         </button>
@@ -73,18 +82,22 @@ export default function AdminPage() {
                 </div>
             </div>
 
+            {loading && summary ? (
+                <p className="text-xs text-sub mb-4">Refreshing analytics...</p>
+            ) : null}
+
             {/* Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-12">
-                <div className="admin-card p-6 rounded-xl flex items-center space-x-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-6 mb-12">
+                <div className="admin-card p-5 sm:p-6 rounded-xl flex items-center space-x-4 shadow-sm">
                     <div className="h-12 w-12 bg-accent/20 text-accent rounded-lg flex items-center justify-center">
                         <DollarSign className="h-6 w-6" />
                     </div>
                     <div>
-                        <p className="text-sm text-sub">Total Revenue</p>
+                        <p className="text-sm text-sub">Revenue</p>
                         <h3 className="text-2xl font-bold text-main">LKR {summary?.revenue.toLocaleString() || 0}</h3>
                     </div>
                 </div>
-                <div className="admin-card p-6 rounded-xl flex items-center space-x-4">
+                <div className="admin-card p-5 sm:p-6 rounded-xl flex items-center space-x-4 shadow-sm">
                     <div className="h-12 w-12 bg-accent/20 text-accent rounded-lg flex items-center justify-center">
                         <ShoppingBag className="h-6 w-6" />
                     </div>
@@ -93,7 +106,7 @@ export default function AdminPage() {
                         <h3 className="text-2xl font-bold text-main">{summary?.orders || 0}</h3>
                     </div>
                 </div>
-                <div className="admin-card p-6 rounded-xl flex items-center space-x-4">
+                <div className="admin-card p-5 sm:p-6 rounded-xl flex items-center space-x-4 shadow-sm">
                     <div className="h-12 w-12 bg-accent/20 text-accent rounded-lg flex items-center justify-center">
                         <Eye className="h-6 w-6" />
                     </div>
@@ -102,30 +115,49 @@ export default function AdminPage() {
                         <h3 className="text-2xl font-bold text-main">{summary?.productViews || 0}</h3>
                     </div>
                 </div>
-                <div className="admin-card p-6 rounded-xl flex items-center space-x-4">
+                <div className="admin-card p-5 sm:p-6 rounded-xl flex items-center space-x-4 shadow-sm">
                     <div className="h-12 w-12 bg-accent/20 text-accent rounded-lg flex items-center justify-center">
                         <Activity className="h-6 w-6" />
                     </div>
                     <div>
                         <p className="text-sm text-sub">Conversion Rate</p>
-                        <h3 className="text-2xl font-bold text-main">
-                            {((summary?.orders && summary.orders > 0 && summary?.productViews && summary.productViews > 0)
-                                ? ((summary.orders / summary.productViews) * 100).toFixed(2)
-                                : '0.00')}%
-                        </h3>
+                        <h3 className="text-2xl font-bold text-main">{conversionRate}%</h3>
                     </div>
                 </div>
             </div>
 
-            <div className="flex justify-end mb-8 gap-4">
-                <Link href="/admin/orders" className="bg-accent hover:bg-accent/90 text-white px-6 py-3 rounded-xl flex items-center gap-2 transition-colors">
-                    <ShoppingBag className="h-5 w-5" />
-                    Manage Orders
-                </Link>
-                <Link href="/admin/products" className="bg-accent hover:bg-accent/90 text-white px-6 py-3 rounded-xl flex items-center gap-2 transition-colors">
-                    <PackageIcon className="h-5 w-5" />
-                    Manage Products
-                </Link>
+            <div className="mb-10">
+                <h2 className="text-lg font-semibold text-main mb-4">Quick actions</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <Link href="/admin/orders" className="admin-card p-5 rounded-xl hover:border-accent/50 transition-colors group">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="h-10 w-10 bg-accent/20 text-accent rounded-lg flex items-center justify-center">
+                                    <ShoppingBag className="h-5 w-5" />
+                                </div>
+                                <div>
+                                    <p className="font-semibold text-main">Manage orders</p>
+                                    <p className="text-xs text-sub">Update order statuses and view details.</p>
+                                </div>
+                            </div>
+                            <ArrowRight className="h-4 w-4 text-sub group-hover:text-main transition-colors" />
+                        </div>
+                    </Link>
+                    <Link href="/admin/products" className="admin-card p-5 rounded-xl hover:border-accent/50 transition-colors group">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="h-10 w-10 bg-accent/20 text-accent rounded-lg flex items-center justify-center">
+                                    <Package className="h-5 w-5" />
+                                </div>
+                                <div>
+                                    <p className="font-semibold text-main">Manage products</p>
+                                    <p className="text-xs text-sub">Add, edit, and organize inventory.</p>
+                                </div>
+                            </div>
+                            <ArrowRight className="h-4 w-4 text-sub group-hover:text-main transition-colors" />
+                        </div>
+                    </Link>
+                </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
@@ -155,7 +187,7 @@ export default function AdminPage() {
                                             <td className="px-6 py-4">LKR {order.total.toLocaleString()}</td>
                                             <td className="px-6 py-4">
                                                 <span className={`px-2 py-1 rounded-full text-xs font-medium ${order.status === 'paid' || order.status === 'delivered' ? 'bg-accent/20 text-accent' : order.status === 'pending' ? 'bg-amber-500/20 text-amber-400' : 'bg-base text-sub'}`}>
-                                                    {order.status}
+                                                    {formatStatus(order.status)}
                                                 </span>
                                             </td>
                                         </tr>
@@ -184,7 +216,7 @@ export default function AdminPage() {
                                     <tr><td colSpan={3} className="p-6 text-center text-sub">No data available</td></tr>
                                 ) : (
                                     summary?.topProducts?.map((p) => (
-                                        <tr key={p.productId || Math.random()} className="hover:bg-base/50">
+                                        <tr key={p.productId} className="hover:bg-base/50">
                                             <td className="px-6 py-4 max-w-[200px] truncate" title={p.title}>{p.title}</td>
                                             <td className="px-6 py-4 text-right">{p.views}</td>
                                             <td className="px-6 py-4 text-right">{p.purchases}</td>
@@ -198,26 +230,4 @@ export default function AdminPage() {
             </div>
         </div>
     );
-}
-
-function PackageIcon(props: React.SVGProps<SVGSVGElement>) {
-    return (
-        <svg
-            {...props}
-            xmlns="http://www.w3.org/2000/svg"
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-        >
-            <path d="m7.5 4.27 9 5.15" />
-            <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
-            <path d="m3.3 7 8.7 5 8.7-5" />
-            <path d="M12 22v-9.5" />
-        </svg>
-    )
 }

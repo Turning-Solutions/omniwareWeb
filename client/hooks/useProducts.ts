@@ -42,6 +42,7 @@ export interface Product {
     colorVariants?: {
         name: string;
         hex?: string;
+        image?: string;
         sku?: string;
         price?: number;
         stock?: { qty?: number };

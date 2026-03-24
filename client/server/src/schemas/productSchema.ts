@@ -36,6 +36,7 @@ export const productSchema = z.object({
     colorVariants: z.array(z.object({
         name: z.string().min(1),
         hex: z.string().optional(),
+        image: z.string().optional(),
         sku: z.string().optional(),
         price: z.number().optional(),
         stock: z.object({ qty: z.number().min(0) }).optional(),

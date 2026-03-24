@@ -2,10 +2,11 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Search, Edit, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, Search, Edit, Trash2, ChevronLeft, ChevronRight, X } from "lucide-react";
 import Link from "next/link";
 import api from "@/lib/api";
 import { isAxiosError } from "axios";
+import PopupDialog from "@/components/PopupDialog";
 
 interface Product {
     _id: string;
@@ -47,6 +48,9 @@ export default function ProductsPage() {
     const [selectedBrand, setSelectedBrand] = useState("");
     const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
+    const [productToDeleteId, setProductToDeleteId] = useState<string | null>(null);
+    const [deletePopup, setDeletePopup] = useState<{ title: string; message: string; tone: "success" | "danger" } | null>(null);
+    const [deletingId, setDeletingId] = useState<string | null>(null);
     const [pagination, setPagination] = useState<PaginationState>({
         page: 1,
         pages: 1,
@@ -93,7 +97,8 @@ export default function ProductsPage() {
                 page: String(currentPage),
                 ...(debouncedSearchTerm && { q: debouncedSearchTerm }),
                 ...(selectedCategory && { category: selectedCategory }),
-                ...(selectedBrand && { brand: selectedBrand })
+                ...(selectedBrand && { brand: selectedBrand }),
+                _t: String(Date.now()),
             });
 
             const { data } = await api.get(`/admin/products?${queryParams}`);
@@ -116,75 +121,154 @@ export default function ProductsPage() {
     };
 
     const deleteProduct = async (id: string) => {
-        if (!confirm("Are you sure you want to delete this product?")) return;
-
+        setDeletingId(id);
         try {
-            await api.patch(`/admin/products/${id}`, { isActive: false });
-            fetchProducts();
+            await api.delete(`/admin/products/${id}`);
+            setProducts((prev) => prev.filter((p) => p._id !== id));
+            setPagination((prev) => ({
+                ...prev,
+                total: Math.max(0, prev.total - 1),
+            }));
+            setDeletePopup({
+                title: "Product deleted",
+                message: "The product was permanently deleted.",
+                tone: "success",
+            });
+            // If the last row on a non-first page is deleted, move back one page.
+            if (products.length === 1 && currentPage > 1) {
+                setCurrentPage((p) => p - 1);
+            } else {
+                await fetchProducts();
+            }
         } catch (error) {
             console.error("Error deleting product", error);
+            setDeletePopup({
+                title: "Action failed",
+                message: "Could not deactivate this product. Please try again.",
+                tone: "danger",
+            });
+        } finally {
+            setDeletingId(null);
         }
     };
 
     const filteredProducts = products; // Filtering handled by API now
+    const hasFilters = Boolean(searchTerm || selectedCategory || selectedBrand);
+    const activeCount = filteredProducts.filter((p) => p.isActive).length;
+    const inactiveCount = filteredProducts.length - activeCount;
+    const lowStockCount = filteredProducts.filter((p) => (p.stock?.qty || 0) > 0 && (p.stock?.qty || 0) <= 5).length;
+    const outOfStockCount = filteredProducts.filter((p) => (p.stock?.qty || 0) === 0).length;
+    const selectedCategoryName = categories.find((c) => c._id === selectedCategory)?.name;
+    const selectedBrandName = brands.find((b) => b._id === selectedBrand)?.name;
+
+    const clearFilters = () => {
+        setSearchTerm("");
+        setDebouncedSearchTerm("");
+        setSelectedCategory("");
+        setSelectedBrand("");
+        setCurrentPage(1);
+    };
+
+    const getVisiblePages = () => {
+        const totalPages = Math.max(1, pagination.pages || 1);
+        const pages = new Set<number>([1, totalPages, currentPage, currentPage - 1, currentPage + 1]);
+        return Array.from(pages)
+            .filter((p) => p >= 1 && p <= totalPages)
+            .sort((a, b) => a - b);
+    };
 
     return (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-            <div className="flex justify-between items-center mb-8">
-                <h1 className="text-3xl font-bold text-main">Products</h1>
-                <Link href="/admin/products/new" className="bg-accent hover:bg-accent/90 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors">
+            <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center mb-8">
+                <div>
+                    <h1 className="text-3xl font-bold text-main">Products</h1>
+                    <p className="text-sm text-sub mt-1">Search, filter, and manage your product catalog.</p>
+                </div>
+                <Link href="/admin/products/new" className="bg-accent hover:bg-accent/90 text-white px-4 py-2.5 rounded-lg flex items-center justify-center gap-2 transition-colors w-full sm:w-auto">
                     <Plus className="h-5 w-5" />
                     Add Product
                 </Link>
             </div>
 
-            <div className="admin-card rounded-xl p-6 mb-8">
-                <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-sub h-5 w-5" />
-                    <input
-                        type="text"
-                        placeholder="Search products..."
-                        className="w-full bg-base border border-border-soft rounded-lg pl-10 pr-4 py-2 text-main focus:outline-none focus:border-accent transition-colors"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
+            <div className="admin-card rounded-xl p-4 sm:p-6 mb-8">
+                <div className="flex flex-col gap-4">
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-sub h-5 w-5" />
+                        <input
+                            type="text"
+                            placeholder="Search by product title..."
+                            className="w-full bg-base border border-border-soft rounded-lg pl-10 pr-4 py-2.5 text-main focus:outline-none focus:border-accent transition-colors"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                    setCurrentPage(1);
+                                    setDebouncedSearchTerm(searchTerm.trim());
+                                }
+                            }}
+                        />
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-[1fr_1fr_auto] gap-3">
+                        <select
+                            className="bg-base border border-border-soft rounded-lg px-4 py-2.5 text-main focus:outline-none focus:border-accent [&>option]:text-white"
+                            value={selectedCategory}
+                            onChange={(e) => {
                                 setCurrentPage(1);
-                                setDebouncedSearchTerm(searchTerm.trim());
-                            }
-                        }}
-                    />
+                                setSelectedCategory(e.target.value);
+                            }}
+                        >
+                            <option value="">All Categories</option>
+                            {categories.map((c) => (
+                                <option key={c._id} value={c._id}>{c.name}</option>
+                            ))}
+                        </select>
+                        <select
+                            className="bg-base border border-border-soft rounded-lg px-4 py-2.5 text-main focus:outline-none focus:border-accent [&>option]:text-white"
+                            value={selectedBrand}
+                            onChange={(e) => {
+                                setCurrentPage(1);
+                                setSelectedBrand(e.target.value);
+                            }}
+                        >
+                            <option value="">All Brands</option>
+                            {brands.map((b) => (
+                                <option key={b._id} value={b._id}>{b.name}</option>
+                            ))}
+                        </select>
+                        <button
+                            type="button"
+                            onClick={clearFilters}
+                            disabled={!hasFilters}
+                            className="inline-flex items-center justify-center gap-2 rounded-lg border border-border-soft px-4 py-2.5 text-sm text-main disabled:opacity-50 disabled:cursor-not-allowed hover:bg-base transition-colors sm:col-span-2 xl:col-span-1"
+                        >
+                            <X className="h-4 w-4" />
+                            Clear
+                        </button>
+                    </div>
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-                <select
-                    className="admin-card border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent [&>option]:text-black"
-                    value={selectedCategory}
-                    onChange={(e) => {
-                        setCurrentPage(1);
-                        setSelectedCategory(e.target.value);
-                    }}
-                >
-                    <option value="">All Categories</option>
-                    {categories.map(c => (
-                        <option key={c._id} value={c._id}>{c.name}</option>
-                    ))}
-                </select>
-                <select
-                    className="admin-card border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent [&>option]:text-black"
-                    value={selectedBrand}
-                    onChange={(e) => {
-                        setCurrentPage(1);
-                        setSelectedBrand(e.target.value);
-                    }}
-                >
-                    <option value="">All Brands</option>
-                    {brands.map(b => (
-                        <option key={b._id} value={b._id}>{b.name}</option>
-                    ))}
-                </select>
-            </div>
+           
+            {hasFilters ? (
+                <div className="mb-6 flex flex-wrap items-center gap-2">
+                    <span className="text-xs text-sub uppercase tracking-wide">Active filters</span>
+                    {searchTerm ? (
+                        <span className="text-xs px-2 py-1 rounded-full bg-base text-main border border-border-soft">
+                            Search: {searchTerm}
+                        </span>
+                    ) : null}
+                    {selectedCategory ? (
+                        <span className="text-xs px-2 py-1 rounded-full bg-base text-main border border-border-soft">
+                            Category: {selectedCategoryName || "Selected"}
+                        </span>
+                    ) : null}
+                    {selectedBrand ? (
+                        <span className="text-xs px-2 py-1 rounded-full bg-base text-main border border-border-soft">
+                            Brand: {selectedBrandName || "Selected"}
+                        </span>
+                    ) : null}
+                </div>
+            ) : null}
 
             <div className="admin-card rounded-xl overflow-hidden">
                 {isFetching && !loading ? (
@@ -194,15 +278,15 @@ export default function ProductsPage() {
                 ) : null}
                 <div className="overflow-x-auto">
                     <table className="w-full text-left">
-                        <thead className="bg-base text-sub uppercase text-xs">
+                        <thead className="bg-base text-sub uppercase text-xs sticky top-0">
                             <tr>
-                                <th className="px-6 py-4">Title</th>
-                                <th className="px-6 py-4">Price</th>
-                                <th className="px-6 py-4">Stock</th>
-                                <th className="px-6 py-4">Brand</th>
-                                <th className="px-6 py-4">Category</th>
-                                <th className="px-6 py-4">Status</th>
-                                <th className="px-6 py-4 text-right">Actions</th>
+                                <th className="px-4 sm:px-6 py-4">Title</th>
+                                <th className="px-4 sm:px-6 py-4">Price</th>
+                                <th className="px-4 sm:px-6 py-4">Stock</th>
+                                <th className="px-4 sm:px-6 py-4">Brand</th>
+                                <th className="px-4 sm:px-6 py-4">Category</th>
+                                <th className="px-4 sm:px-6 py-4">Status</th>
+                                <th className="px-4 sm:px-6 py-4 text-right">Actions</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-border-soft text-main">
@@ -213,22 +297,29 @@ export default function ProductsPage() {
                             ) : (
                                 filteredProducts.map((product) => (
                                     <tr key={product._id} className="hover:bg-base/50 transition-colors">
-                                        <td className="px-6 py-4 font-medium">{product.title}</td>
-                                        <td className="px-6 py-4">LKR {product.price.toLocaleString()}</td>
-                                        <td className="px-6 py-4">{product.stock?.qty || 0}</td>
-                                        <td className="px-6 py-4">{product.brandId?.name || '-'}</td>
-                                        <td className="px-6 py-4">{product.categoryIds?.map(c => c.name).join(', ') || '-'}</td>
-                                        <td className="px-6 py-4">
-                                            <span className={`px-2 py-1 rounded text-xs ${product.isActive ? 'bg-accent/20 text-accent' : 'bg-red-500/20 text-red-400'}`}>
+                                        <td className="px-4 sm:px-6 py-4 font-medium max-w-[260px] truncate" title={product.title}>{product.title}</td>
+                                        <td className="px-4 sm:px-6 py-4 whitespace-nowrap">LKR {product.price.toLocaleString()}</td>
+                                        <td className="px-4 sm:px-6 py-4 whitespace-nowrap">{product.stock?.qty || 0}</td>
+                                        <td className="px-4 sm:px-6 py-4 whitespace-nowrap">{product.brandId?.name || '-'}</td>
+                                        <td className="px-4 sm:px-6 py-4 max-w-[260px] truncate" title={product.categoryIds?.map(c => c.name).join(', ') || '-'}>
+                                            {product.categoryIds?.map(c => c.name).join(", ") || "-"}
+                                        </td>
+                                        <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
+                                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${product.isActive ? 'bg-accent/20 text-accent' : 'bg-red-500/20 text-red-400'}`}>
                                                 {product.isActive ? 'Active' : 'Inactive'}
                                             </span>
                                         </td>
-                                        <td className="px-6 py-4 text-right">
+                                        <td className="px-4 sm:px-6 py-4 text-right">
                                             <div className="flex justify-end gap-2">
-                                                <Link href={`/admin/products/${product._id}`} className="p-2 hover:bg-base rounded-lg text-accent transition-colors">
+                                                <Link href={`/admin/products/${product._id}`} className="p-2 hover:bg-base rounded-lg text-accent transition-colors" title="Edit product">
                                                     <Edit className="h-4 w-4" />
                                                 </Link>
-                                                <button onClick={() => deleteProduct(product._id)} className="p-2 hover:bg-base rounded-lg text-red-400 transition-colors">
+                                                <button
+                                                    onClick={() => setProductToDeleteId(product._id)}
+                                                    disabled={deletingId === product._id}
+                                                    className="p-2 hover:bg-base rounded-lg text-red-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                                    title="Delete product"
+                                                >
                                                     <Trash2 className="h-4 w-4" />
                                                 </button>
                                             </div>
@@ -241,7 +332,7 @@ export default function ProductsPage() {
                 </div>
             </div>
 
-            <div className="mt-5 flex items-center justify-between">
+            <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-sm text-sub">
                     Showing page {pagination.page} of {pagination.pages} ({pagination.total} products)
                 </p>
@@ -255,6 +346,25 @@ export default function ProductsPage() {
                         <ChevronLeft className="h-4 w-4" />
                         Prev
                     </button>
+                    {getVisiblePages().map((pageNum, index, arr) => (
+                        <span key={pageNum} className="inline-flex items-center gap-2">
+                            {index > 0 && pageNum - arr[index - 1] > 1 ? (
+                                <span className="text-sub px-1">...</span>
+                            ) : null}
+                            <button
+                                type="button"
+                                onClick={() => setCurrentPage(pageNum)}
+                                disabled={isFetching || pageNum === currentPage}
+                                className={`min-w-9 rounded-lg border px-3 py-2 text-sm transition-colors ${
+                                    pageNum === currentPage
+                                        ? "border-accent bg-accent/20 text-main"
+                                        : "border-border-soft text-main hover:bg-base"
+                                } disabled:opacity-60`}
+                            >
+                                {pageNum}
+                            </button>
+                        </span>
+                    ))}
                     <button
                         type="button"
                         onClick={() => setCurrentPage((p) => Math.min(pagination.pages, p + 1))}
@@ -266,6 +376,30 @@ export default function ProductsPage() {
                     </button>
                 </div>
             </div>
+            <PopupDialog
+                open={Boolean(productToDeleteId)}
+                title="Delete product"
+                message="Are you sure you want to permanently delete this product?"
+                tone="danger"
+                confirmText="Delete"
+                cancelText="Cancel"
+                onClose={() => setProductToDeleteId(null)}
+                onConfirm={() => {
+                    if (!productToDeleteId) return;
+                    const id = productToDeleteId;
+                    setProductToDeleteId(null);
+                    void deleteProduct(id);
+                }}
+            />
+            <PopupDialog
+                open={Boolean(deletePopup)}
+                title={deletePopup?.title || ""}
+                message={deletePopup?.message || ""}
+                tone={deletePopup?.tone || "info"}
+                confirmText="OK"
+                onClose={() => setDeletePopup(null)}
+                onConfirm={() => setDeletePopup(null)}
+            />
         </div>
     );
 }

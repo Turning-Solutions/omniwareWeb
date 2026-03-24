@@ -266,17 +266,19 @@ export const getProductFacets = async (req: Request, res: Response) => {
 
         const { search, minPrice, maxPrice, brand, category, ...dynamicFilters } = req.query;
 
+        const lookupCache: MatchStageCache = {};
         // 1. Full Match
-        const matchStage = await buildProductMatchStage(req);
-
-        // For Categories: Exclude 'category' filter
-        const categoryMatchStage = await buildProductMatchStage(req, ['category']);
+        const matchStage = await buildProductMatchStage(req, [], lookupCache);
+        // 2. Facet Matches (Exclude specific filters)
+        const categoryMatchStage = await buildProductMatchStage(req, ['category'], lookupCache);
+        const brandMatchStage = await buildProductMatchStage(req, ['brand'], lookupCache);
+        const priceMatchStage = await buildProductMatchStage(req, ['price'], lookupCache);
 
         const pipeline = [
-            { $match: matchStage },
             {
                 $facet: {
                     price: [
+                        { $match: priceMatchStage },
                         { $group: { _id: null, min: { $min: "$price" }, max: { $max: "$price" } } }
                     ],
                     categories: [
@@ -289,16 +291,19 @@ export const getProductFacets = async (req: Request, res: Response) => {
                         { $sort: { label: 1 } }
                     ],
                     brands: [
+                        { $match: brandMatchStage },
                         { $group: { _id: "$brandId", count: { $sum: 1 } } },
                         { $lookup: { from: 'brands', localField: '_id', foreignField: '_id', as: 'brand' } },
                         { $unwind: "$brand" },
                         { $project: { value: "$brand.slug", label: "$brand.name", count: 1 } }
                     ],
                     availability: [
+                        { $match: matchStage },
                         { $group: { _id: "$availability", count: { $sum: 1 } } },
                         { $project: { value: "$_id", count: 1, _id: 0 } }
                     ],
                     specs: [
+                        { $match: matchStage },
                         SPECS_OBJECT_TO_ARRAY_PROJECT,
                         { $unwind: "$specs" },
                         {

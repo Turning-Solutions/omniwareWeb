@@ -37,7 +37,10 @@ interface ColorVariant {
     name: string;
     hex: string;
     price: string;
+    image?: string;
 }
+
+const DEFAULT_ATTRIBUTE_GROUP_NAME = "Specifications";
 
 const COLOR_NAME_TO_HEX: Record<string, string> = {
     black: "#000000",
@@ -79,6 +82,10 @@ function normalizeSpecKey(key: string): string {
         .join("_");
 }
 
+function formatSpecLabel(specKey: string): string {
+    return specKey.replace(/_/g, " ");
+}
+
 export default function ProductFormPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
     const router = useRouter();
@@ -98,7 +105,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
         filterSpecs: [] as FilterSpec[],
         colorVariants: [] as ColorVariant[],
         images: [] as string[],
-        availability: "in_stock" as "in_stock" | "out_of_stock" | "pre_order" | "coming_soon",
+        availability: "pre_order" as "in_stock" | "out_of_stock" | "pre_order" | "coming_soon",
         isActive: true
     });
 
@@ -109,6 +116,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
     const [loading, setLoading] = useState(false);
     const [initialLoading, setInitialLoading] = useState(true);
     const [imageUploading, setImageUploading] = useState<string | number | null>(null); // 'add' or index when replacing
+    const [colorImageUploading, setColorImageUploading] = useState<number | null>(null);
     const [previewRefreshKey, setPreviewRefreshKey] = useState(0);
     // Selected attributes for "move to category": Set of "groupIndex-attrIndex"
     const [selectedAttributeKeys, setSelectedAttributeKeys] = useState<Set<string>>(new Set());
@@ -144,9 +152,10 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                     : [];
                 const rawGroups = data.attributeGroups;
                 const colorVariants: ColorVariant[] = Array.isArray(data.colorVariants)
-                    ? data.colorVariants.map((v: { name?: string; hex?: string; price?: number }) => ({
+                    ? data.colorVariants.map((v: { name?: string; hex?: string; image?: string; price?: number }) => ({
                         name: v.name || "",
                         hex: v.hex || "",
+                        image: v.image || "",
                         price: v.price != null ? String(v.price) : "",
                     }))
                     : [];
@@ -160,21 +169,21 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                             ? [{ category: 'General', attributes: data.attributes.map((a: any) => ({ name: a.name || '', value: a.value || '' })) }]
                             : [];
                 setFormData({
-                    title: data.title,
-                    price: data.price,
-                    sku: data.sku || "",
-                    slug: data.slug,
-                    stock: data.stock?.qty || 0,
-                    description: data.description || "",
-                    warranty: data.warranty || "",
+                    title: data.title ?? "",
+                    price: data.price != null ? String(data.price) : "",
+                    sku: data.sku ?? "",
+                    slug: data.slug ?? "",
+                    stock: data.stock?.qty != null ? String(data.stock.qty) : "",
+                    description: data.description ?? "",
+                    warranty: data.warranty ?? "",
                     brandId: data.brandId?._id || data.brandId || "",
                     categoryIds: data.categoryIds?.map((c: any) => c._id || c) || [], // eslint-disable-line @typescript-eslint/no-explicit-any
                     attributeGroups,
                     filterSpecs,
                     colorVariants,
                     images: Array.isArray(data.images) ? data.images : [],
-                    availability: data.availability || "in_stock",
-                    isActive: data.isActive
+                    availability: data.availability || "pre_order",
+                    isActive: typeof data.isActive === "boolean" ? data.isActive : true,
                 });
                 setSelectedAttributeKeys(new Set());
             } catch (err) {
@@ -226,6 +235,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                     .map((variant) => ({
                         name: variant.name.trim(),
                         hex: variant.hex.trim() || undefined,
+                        image: variant.image?.trim() || undefined,
                         price: variant.price.trim() ? parseFloat(variant.price) : undefined,
                     })),
                 attributeGroups: formData.attributeGroups.filter(
@@ -265,7 +275,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
     const addAttributeGroup = () => {
         setFormData({
             ...formData,
-            attributeGroups: [...formData.attributeGroups, { category: "General", attributes: [] }]
+            attributeGroups: [...formData.attributeGroups, { category: DEFAULT_ATTRIBUTE_GROUP_NAME, attributes: [] }]
         });
     };
 
@@ -501,6 +511,14 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
         setFormData({ ...formData, filterSpecs: formData.filterSpecs.filter(s => s.key !== specKey) });
     };
 
+    const clearAllFilterSpecValues = () => {
+        if (featuredSpecKeys.length === 0) return;
+        setFormData({
+            ...formData,
+            filterSpecs: formData.filterSpecs.filter((s) => !featuredSpecKeys.includes(s.key)),
+        });
+    };
+
     const handleAddBrand = async () => {
         const name = window.prompt("Enter new brand name:");
         if (!name) return;
@@ -600,19 +618,77 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
         }));
     };
 
+    const handleColorVariantImageUpload = async (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        e.target.value = "";
+        setColorImageUploading(index);
+        try {
+            const oldUrl = formData.colorVariants[index]?.image;
+            if (oldUrl?.includes("cloudinary.com")) {
+                await deleteImageFromCloud(oldUrl);
+            }
+            const { url } = await uploadImage(file);
+            setFormData((prev) => ({
+                ...prev,
+                colorVariants: prev.colorVariants.map((variant, i) =>
+                    i === index ? { ...variant, image: url } : variant
+                ),
+            }));
+        } catch (err) {
+            toast.error((err as Error).message);
+        } finally {
+            setColorImageUploading(null);
+        }
+    };
+
+    const handleRemoveColorVariantImage = async (index: number) => {
+        const url = formData.colorVariants[index]?.image;
+        if (!url) return;
+        if (url.includes("cloudinary.com")) {
+            try {
+                await deleteImageFromCloud(url);
+            } catch (err) {
+                toast.error((err as Error).message);
+                return;
+            }
+        }
+        setFormData((prev) => ({
+            ...prev,
+            colorVariants: prev.colorVariants.map((variant, i) =>
+                i === index ? { ...variant, image: "" } : variant
+            ),
+        }));
+    };
+
     if (initialLoading && !isNew) return <div className="p-10 text-center text-main">Loading...</div>;
 
+    const sectionClass = "rounded-xl border border-border-soft bg-base/30 p-4 sm:p-6";
+
     return (
-        <div className="max-w-7xl mx-auto px-4 py-12">
-            <div className="flex items-center gap-4 mb-8">
-                <Link href="/admin/products" className="p-2 admin-card rounded-lg hover:bg-base text-main transition-colors">
-                    <ArrowLeft className="h-5 w-5" />
-                </Link>
-                <h1 className="text-3xl font-bold text-main">{isNew ? 'New Product' : 'Edit Product'}</h1>
+        <div className="mx-auto w-full max-w-[1500px] px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
+            <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                    <Link href="/admin/products" className="rounded-lg border border-border-soft p-2 text-main transition-colors hover:bg-base">
+                        <ArrowLeft className="h-5 w-5" />
+                    </Link>
+                    <div>
+                        <p className="text-xs uppercase tracking-[0.16em] text-sub">Admin / Products</p>
+                        <h1 className="text-3xl font-bold text-main">{isNew ? "Create product" : "Edit product"}</h1>
+                    </div>
+                </div>
+                <span className="rounded-full border border-border-soft bg-base px-3 py-1 text-xs text-sub">
+                    {isNew ? "Draft mode" : "Update mode"}
+                </span>
             </div>
 
-            <form onSubmit={handleSubmit} className="admin-card rounded-xl p-8 space-y-6">
-                <div className={`grid grid-cols-1 gap-6 ${!isNew ? "xl:grid-cols-2" : ""}`}>
+            <form onSubmit={handleSubmit} className="space-y-8">
+                <section className="pb-2">
+                    <div className="mb-5">
+                        <h2 className="text-lg font-semibold text-main">Basic information</h2>
+                        <p className="mt-1 text-sm text-sub">Core product details for catalog and pricing.</p>
+                    </div>
+                    <div className={`grid grid-cols-1 gap-6 ${!isNew ? "xl:grid-cols-2" : ""}`}>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-2">
                             <label className="text-sub text-sm">Product Title</label>
@@ -676,7 +752,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                         <div className="space-y-2">
                             <label className="text-sub text-sm">Availability Status</label>
                             <select
-                                className="w-full bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent [&>option]:text-black"
+                                className="w-full bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent [&>option]:text-white"
                                 value={formData.availability}
                                 onChange={(e) => setFormData({ ...formData, availability: e.target.value as typeof formData.availability })}
                             >
@@ -696,7 +772,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                                 </div>
                             </label>
                             <select
-                                className="w-full bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent [&>option]:text-black"
+                                className="w-full bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent [&>option]:text-white"
                                 value={formData.brandId}
                                 onChange={(e) => setFormData({ ...formData, brandId: e.target.value })}
                             >
@@ -716,7 +792,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                                 </div>
                             </label>
                             <select
-                                className="w-full bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent [&>option]:text-black"
+                                className="w-full bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent [&>option]:text-white"
                                 value={formData.categoryIds[0] || ""}
                                 onChange={(e) => setFormData({ ...formData, categoryIds: [e.target.value] })}
                             >
@@ -728,8 +804,8 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                         </div>
                     </div>
 
-                    {!isNew && (
-                        <div className="border border-border-soft rounded-xl p-4 bg-base/40">
+                        {!isNew && (
+                        <div className="rounded-xl border border-border-soft bg-base/20 p-4">
                             <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
                                 <div>
                                     <h2 className="text-lg font-bold text-main">Shop page preview</h2>
@@ -758,18 +834,19 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                             )}
                         </div>
                     )}
-                </div>
+                    </div>
+                </section>
 
-                <div className="space-y-2">
+                <section className="border-t border-border-soft pt-6">
                     <label className="text-sub text-sm">Description</label>
                     <textarea
-                        className="w-full bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent h-32"
+                        className="mt-2 h-32 w-full rounded-lg border border-border-soft bg-base px-4 py-2 text-main focus:outline-none focus:border-accent"
                         value={formData.description}
                         onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                     ></textarea>
-                </div>
+                </section>
 
-                <div className="border-t border-border-soft pt-6">
+                <section className="border-t border-border-soft pt-6">
                     <div className="flex items-center justify-between mb-4">
                         <div>
                             <h2 className="text-xl font-bold text-main">Color variants</h2>
@@ -788,7 +865,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                     )}
                     <div className="space-y-3">
                         {formData.colorVariants.map((variant, index) => (
-                            <div key={index} className="grid grid-cols-1 md:grid-cols-5 gap-3 bg-base border border-border-soft rounded-lg p-3">
+                            <div key={index} className="grid grid-cols-1 md:grid-cols-6 gap-3 bg-base border border-border-soft rounded-lg p-3">
                                 <input
                                     type="text"
                                     placeholder="Color name (e.g. Black)"
@@ -817,6 +894,39 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                                     value={variant.price}
                                     onChange={(e) => updateColorVariant(index, "price", e.target.value)}
                                 />
+                                <div className="flex items-center gap-2">
+                                    {colorImageUploading === index ? (
+                                        <div className="flex h-[42px] w-[42px] items-center justify-center rounded border border-border-soft">
+                                            <Loader2 className="h-4 w-4 animate-spin text-accent" />
+                                        </div>
+                                    ) : variant.image ? (
+                                        <img src={variant.image} alt={`${variant.name} variant`} className="h-[42px] w-[42px] rounded border border-border-soft object-cover" />
+                                    ) : (
+                                        <div className="flex h-[42px] w-[42px] items-center justify-center rounded border border-dashed border-border-soft text-sub">
+                                            <ImagePlus className="h-4 w-4" />
+                                        </div>
+                                    )}
+                                    <label className="cursor-pointer rounded border border-border-soft px-2 py-1 text-xs text-sub hover:text-main hover:bg-base">
+                                        {variant.image ? "Replace" : "Image"}
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            className="hidden"
+                                            onChange={(e) => handleColorVariantImageUpload(index, e)}
+                                            disabled={colorImageUploading !== null}
+                                        />
+                                    </label>
+                                    {variant.image && (
+                                        <button
+                                            type="button"
+                                            onClick={() => handleRemoveColorVariantImage(index)}
+                                            className="rounded border border-border-soft px-2 py-1 text-xs text-red-400 hover:bg-red-400/10"
+                                            title="Remove variant image"
+                                        >
+                                            Remove
+                                        </button>
+                                    )}
+                                </div>
                                 <div className="flex gap-2">
                                     <button
                                         type="button"
@@ -830,10 +940,10 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                             </div>
                         ))}
                     </div>
-                </div>
+                </section>
 
                 {/* Product images (Cloudinary) */}
-                <div className="border-t border-border-soft pt-6">
+                <section className="border-t border-border-soft pt-6">
                     <h2 className="text-xl font-bold text-main mb-2">Product images</h2>
                     <p className="text-sub text-sm mb-4">Upload images to Cloudinary. You can delete or replace any image.</p>
                     <div className="flex flex-wrap gap-4">
@@ -883,13 +993,29 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                             />
                         </label>
                     </div>
-                </div>
+                </section>
 
                 {/* Filter Specs — only featured spec keys for the selected category */}
-                <div className="border-t border-border-soft pt-6">
-                    <div className="mb-4">
-                        <h2 className="text-xl font-bold text-main">Filter Specs</h2>
-                        <p className="text-sub text-sm mt-0.5">Only the category’s featured specs are shown. Set values to appear in shop filters.</p>
+                <section className="border-t border-border-soft pt-6">
+                    <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                            <h2 className="text-xl font-bold text-main">Featured specs</h2>
+                            <p className="text-sub text-sm mt-0.5">Set values for this category's featured specs to surface richer shop filters.</p>
+                        </div>
+                        {featuredSpecKeys.length > 0 && (
+                            <div className="flex flex-wrap items-center gap-2">
+                                <span className="text-xs rounded-full border border-border-soft bg-base px-2.5 py-1 text-sub">
+                                    {formData.filterSpecs.filter((s) => featuredSpecKeys.includes(s.key)).length}/{featuredSpecKeys.length} filled
+                                </span>
+                                <button
+                                    type="button"
+                                    onClick={clearAllFilterSpecValues}
+                                    className="text-xs rounded-lg border border-border-soft px-3 py-1.5 text-sub hover:text-main hover:bg-base transition-colors"
+                                >
+                                    Clear all values
+                                </button>
+                            </div>
+                        )}
                     </div>
 
                     {featuredSpecsLoading && (
@@ -902,54 +1028,66 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                         <p className="text-sub text-sm italic">No featured specs for this category. Configure them under Admin → Categories → Featured Specs.</p>
                     )}
                     {!featuredSpecsLoading && featuredSpecKeys.length > 0 && (
-                        <>
-                            <div className="flex gap-4 mb-2 px-1">
-                                <span className="flex-1 text-xs text-sub uppercase tracking-wider">Key</span>
-                                <span className="flex-1 text-xs text-sub uppercase tracking-wider">Value</span>
-                                <span className="w-8" />
-                            </div>
-                            <div className="space-y-3">
-                                {featuredSpecKeys.map((specKey) => (
-                                    <div key={specKey} className="flex gap-4 items-center">
-                                        <input
-                                            type="text"
-                                            readOnly
-                                            className="flex-1 bg-base border border-border-soft rounded-lg px-4 py-2 text-sub cursor-default"
-                                            value={specKey}
-                                        />
-                                        <input
-                                            type="text"
-                                            placeholder="Value"
-                                            className="flex-1 bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent"
-                                            value={getFilterSpecValue(specKey)}
-                                            onChange={(e) => updateFilterSpecValue(specKey, e.target.value)}
-                                        />
-                                        <button
-                                            type="button"
-                                            onClick={() => removeFilterSpecByKey(specKey)}
-                                            className="p-2 text-red-400 hover:bg-red-400/10 rounded"
-                                            title="Clear value"
-                                        >
-                                            <Trash2 className="h-5 w-5" />
-                                        </button>
+                        <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+                            {featuredSpecKeys.map((specKey) => {
+                                const specValue = getFilterSpecValue(specKey);
+                                const hasValue = specValue.trim().length > 0;
+                                return (
+                                    <div
+                                        key={specKey}
+                                        className={`rounded-lg border p-3 transition-colors ${hasValue ? "border-accent/40 bg-accent/5" : "border-border-soft bg-base/60"}`}
+                                    >
+                                        <div className="flex items-center justify-between gap-3 mb-2">
+                                            <div>
+                                                <p className="text-main text-sm font-semibold">{formatSpecLabel(specKey)}</p>
+                                                <p className="text-sub text-[11px]">{specKey}</p>
+                                            </div>
+                                            {hasValue ? (
+                                                <span className="text-[11px] rounded-full bg-accent/20 text-accent px-2 py-0.5">Filled</span>
+                                            ) : (
+                                                <span className="text-[11px] rounded-full bg-base text-sub border border-border-soft px-2 py-0.5">Empty</span>
+                                            )}
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                                type="text"
+                                                placeholder={`Enter ${formatSpecLabel(specKey).toLowerCase()}`}
+                                                className="flex-1 bg-base border border-border-soft rounded-lg px-3 py-2 text-main text-sm focus:outline-none focus:border-accent"
+                                                value={specValue}
+                                                onChange={(e) => updateFilterSpecValue(specKey, e.target.value)}
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => removeFilterSpecByKey(specKey)}
+                                                disabled={!hasValue}
+                                                className="p-2 text-red-400 hover:bg-red-400/10 rounded disabled:opacity-40 disabled:cursor-not-allowed"
+                                                title="Clear value"
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                            </button>
+                                        </div>
                                     </div>
-                                ))}
-                            </div>
-                        </>
+                                );
+                            })}
+                        </div>
                     )}
-                </div>
+                </section>
 
                 {/* Product details — attribute groups (e.g. General, Cable Specs) */}
-                <div className="border-t border-border-soft pt-6">
-                    <div className="flex justify-between items-center mb-4">
+                <section className="border-t border-border-soft pt-6">
+                    <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
                         <div>
                             <h2 className="text-xl font-bold text-main">Product details (Attributes)</h2>
-                            <p className="text-sub text-sm mt-0.5">Group attributes by category (e.g. General, Cable Specs, General Specs).</p>
+                            <p className="mt-0.5 text-sm text-sub">Group details by category (General, Cable Specs, etc.) and update values quickly.</p>
+                            <p className="mt-1 text-xs text-sub">
+                                {formData.attributeGroups.length} categories,{" "}
+                                {formData.attributeGroups.reduce((sum, g) => sum + g.attributes.length, 0)} total attributes
+                            </p>
                         </div>
                         <button
                             type="button"
                             onClick={addAttributeGroup}
-                            className="text-sm bg-accent/20 text-accent px-3 py-1.5 rounded hover:bg-accent/30 transition-colors flex items-center gap-1"
+                            className="inline-flex items-center gap-2 rounded-lg bg-accent/15 px-3 py-2 text-sm text-accent transition-colors hover:bg-accent/25"
                         >
                             <Plus className="h-4 w-4" /> Add category
                         </button>
@@ -960,13 +1098,13 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                     )}
 
                     {selectedAttributeKeys.size > 0 && formData.attributeGroups.length > 0 && (
-                        <div className="flex flex-wrap items-center gap-3 p-3 rounded-lg bg-accent/10 border border-accent/30 mb-4">
+                        <div className="mb-5 flex flex-wrap items-center gap-3 rounded-lg border border-accent/30 bg-accent/10 p-3">
                             <span className="text-sm font-medium text-main">
                                 {selectedAttributeKeys.size} attribute{selectedAttributeKeys.size !== 1 ? "s" : ""} selected
                             </span>
                             <select
                                 id="move-target-category"
-                                className="bg-base border border-border-soft rounded-lg px-3 py-1.5 text-sm text-main focus:outline-none focus:border-accent [&>option]:text-black"
+                                className="bg-base border border-border-soft rounded-lg px-3 py-1.5 text-sm text-main focus:outline-none focus:border-accent [&>option]:text-white"
                             >
                                 <option value="">Move to category…</option>
                                 {formData.attributeGroups.map((g, i) => (
@@ -983,7 +1121,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                                     if (val === "" || val == null) return;
                                     moveSelectedAttributesToGroup(Number(val));
                                 }}
-                                className="text-sm bg-accent text-white px-3 py-1.5 rounded hover:bg-accent/90 flex items-center gap-1.5"
+                                className="inline-flex items-center gap-1.5 rounded bg-accent px-3 py-1.5 text-sm text-white hover:bg-accent/90"
                             >
                                 <ArrowRightLeft className="h-4 w-4" /> Move
                             </button>
@@ -997,16 +1135,16 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                         </div>
                     )}
 
-                    <div className="space-y-6">
+                    <div className="space-y-4">
                         {formData.attributeGroups.map((group, groupIndex) => (
-                            <div key={groupIndex} className="bg-base rounded-xl border border-border-soft p-4">
-                                <div className="flex items-center gap-2 mb-3">
-                                    <div className="flex flex-col w-12 shrink-0 gap-0.5">
+                            <div key={groupIndex} className="rounded-xl border border-border-soft bg-base/60 p-4">
+                                <div className="mb-3 flex flex-wrap items-center gap-2">
+                                    <div className="flex w-12 shrink-0 flex-col gap-0.5">
                                         <button
                                             type="button"
                                             onClick={() => moveGroupUp(groupIndex)}
                                             disabled={groupIndex === 0}
-                                            className="p-1 text-sub hover:text-main hover:bg-white/5 rounded disabled:opacity-40 disabled:pointer-events-none"
+                                            className="rounded p-1 text-sub hover:bg-white/5 hover:text-main disabled:pointer-events-none disabled:opacity-40"
                                             title="Move category up"
                                         >
                                             <ChevronUp className="h-4 w-4" />
@@ -1015,7 +1153,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                                             type="button"
                                             onClick={() => moveGroupDown(groupIndex)}
                                             disabled={groupIndex === formData.attributeGroups.length - 1}
-                                            className="p-1 text-sub hover:text-main hover:bg-white/5 rounded disabled:opacity-40 disabled:pointer-events-none"
+                                            className="rounded p-1 text-sub hover:bg-white/5 hover:text-main disabled:pointer-events-none disabled:opacity-40"
                                             title="Move category down"
                                         >
                                             <ChevronDown className="h-4 w-4" />
@@ -1024,21 +1162,24 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                                     <input
                                         type="text"
                                         placeholder="Category name (e.g. General, Cable Specs)"
-                                        className="flex-1 bg-white/5 border border-border-soft rounded-lg px-3 py-2 text-main font-medium focus:outline-none focus:border-accent"
+                                        className="min-w-[220px] flex-1 rounded-lg border border-border-soft bg-base px-3 py-2 text-main font-medium focus:border-accent focus:outline-none"
                                         value={group.category}
                                         onChange={(e) => updateGroupCategory(groupIndex, e.target.value)}
                                     />
+                                    <span className="rounded-full border border-border-soft px-2.5 py-1 text-xs text-sub">
+                                        {group.attributes.length} item{group.attributes.length === 1 ? "" : "s"}
+                                    </span>
                                     <button
                                         type="button"
                                         onClick={() => removeAttributeGroup(groupIndex)}
-                                        className="p-2 text-red-400 hover:bg-red-400/10 rounded shrink-0"
+                                        className="shrink-0 rounded p-2 text-red-400 hover:bg-red-400/10"
                                         title="Remove category"
                                     >
                                         <Trash2 className="h-5 w-5" />
                                     </button>
                                 </div>
                                 {group.attributes.length > 0 && (
-                                    <div className="flex items-center gap-2 mb-2 pl-4">
+                                    <div className="mb-2 flex items-center gap-2">
                                         <button
                                             type="button"
                                             onClick={() => selectAllInGroup(groupIndex)}
@@ -1057,10 +1198,10 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                                     </div>
                                 )}
 
-                                <div className="pl-4 space-y-2">
+                                <div className="space-y-2">
                                     {group.attributes.length > 0 && (
-                                        <div className="flex gap-2 mb-2 px-1 text-xs text-sub uppercase tracking-wider">
-                                            <span className="w-8 shrink-0">Select</span>
+                                        <div className="mb-2 hidden gap-2 px-1 text-xs uppercase tracking-wider text-sub lg:flex">
+                                            <span className="w-14 shrink-0">Select</span>
                                             <span className="w-16 shrink-0">Order</span>
                                             <span className="flex-1">Name</span>
                                             <span className="flex-1">Value</span>
@@ -1068,8 +1209,14 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                                         </div>
                                     )}
                                     {group.attributes.map((attr, attrIndex) => (
-                                        <div key={attrIndex} className={`flex gap-2 items-center rounded px-2 py-1 ${isAttributeSelected(groupIndex, attrIndex) ? "bg-accent/15" : ""}`}>
-                                            <label className="w-8 shrink-0 flex items-center cursor-pointer" title="Select to move to another category">
+                                        <div
+                                            key={attrIndex}
+                                            className={`grid grid-cols-1 items-center gap-2 rounded-lg border border-border-soft p-2 lg:grid-cols-[auto_auto_1fr_1fr_auto] ${isAttributeSelected(groupIndex, attrIndex) ? "border-accent/50 bg-accent/10" : "bg-base/40"}`}
+                                        >
+                                            <div className="flex items-center justify-between lg:hidden">
+                                                <span className="text-xs font-medium text-sub">Attribute {attrIndex + 1}</span>
+                                            </div>
+                                            <label className="flex w-14 shrink-0 cursor-pointer items-center" title="Select to move to another category">
                                                 <input
                                                     type="checkbox"
                                                     checked={isAttributeSelected(groupIndex, attrIndex)}
@@ -1077,12 +1224,12 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                                                     className="w-4 h-4 rounded border-gray-500 text-accent focus:ring-accent"
                                                 />
                                             </label>
-                                            <div className="flex flex-col w-16 shrink-0 gap-0.5">
+                                            <div className="flex w-16 shrink-0 flex-col gap-0.5">
                                                 <button
                                                     type="button"
                                                     onClick={() => moveAttributeUp(groupIndex, attrIndex)}
                                                     disabled={attrIndex === 0}
-                                                    className="p-1.5 text-sub hover:text-main hover:bg-white/5 rounded disabled:opacity-40 disabled:pointer-events-none"
+                                                    className="rounded p-1.5 text-sub hover:bg-white/5 hover:text-main disabled:pointer-events-none disabled:opacity-40"
                                                     title="Move up"
                                                 >
                                                     <ChevronUp className="h-4 w-4" />
@@ -1091,7 +1238,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                                                     type="button"
                                                     onClick={() => moveAttributeDown(groupIndex, attrIndex)}
                                                     disabled={attrIndex === group.attributes.length - 1}
-                                                    className="p-1.5 text-sub hover:text-main hover:bg-white/5 rounded disabled:opacity-40 disabled:pointer-events-none"
+                                                    className="rounded p-1.5 text-sub hover:bg-white/5 hover:text-main disabled:pointer-events-none disabled:opacity-40"
                                                     title="Move down"
                                                 >
                                                     <ChevronDown className="h-4 w-4" />
@@ -1099,7 +1246,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                                             </div>
                                             <input
                                                 type="text"
-                                                placeholder="Name (optional, e.g. Color)"
+                                                placeholder="Name (e.g. Color)"
                                                 className="flex-1 bg-base border border-border-soft rounded-lg px-3 py-2 text-main text-sm focus:outline-none focus:border-accent min-w-0"
                                                 value={attr.name ?? ''}
                                                 onChange={(e) => updateAttribute(groupIndex, attrIndex, "name", e.target.value)}
@@ -1123,37 +1270,39 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                                     <button
                                         type="button"
                                         onClick={() => addAttributeToGroup(groupIndex)}
-                                        className="text-sm text-accent hover:bg-accent/10 px-3 py-1.5 rounded transition-colors"
+                                        className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm text-accent transition-colors hover:bg-accent/10"
                                     >
-                                        + Add property to this category
+                                        <Plus className="h-4 w-4" />
+                                        Add property
                                     </button>
                                 </div>
                             </div>
                         ))}
                     </div>
-                </div>
+                </section>
 
-                <div className="flex items-center gap-2 pt-4 border-t border-border-soft">
-                    <input
-                        type="checkbox"
-                        id="isActive"
-                        checked={formData.isActive}
-                        onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
-                        className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                    />
-                    <label htmlFor="isActive" className="text-main">Active Product</label>
-                </div>
-
-                <div className="flex justify-end pt-4">
+                <section className="border-t border-border-soft pt-6">
+                    <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg bg-base/20 p-3 sm:p-4">
+                    <label htmlFor="isActive" className="flex items-center gap-2 text-main">
+                        <input
+                            type="checkbox"
+                            id="isActive"
+                            checked={formData.isActive}
+                            onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
+                            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        Active Product
+                    </label>
                     <button
                         type="submit"
                         disabled={loading}
-                        className="bg-accent hover:bg-accent/90 text-white px-6 py-2 rounded-lg flex items-center gap-2 transition-colors disabled:opacity-50"
+                        className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-accent px-6 py-2 text-white transition-colors hover:bg-accent/90 disabled:opacity-50 sm:w-auto"
                     >
                         <Save className="h-5 w-5" />
                         {loading ? 'Saving...' : 'Save Product'}
                     </button>
-                </div>
+                    </div>
+                </section>
             </form>
         </div>
     );
