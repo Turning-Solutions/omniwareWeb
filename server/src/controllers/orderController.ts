@@ -83,7 +83,8 @@ export const getOrders = async (req: Request, res: Response) => {
     try {
         const { page = 1, limit = 20, status, search, minTotal, maxTotal, from, to, sort } = req.query;
 
-        const query: any = {};
+        // Make query shape explicit so TS knows nested operator fields are writable.
+        const query: Record<string, any> = {};
 
         // Status Filter
         if (status) {
@@ -92,9 +93,10 @@ export const getOrders = async (req: Request, res: Response) => {
 
         // Price Range Filter
         if (minTotal || maxTotal) {
-            query.totalPrice = {};
-            if (minTotal) query.totalPrice.$gte = Number(minTotal);
-            if (maxTotal) query.totalPrice.$lte = Number(maxTotal);
+            const totalPrice: Record<string, any> = {};
+            if (minTotal) totalPrice.$gte = Number(minTotal);
+            if (maxTotal) totalPrice.$lte = Number(maxTotal);
+            query.totalPrice = totalPrice;
         }
 
         // Date Range Filter
