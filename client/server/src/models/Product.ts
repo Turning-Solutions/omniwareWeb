@@ -7,6 +7,12 @@ const productSchema = new mongoose.Schema({
     brandId: { type: mongoose.Schema.Types.ObjectId, ref: 'Brand', index: true },
     categoryIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Category', index: true }],
     price: { type: Number, required: true, index: true },
+    /**
+     * Optional product-level discount override.
+     * If null/0, category discount may apply.
+     * Stored as percent (0-100).
+     */
+    discountPercent: { type: Number, required: false, default: null, min: 0, max: 100 },
     stock: {
         qty: { type: Number, required: true, default: 0 }
     },

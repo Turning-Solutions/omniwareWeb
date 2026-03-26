@@ -16,6 +16,7 @@ interface Category {
     _id: string;
     name: string;
     slug?: string;
+    discountPercent?: number | null;
 }
 
 interface Attribute {
@@ -107,6 +108,8 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
     const [formData, setFormData] = useState({
         title: "",
         price: "",
+        /** Optional product-level discount override (empty => use category discount). */
+        discountPercent: "",
         sku: "",
         slug: "",
         stock: "",
@@ -114,6 +117,8 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
         warranty: "",
         brandId: "",
         categoryIds: [] as string[],
+        /** Category-wide discount for the currently selected category (empty => no category discount). */
+        categoryDiscountPercent: "",
         attributeGroups: [] as AttributeGroup[],
         filterSpecs: [] as FilterSpec[],
         colorVariants: [] as ColorVariant[],
@@ -131,6 +136,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
     const [imageUploading, setImageUploading] = useState<string | number | null>(null); // 'add' or index when replacing
     const [colorImageUploading, setColorImageUploading] = useState<number | null>(null);
     const [previewRefreshKey, setPreviewRefreshKey] = useState(0);
+    const [initialCategoryDiscountPercent, setInitialCategoryDiscountPercent] = useState<string>("");
     // Selected attributes for "move to category": Set of "groupIndex-attrIndex"
     const [selectedAttributeKeys, setSelectedAttributeKeys] = useState<Set<string>>(new Set());
     const previewTarget = !isNew ? (formData.slug?.trim() || id) : "";
@@ -171,9 +177,18 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
             try {
                 const { data } = await api.get(`/products/id/${id}`);
                 const specsObj = data.specs;
-                const filterSpecs: FilterSpec[] = specsObj && typeof specsObj === 'object' && !Array.isArray(specsObj)
-                    ? Object.entries(specsObj).map(([k, v]) => ({ key: normalizeSpecKey(k), value: String(v) }))
-                    : [];
+                // Mongoose `Map` fields sometimes arrive as Map-like objects; normalize to plain entries.
+                const specsEntries: Array<[string, unknown]> =
+                    specsObj && typeof specsObj === "object"
+                        ? specsObj instanceof Map
+                            ? Array.from(specsObj.entries())
+                            : Array.isArray(specsObj)
+                              ? []
+                              : Object.entries(specsObj as Record<string, unknown>)
+                        : [];
+
+                const filterSpecs: FilterSpec[] = specsEntries
+                    .map(([k, v]) => ({ key: normalizeSpecKey(k), value: String(v) }));
                 const rawGroups = data.attributeGroups;
                 const colorVariants: ColorVariant[] = Array.isArray(data.colorVariants)
                     ? data.colorVariants.map((v: { name?: string; hex?: string; image?: string; price?: number }) => ({
@@ -192,9 +207,15 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                         : (data.attributes && Array.isArray(data.attributes) && data.attributes.length > 0)
                             ? [{ category: 'General', attributes: data.attributes.map((a: any) => ({ name: a.name || '', value: a.value || '' })) }]
                             : [];
+
+                const productDiscountPercent = data.discountPercent != null ? String(data.discountPercent) : "";
+                const firstCategory = Array.isArray(data.categoryIds) ? data.categoryIds[0] : null;
+                const categoryDiscountPercent = firstCategory?.discountPercent != null ? String(firstCategory.discountPercent) : "";
+                setInitialCategoryDiscountPercent(categoryDiscountPercent);
                 setFormData({
                     title: data.title ?? "",
                     price: data.price != null ? String(data.price) : "",
+                    discountPercent: productDiscountPercent,
                     sku: data.sku ?? "",
                     slug: data.slug ?? "",
                     stock: data.stock?.qty != null ? String(data.stock.qty) : "",
@@ -202,6 +223,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                     warranty: data.warranty ?? "",
                     brandId: data.brandId?._id || data.brandId || "",
                     categoryIds: data.categoryIds?.map((c: any) => c._id || c) || [], // eslint-disable-line @typescript-eslint/no-explicit-any
+                    categoryDiscountPercent,
                     attributeGroups,
                     filterSpecs,
                     colorVariants,
@@ -246,9 +268,34 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                 const k = key.trim();
                 if (k && featuredSpecKeys.includes(k)) specsRecord[k] = value.trim();
             });
-            const { filterSpecs: _omit, ...rest } = formData;
+            const {
+                filterSpecs: _omit,
+                categoryDiscountPercent: _omitCategoryDiscountPercent,
+                discountPercent: _omitProductDiscountPercent,
+                ...rest
+            } = formData;
+
+            const parsedProductDiscountPercent =
+                formData.discountPercent.trim() === ""
+                    ? null
+                    : Math.max(0, Math.min(100, Math.round(Number(formData.discountPercent))));
+
+            const selectedCategoryId = formData.categoryIds[0];
+            const parsedCategoryDiscountPercent =
+                formData.categoryDiscountPercent.trim() === ""
+                    ? null
+                    : Math.max(0, Math.min(100, Math.round(Number(formData.categoryDiscountPercent))));
+            const parsedInitialCategoryDiscountPercent =
+                initialCategoryDiscountPercent.trim() === ""
+                    ? null
+                    : Math.max(
+                        0,
+                        Math.min(100, Math.round(Number(initialCategoryDiscountPercent)))
+                    );
+
             const payload = {
                 ...rest,
+                discountPercent: parsedProductDiscountPercent,
                 price: parseFloat(formData.price),
                 stock: { qty: parseInt(formData.stock) },
                 availability: formData.availability,
@@ -271,11 +318,24 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
             };
 
             if (isNew) {
-                await api.post("/admin/products", payload);
+                const createdRes = await api.post("/admin/products", payload);
+                const createdId: string | undefined =
+                    createdRes?.data?._id || createdRes?.data?.id;
+                if (selectedCategoryId && parsedCategoryDiscountPercent !== parsedInitialCategoryDiscountPercent) {
+                    await api.put(`/admin/products/categories/${selectedCategoryId}/discount`, {
+                        discountPercent: parsedCategoryDiscountPercent,
+                    });
+                }
                 toast.success("Product saved successfully");
+                if (createdId) notifyProductsListUpdated(createdId);
                 router.push('/admin/products');
             } else {
                 await api.patch(`/admin/products/${id}`, payload);
+                if (selectedCategoryId && parsedCategoryDiscountPercent !== parsedInitialCategoryDiscountPercent) {
+                    await api.put(`/admin/products/categories/${selectedCategoryId}/discount`, {
+                        discountPercent: parsedCategoryDiscountPercent,
+                    });
+                }
                 toast.success("Product saved successfully");
                 notifyProductsListUpdated(id);
                 setPreviewRefreshKey((prev) => prev + 1);
@@ -584,7 +644,10 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
         try {
             const { data: newCategory } = await api.post("/admin/products/categories", { name, slug });
             setCategories([...categories, newCategory]);
-            setFormData({ ...formData, categoryIds: [newCategory._id] });
+            const nextCategoryDiscount =
+                newCategory?.discountPercent != null ? String(newCategory.discountPercent) : "";
+            setInitialCategoryDiscountPercent(nextCategoryDiscount);
+            setFormData({ ...formData, categoryIds: [newCategory._id], categoryDiscountPercent: nextCategoryDiscount });
         } catch (e) {
             console.error(e);
             toast.error("Failed to create category");
@@ -830,7 +893,18 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                             <select
                                 className="w-full bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent [&>option]:text-white"
                                 value={formData.categoryIds[0] || ""}
-                                onChange={(e) => setFormData({ ...formData, categoryIds: [e.target.value] })}
+                                onChange={(e) => {
+                                    const nextCategoryId = e.target.value;
+                                    const cat = categories.find((c) => c._id === nextCategoryId);
+                                    const nextCategoryDiscount =
+                                        cat?.discountPercent != null ? String(cat.discountPercent) : "";
+                                    setInitialCategoryDiscountPercent(nextCategoryDiscount);
+                                    setFormData({
+                                        ...formData,
+                                        categoryIds: [nextCategoryId],
+                                        categoryDiscountPercent: nextCategoryDiscount,
+                                    });
+                                }}
                             >
                                 <option value="">Select Category</option>
                                 {categories.map(c => (
@@ -870,6 +944,48 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                             )}
                         </div>
                     )}
+                    </div>
+                </section>
+
+                <section className="border-t border-border-soft pt-6">
+                    <div className="mb-4">
+                        <h2 className="text-xl font-bold text-main">Discounts</h2>
+                        <p className="text-sub text-sm mt-0.5">
+                            Set a product-level discount override, or set a category discount that applies to all products in the selected category.
+                        </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                            <label className="text-sub text-sm">Product discount % (override)</label>
+                            <input
+                                type="number"
+                                min={0}
+                                max={100}
+                                step={1}
+                                className="w-full bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent"
+                                value={formData.discountPercent}
+                                onChange={(e) => setFormData({ ...formData, discountPercent: e.target.value })}
+                                placeholder="e.g. 10"
+                            />
+                            <p className="text-xs text-sub">Leave empty to use the category discount (if any).</p>
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-sub text-sm">Category discount % (apply to all)</label>
+                            <input
+                                type="number"
+                                min={0}
+                                max={100}
+                                step={1}
+                                className="w-full bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent disabled:opacity-60"
+                                value={formData.categoryDiscountPercent}
+                                onChange={(e) => setFormData({ ...formData, categoryDiscountPercent: e.target.value })}
+                                placeholder="e.g. 15"
+                                disabled={!formData.categoryIds[0]}
+                            />
+                            <p className="text-xs text-sub">Leave empty to remove the category discount.</p>
+                        </div>
                     </div>
                 </section>
 

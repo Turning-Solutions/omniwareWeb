@@ -7,6 +7,11 @@ export const productSchema = z.object({
     brandId: z.string().optional(),
     categoryIds: z.array(z.string()).optional(),
     price: z.number().min(0),
+    /**
+     * Optional product-level discount override (percent 0-100).
+     * If null/empty, category discount may apply.
+     */
+    discountPercent: z.number().min(0).max(100).nullable().optional(),
     stock: z.object({
         qty: z.number().min(0)
     }),

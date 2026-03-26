@@ -24,6 +24,17 @@ export interface Product {
     title: string;
     description: string;
     price: number;
+    /**
+     * Original price stored in DB.
+     * (Kept as `price` in DB responses; we also expose `originalPrice` for safety.)
+     */
+    originalPrice?: number;
+    /** Effective price after applying product/category discounts. */
+    discountedPrice?: number;
+    /** Discount percent actually applied to the customer (0/null if none). */
+    effectiveDiscountPercent?: number | null;
+    /** Product-level override discount percent (null if not set). */
+    discountPercent?: number | null;
     images: string[];
     category: string;
     categoryIds?: { _id: string; name: string }[];

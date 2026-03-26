@@ -61,25 +61,36 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
 
     if (!product) return <div className="min-h-screen pt-20 text-center text-white">Product not found</div>;
 
-    const selectedColorVariant = selectedVariant && "name" in selectedVariant && !("attributes" in selectedVariant)
-        ? selectedVariant as ProductColorVariant
-        : null;
+    const selectedColorVariant =
+        selectedVariant && "name" in selectedVariant && !("attributes" in selectedVariant)
+            ? selectedVariant as ProductColorVariant
+            : null;
+
     const selectedColorImage = selectedColorVariant?.image?.trim() || "";
     const currentImage = selectedColorImage || product.images?.[selectedImage] || "";
-    const currentPrice = selectedVariant?.price ?? product.price;
+
+    const effectiveDiscountPercent = product.effectiveDiscountPercent ?? product.discountPercent ?? 0;
+    const applyDiscountToPrice = (price: number) =>
+        effectiveDiscountPercent > 0 ? Math.round(price * (1 - effectiveDiscountPercent / 100)) : price;
+
+    const currentOriginalPrice = selectedVariant?.price ?? product.price;
+    const currentPrice = applyDiscountToPrice(currentOriginalPrice);
+
     const currentStock = selectedVariant?.stock?.qty ?? product.stock?.qty ?? 0;
-    const availability = product.availability ?? (currentStock > 0 ? 'in_stock' : 'out_of_stock');
+    const availability = product.availability ?? (currentStock > 0 ? "in_stock" : "out_of_stock");
 
     const availabilityConfig = {
-        in_stock: { label: 'In Stock', className: 'text-green-400', icon: Check },
-        out_of_stock: { label: 'Out of Stock', className: 'text-red-400', icon: AlertCircle },
-        pre_order: { label: 'Pre-Order', className: 'text-yellow-400', icon: Clock },
-        coming_soon: { label: 'Coming Soon', className: 'text-blue-400', icon: Package },
+        in_stock: { label: "In Stock", className: "text-green-400", icon: Check },
+        out_of_stock: { label: "Out of Stock", className: "text-red-400", icon: AlertCircle },
+        pre_order: { label: "Pre-Order", className: "text-yellow-400", icon: Clock },
+        coming_soon: { label: "Coming Soon", className: "text-blue-400", icon: Package },
     } as const;
 
-    const availInfo = availabilityConfig[availability as keyof typeof availabilityConfig] ?? availabilityConfig.out_of_stock;
+    const availInfo =
+        availabilityConfig[availability as keyof typeof availabilityConfig] ?? availabilityConfig.out_of_stock;
     const AvailIcon = availInfo.icon;
-    const canAddToCart = availability === 'in_stock' || availability === 'pre_order';
+    const canAddToCart = availability === "in_stock" || availability === "pre_order";
+
     const productPath = `/product/${product.slug || product._id}`;
     const whatsappUrl = buildProductWhatsAppUrl({
         productTitle: product.title,
@@ -87,21 +98,21 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
     });
 
     const handleAddToCart = () => {
-        const selectedLabel = selectedVariant && "attributes" in selectedVariant
-            ? (selectedVariant.attributes ?? []).map((a) => a.value).join("/")
-            : selectedVariant && "name" in selectedVariant
-                ? selectedVariant.name
-                : "";
+        const selectedLabel =
+            selectedVariant && "attributes" in selectedVariant
+                ? (selectedVariant.attributes ?? []).map((a) => a.value).join("/")
+                : selectedVariant && "name" in selectedVariant
+                  ? selectedVariant.name
+                  : "";
+
         const itemToAdd = {
             ...product,
             price: currentPrice,
             // If variant selected, we might want to append variant info to title or id
-            // For simple cart context:
-            title: selectedVariant
-                ? `${product.title} (${selectedLabel})`
-                : product.title,
-            _id: selectedVariant ? `${product._id}-${selectedVariant.sku ?? selectedLabel}` : product._id
+            title: selectedVariant ? `${product.title} (${selectedLabel})` : product.title,
+            _id: selectedVariant ? `${product._id}-${selectedVariant.sku ?? selectedLabel}` : product._id,
         };
+
         addToCart(itemToAdd, qty);
         setCartPopupOpen(true);
     };
@@ -118,6 +129,7 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
                     Back
                 </button>
             </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
                 {/* Image Gallery */}
                 <div>
@@ -140,13 +152,16 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
                             <span className="text-gray-500 text-lg">No Image Available</span>
                         )}
                     </motion.div>
+
                     {product.images && product.images.length > 1 && (
                         <div className="flex gap-2 cursor-pointer overflow-x-auto pb-2">
                             {product.images.map((img: string, idx: number) => (
                                 <div
                                     key={idx}
                                     onClick={() => setSelectedImage(idx)}
-                                    className={`w-20 h-20 rounded-lg flex-shrink-0 border ${selectedImage === idx ? 'border-primary' : 'border-transparent'} bg-white/5 overflow-hidden`}
+                                    className={`w-20 h-20 rounded-lg flex-shrink-0 border ${
+                                        selectedImage === idx ? "border-primary" : "border-transparent"
+                                    } bg-white/5 overflow-hidden`}
                                 >
                                     <div className="relative w-full h-full">
                                         <Image
@@ -161,6 +176,7 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
                             ))}
                         </div>
                     )}
+
                     {/* Specs Map (filter specs) */}
                     {product.specs && Object.keys(product.specs).length > 0 && (
                         <div className="mt-6 p-4 bg-white/5 rounded-xl">
@@ -180,12 +196,9 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
                 </div>
 
                 {/* Product Info */}
-                <motion.div
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                >
+                <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
                     <div className="mb-2 text-sm text-blue-400 font-semibold tracking-wide uppercase">
-                        {typeof product.brandId !== 'string' ? product.brandId?.name : ''}
+                        {typeof product.brandId !== "string" ? product.brandId?.name : ""}
                     </div>
                     <h1 className="text-3xl font-bold text-white mb-2">{product.title}</h1>
 
@@ -201,7 +214,19 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
                     )}
 
                     <div className="flex items-center space-x-4 mb-6">
-                        <span className="text-2xl font-bold text-primary">LKR {currentPrice?.toLocaleString()}</span>
+                        <div className="flex items-baseline gap-3 flex-wrap">
+                            <span className="text-2xl font-bold text-primary">LKR {currentPrice.toLocaleString()}</span>
+                            {effectiveDiscountPercent > 0 && (
+                                <span className="text-xs text-gray-400 line-through">
+                                    LKR {currentOriginalPrice.toLocaleString()}
+                                </span>
+                            )}
+                            {effectiveDiscountPercent > 0 && (
+                                <span className="text-xs bg-[#D12B28]/10 border border-[#D12B28]/20 text-[#D12B28] px-2 py-1 rounded-full font-bold">
+                                    Discount {effectiveDiscountPercent}%
+                                </span>
+                            )}
+                        </div>
                         <span className={`flex items-center text-sm font-medium ${availInfo.className}`}>
                             <AvailIcon className="h-4 w-4 mr-1" />
                             {availInfo.label}
@@ -223,20 +248,31 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
                                     <button
                                         key={idx}
                                         onClick={() => setSelectedVariant(variant)}
-                                        className={`px-4 py-2 rounded-lg border text-sm transition-all ${selectedVariant === variant
-                                            ? 'border-primary bg-primary/10 text-white'
-                                            : 'border-white/10 bg-white/5 text-gray-400 hover:bg-white/10'
-                                            }`}
+                                        className={`px-4 py-2 rounded-lg border text-sm transition-all ${
+                                            selectedVariant === variant ? "border-primary bg-primary/10 text-white" : "border-white/10 bg-white/5 text-gray-400 hover:bg-white/10"
+                                        }`}
                                     >
-                                        {(variant.attributes ?? []).map((a) => a.value).join(' / ')}
+                                        {(variant.attributes ?? []).map((a) => a.value).join(" / ")}
                                         {variant.price != null && (
-                                            <span className="ml-2 text-xs opacity-75">LKR {variant.price.toLocaleString()}</span>
+                                            <span className="ml-2 text-xs opacity-75">
+                                                {effectiveDiscountPercent > 0 ? (
+                                                    <>
+                                                        LKR {applyDiscountToPrice(variant.price).toLocaleString()}
+                                                        <span className="ml-1 opacity-60 line-through">
+                                                            LKR {variant.price.toLocaleString()}
+                                                        </span>
+                                                    </>
+                                                ) : (
+                                                    <>LKR {variant.price.toLocaleString()}</>
+                                                )}
+                                            </span>
                                         )}
                                     </button>
                                 ))}
                             </div>
                         </div>
                     )}
+
                     {product.colorVariants && product.colorVariants.length > 0 && (
                         <div className="mb-8">
                             <h3 className="text-sm font-medium text-gray-300 uppercase mb-3">Colors</h3>
@@ -247,8 +283,8 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
                                         onClick={() => setSelectedVariant(color)}
                                         className={`px-4 py-2 rounded-lg border text-sm transition-all inline-flex items-center gap-2 ${
                                             selectedVariant === color
-                                                ? 'border-primary bg-primary/10 text-white'
-                                                : 'border-white/10 bg-white/5 text-gray-300 hover:bg-white/10'
+                                                ? "border-primary bg-primary/10 text-white"
+                                                : "border-white/10 bg-white/5 text-gray-300 hover:bg-white/10"
                                         }`}
                                     >
                                         <span
@@ -257,7 +293,18 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
                                         />
                                         <span>{color.name}</span>
                                         {color.price != null && (
-                                            <span className="ml-1 text-xs opacity-75">LKR {color.price.toLocaleString()}</span>
+                                            <span className="ml-1 text-xs opacity-75">
+                                                {effectiveDiscountPercent > 0 ? (
+                                                    <>
+                                                        LKR {applyDiscountToPrice(color.price).toLocaleString()}
+                                                        <span className="ml-1 opacity-60 line-through">
+                                                            LKR {color.price.toLocaleString()}
+                                                        </span>
+                                                    </>
+                                                ) : (
+                                                    <>LKR {color.price.toLocaleString()}</>
+                                                )}
+                                            </span>
                                         )}
                                     </button>
                                 ))}
@@ -272,12 +319,16 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
                                     <button
                                         onClick={() => setQty(Math.max(1, qty - 1))}
                                         className="px-3 py-2 text-gray-400 hover:text-white"
-                                    >-</button>
+                                    >
+                                        -
+                                    </button>
                                     <span className="w-8 text-center text-white">{qty}</span>
                                     <button
                                         onClick={() => setQty(Math.min(currentStock || 99, qty + 1))}
                                         className="px-3 py-2 text-gray-400 hover:text-white"
-                                    >+</button>
+                                    >
+                                        +
+                                    </button>
                                 </div>
                             )}
 
@@ -285,22 +336,39 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
                                 onClick={handleAddToCart}
                                 disabled={!canAddToCart}
                                 className={`flex-1 py-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all ${
-                                    availability === 'in_stock'
-                                        ? 'bg-primary text-white hover:bg-primary/90'
-                                        : availability === 'pre_order'
-                                            ? 'bg-yellow-500 text-white hover:bg-yellow-500/90'
-                                            : 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                                    availability === "in_stock"
+                                        ? "bg-primary text-white hover:bg-primary/90"
+                                        : availability === "pre_order"
+                                          ? "bg-yellow-500 text-white hover:bg-yellow-500/90"
+                                          : "bg-gray-600 text-gray-400 cursor-not-allowed"
                                 }`}
                             >
-                                {availability === 'in_stock' && <><ShoppingCart className="h-5 w-5" /> Add to Cart</>}
-                                {availability === 'pre_order' && <><Clock className="h-5 w-5" /> Pre-Order Now</>}
-                                {availability === 'out_of_stock' && <><AlertCircle className="h-5 w-5" /> Out of Stock</>}
-                                {availability === 'coming_soon' && <><Package className="h-5 w-5" /> Coming Soon</>}
+                                {availability === "in_stock" && (
+                                    <>
+                                        <ShoppingCart className="h-5 w-5" /> Add to Cart
+                                    </>
+                                )}
+                                {availability === "pre_order" && (
+                                    <>
+                                        <Clock className="h-5 w-5" /> Pre-Order Now
+                                    </>
+                                )}
+                                {availability === "out_of_stock" && (
+                                    <>
+                                        <AlertCircle className="h-5 w-5" /> Out of Stock
+                                    </>
+                                )}
+                                {availability === "coming_soon" && (
+                                    <>
+                                        <Package className="h-5 w-5" /> Coming Soon
+                                    </>
+                                )}
                             </button>
                             <button className="px-6 py-4 glass rounded-xl hover:bg-white/10 transition-all">
                                 <Shield className="h-5 w-5 text-gray-300" />
                             </button>
                         </div>
+
                         <a
                             href={whatsappUrl}
                             target="_blank"
@@ -312,19 +380,18 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
                         </a>
                     </div>
 
-                    <p className="text-gray-400 mb-8 leading-relaxed whitespace-pre-line">
-                        {product.description}
-                    </p>
+                    <p className="text-gray-400 mb-8 leading-relaxed whitespace-pre-line">{product.description}</p>
 
                     {/* Product details (attributes by category) — one box, categories divided inside */}
                     {(() => {
-                        const groups: { category: string; attributes: { name?: string; value: string }[] }[] =
-                            product.attributeGroups?.length
-                                ? product.attributeGroups
-                                : product.attributes?.length
-                                    ? [{ category: "General", attributes: product.attributes }]
-                                    : [];
+                        const groups: { category: string; attributes: { name?: string; value: string }[] }[] = product.attributeGroups?.length
+                            ? product.attributeGroups
+                            : product.attributes?.length
+                              ? [{ category: "General", attributes: product.attributes }]
+                              : [];
+
                         if (groups.length === 0) return null;
+
                         return (
                             <div className="mb-8">
                                 <h3 className="text-base font-semibold text-white mb-4 flex items-center gap-2">
@@ -333,9 +400,7 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
                                 <div className="rounded-xl border border-white/15 bg-white/5 overflow-hidden">
                                     {groups.map((group, idx) => (
                                         <div key={idx} className="px-4 py-4">
-                                            <div className="font-semibold text-white uppercase tracking-wide mb-3">
-                                                {group.category}
-                                            </div>
+                                            <div className="font-semibold text-white uppercase tracking-wide mb-3">{group.category}</div>
                                             <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
                                                 {group.attributes.map((attr, i) => (
                                                     <div key={i}>
@@ -350,9 +415,7 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
                                                     </div>
                                                 ))}
                                             </div>
-                                            {idx < groups.length - 1 && (
-                                                <div className="border-b border-white/10 mt-4" aria-hidden />
-                                            )}
+                                            {idx < groups.length - 1 && <div className="border-b border-white/10 mt-4" aria-hidden />}
                                         </div>
                                     ))}
                                 </div>
@@ -361,6 +424,7 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
                     })()}
                 </motion.div>
             </div>
+
             <PopupDialog
                 open={cartPopupOpen}
                 title="Added to cart"
@@ -373,3 +437,4 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
         </div>
     );
 }
+

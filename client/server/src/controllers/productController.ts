@@ -26,6 +26,71 @@ const hasFilters = (req: Request): boolean => {
     return keys.length > 0;
 };
 
+function normalizeDiscountPercent(input: unknown): number | null {
+    if (input == null) return null;
+    const n = typeof input === 'number' ? input : Number(input);
+    if (!Number.isFinite(n)) return null;
+    if (n <= 0) return null;
+    // Clamp to keep data safe even if someone bypasses UI/API validation
+    return Math.max(0, Math.min(100, n));
+}
+
+function computeEffectiveDiscountPercent(product: any): number | null {
+    // 1) Product-level override wins
+    const productOverride = normalizeDiscountPercent(product?.discountPercent);
+    if (productOverride != null) return productOverride;
+
+    // 2) Otherwise, apply the discount from the product's *first* category.
+    // We support both API response shapes:
+    // - aggregate list route: populated `categories` + raw `categoryIds`
+    // - product detail route: populated `categoryIds` (with discountPercent)
+
+    // If `categoryIds[0]` is already a populated category object, read its discount directly.
+    if (Array.isArray(product?.categoryIds) && product.categoryIds.length > 0) {
+        const first = product.categoryIds[0] as any;
+        const direct = normalizeDiscountPercent(first?.discountPercent);
+        if (direct != null) return direct;
+    }
+
+    const firstCategoryId =
+        Array.isArray(product?.categoryIds) && product.categoryIds.length > 0
+            ? product.categoryIds[0]
+            : null;
+
+    const categoriesFromLookup = Array.isArray(product?.categories) ? product.categories : [];
+    if (firstCategoryId != null && categoriesFromLookup.length > 0) {
+        const match = categoriesFromLookup.find(
+            (c: any) => String(c?._id ?? '') === String(firstCategoryId)
+        );
+        return match ? normalizeDiscountPercent(match?.discountPercent) : null;
+    }
+
+    // Fallback: use the first category document if present (aggregate route only).
+    if (categoriesFromLookup.length > 0) return normalizeDiscountPercent(categoriesFromLookup[0]?.discountPercent);
+
+    return null;
+}
+
+function withDiscountInfo(product: any): any {
+    const originalPrice = typeof product?.price === 'number' ? product.price : Number(product?.price);
+    if (!Number.isFinite(originalPrice)) {
+        return { ...product, originalPrice: null, discountedPrice: null, effectiveDiscountPercent: null };
+    }
+
+    const effectiveDiscountPercent = computeEffectiveDiscountPercent(product);
+    const discountedPrice =
+        effectiveDiscountPercent != null
+            ? Math.round(originalPrice * (1 - effectiveDiscountPercent / 100))
+            : originalPrice;
+
+    return {
+        ...product,
+        originalPrice,
+        discountedPrice,
+        effectiveDiscountPercent,
+    };
+}
+
 export const getProducts = async (req: Request, res: Response) => {
     try {
         // Cache product listing responses at the CDN edge in production.
@@ -56,8 +121,10 @@ export const getProducts = async (req: Request, res: Response) => {
                 Product.countDocuments(matchStage),
             ]);
 
+            const productsWithDiscount = products.map(withDiscountInfo);
+
             return res.json({
-                products,
+                products: productsWithDiscount,
                 pagination: {
                     total,
                     page: pageNum,
@@ -87,8 +154,11 @@ export const getProducts = async (req: Request, res: Response) => {
                 Product.countDocuments({ isActive: true }),
             ]);
             res.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=120');
+
+            const productsWithDiscount = products.map(withDiscountInfo);
+
             return res.json({
-                products,
+                products: productsWithDiscount,
                 pagination: { total, page: pageNum, limit: limitNum, pages: Math.ceil(total / limitNum) },
                 categoryKey: null,
                 featuredMode: 'default_all',
@@ -239,7 +309,7 @@ export const getProducts = async (req: Request, res: Response) => {
 
 
         res.json({
-            products: data.products || [],
+            products: (data.products || []).map(withDiscountInfo),
             pagination: {
                 total,
                 page: pageNum,
@@ -379,13 +449,14 @@ export const getProductBySlug = async (req: Request, res: Response) => {
         const product = byId
             ? await Product.findOne({ _id: slugOrId, isActive: true })
                 .populate('brandId', 'name slug logoUrl')
-                .populate('categoryIds', 'name slug')
+                .populate('categoryIds', 'name slug discountPercent')
             : await Product.findOne({ slug: slugOrId, isActive: true })
                 .populate('brandId', 'name slug logoUrl')
-                .populate('categoryIds', 'name slug');
+                .populate('categoryIds', 'name slug discountPercent');
 
         if (product) {
-            res.json(normalizeProductAttributeGroups(product));
+            const normalized = normalizeProductAttributeGroups(product);
+            res.json(withDiscountInfo(normalized));
         } else {
             res.status(404).json({ message: 'Product not found' });
         }
@@ -412,6 +483,17 @@ function normalizeProductSpecs(specs: Record<string, string> | undefined): Recor
 function normalizeProductAttributeGroups(doc: any): any {
     const pojo = doc && typeof doc.toObject === 'function' ? doc.toObject() : doc;
     if (!pojo) return pojo;
+    // `specs` is stored as `Map` in Mongo. Ensure we serialize it as a plain object
+    // so the admin UI can read values via `Object.entries`.
+    if (pojo.specs && typeof pojo.specs === 'object') {
+        if (pojo.specs instanceof Map) {
+            pojo.specs = Object.fromEntries(pojo.specs.entries());
+        } else if (typeof (pojo.specs as any).toObject === 'function') {
+            pojo.specs = (pojo.specs as any).toObject();
+        } else if (Array.isArray(pojo.specs)) {
+            pojo.specs = {};
+        }
+    }
     if (pojo.attributeGroups && Array.isArray(pojo.attributeGroups) && pojo.attributeGroups.length > 0) {
         return pojo;
     }
@@ -492,10 +574,11 @@ export const getProductById = async (req: Request, res: Response) => {
     try {
         const product = await Product.findById(req.params.id)
             .populate('brandId', 'name slug logoUrl')
-            .populate('categoryIds', 'name slug');
+            .populate('categoryIds', 'name slug discountPercent');
 
         if (product) {
-            res.json(normalizeProductAttributeGroups(product));
+            const normalized = normalizeProductAttributeGroups(product);
+            res.json(withDiscountInfo(normalized));
         } else {
             res.status(404).json({ message: 'Product not found' });
         }

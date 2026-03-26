@@ -1,14 +1,54 @@
 "use client";
 
 import { useCart } from "@/context/CartContext";
+import api from "@/lib/api";
 import Link from "next/link";
 import Image from "next/image";
 import { Trash2, ArrowRight } from "lucide-react";
+import { useState } from "react";
+import toast from "react-hot-toast";
 
 export default function CartPage() {
     const { cartItems, removeFromCart } = useCart();
 
     const total = cartItems.reduce((acc, item) => acc + item.price * item.qty, 0);
+    const [downloadingQuote, setDownloadingQuote] = useState(false);
+
+    const downloadQuotationPdf = async () => {
+        if (cartItems.length === 0) return;
+        setDownloadingQuote(true);
+        try {
+            const payload = {
+                items: cartItems.map((item) => ({
+                    productId: item._id,
+                    title: item.title,
+                    qty: item.qty,
+                    unitPrice: item.price,
+                    image: item.image,
+                })),
+            };
+
+            const response = await api.post("/quotes/pdf", payload, { responseType: "blob" });
+            const blob = response.data;
+            const url = window.URL.createObjectURL(new Blob([blob], { type: "application/pdf" }));
+
+            const a = document.createElement("a");
+            a.href = url;
+            const stamp = new Date().toISOString().slice(0, 10);
+            a.download = `quotation-${stamp}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+
+            window.URL.revokeObjectURL(url);
+            toast.success("Quotation downloaded successfully.");
+        } catch (e) {
+            console.error(e);
+            toast.error("Failed to download quotation.");
+        } finally {
+            setDownloadingQuote(false);
+        }
+    };
 
     if (cartItems.length === 0) {
         return (
@@ -74,9 +114,18 @@ export default function CartPage() {
                             <span>Total</span>
                             <span>LKR {total.toLocaleString()}</span>
                         </div>
+                        <button
+                            type="button"
+                            onClick={downloadQuotationPdf}
+                            disabled={downloadingQuote}
+                            className="w-full bg-accent/20 hover:bg-accent/30 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors mt-4 disabled:opacity-60"
+                        >
+                            {downloadingQuote ? "Generating..." : "Download Quotation (PDF)"}
+                        </button>
+
                         <Link
                             href="/checkout"
-                            className="w-full bg-primary text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-primary/90 mt-4"
+                            className="w-full bg-primary text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-primary/90 mt-3"
                         >
                             Proceed to Checkout <ArrowRight className="h-4 w-4" />
                         </Link>

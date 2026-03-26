@@ -60,13 +60,22 @@ export function ShopContent({
     }, [returnStateStorageKey]);
 
     // Fetch products first (fast path without expensive facets aggregation)
-    const { data, isLoading, isFetching, error } = useProducts({
+    const {
+        data,
+        isLoading,
+        isFetching,
+        error,
+        refetch: refetchProducts,
+    } = useProducts({
         ...filters,
         limit: PRODUCTS_PER_PAGE,
         includeFacets: false,
     });
     // Fetch facets asynchronously so grid can render sooner
-    const { data: facetsData } = useProductFacets(filters);
+    const {
+        data: facetsData,
+        refetch: refetchFacets,
+    } = useProductFacets(filters);
     const products = data?.products || [];
     const facets = (facetsData as any)?.facets || {};
 
@@ -85,6 +94,18 @@ export function ShopContent({
             prevCategoryRef.current = filters.category;
         }
     }, [filters.category]);
+
+    // If the admin updates products/discounts, refetch immediately so discounts are reflected.
+    useEffect(() => {
+        const onAdminProductsUpdated = () => {
+            void refetchProducts();
+            void refetchFacets();
+        };
+        window.addEventListener("admin-products-updated", onAdminProductsUpdated as EventListener);
+        return () => {
+            window.removeEventListener("admin-products-updated", onAdminProductsUpdated as EventListener);
+        };
+    }, [refetchProducts, refetchFacets]);
 
     // Keep state in sync with available specs (removes selected specs that are no longer in facets)
     useEffect(() => {
@@ -492,7 +513,7 @@ export function ShopSkeleton() {
 
 export default function ShopPage() {
     const searchParams = useSearchParams();
-    const initialSearch = (searchParams.get("search") ?? searchParams.get("q") ?? "").trim();
+    const initialSearch = (searchParams?.get("search") ?? searchParams?.get("q") ?? "").trim();
 
     return (
         <div className="min-h-screen bg-[#121212] pb-16 pt-6 sm:pt-10">

@@ -191,6 +191,9 @@ export default function Home() {
                                                         const brandLabel = typeof product.brand === "object" && product.brand !== null
                                                             ? product.brand.name
                                                             : product.brand;
+                                                        const effectiveDiscountPercent = product.effectiveDiscountPercent ?? product.discountPercent ?? null;
+                                                        const originalPrice = product.originalPrice ?? product.price;
+                                                        const discountedPrice = product.discountedPrice ?? product.price;
 
                                                         return (
                                                             <li key={product._id}>
@@ -206,9 +209,19 @@ export default function Home() {
                                                                     <div className="min-w-0">
                                                                         <p className="truncate text-[11px] text-[#8E8E8E]">{brandLabel}</p>
                                                                         <p className="line-clamp-1 text-sm font-semibold text-[#F1F1F1]">{product.title}</p>
-                                                                        <p className="mt-0.5 text-xs font-semibold text-[#D12B28]">
-                                                                            LKR {product.price.toLocaleString()}
-                                                                        </p>
+                                                                        {effectiveDiscountPercent != null && effectiveDiscountPercent > 0 ? (
+                                                                            <p className="mt-0.5 text-xs font-semibold text-[#D12B28] flex items-baseline gap-2">
+                                                                                <span className="text-[#8E8E8E] line-through font-semibold text-[11px]">
+                                                                                    LKR {originalPrice.toLocaleString()}
+                                                                                </span>
+                                                                                <span>LKR {discountedPrice.toLocaleString()}</span>
+                                                                                <span className="text-[10px] text-[#F4C5C5] font-bold">-{effectiveDiscountPercent}%</span>
+                                                                            </p>
+                                                                        ) : (
+                                                                            <p className="mt-0.5 text-xs font-semibold text-[#D12B28]">
+                                                                                LKR {product.price.toLocaleString()}
+                                                                            </p>
+                                                                        )}
                                                                     </div>
                                                                 </Link>
                                                             </li>

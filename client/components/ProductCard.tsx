@@ -24,6 +24,9 @@ export default function ProductCard({
         productPath,
     });
     const colorVariants = product.colorVariants ?? [];
+    const effectiveDiscountPercent = product.effectiveDiscountPercent ?? product.discountPercent ?? null;
+    const originalPrice = product.originalPrice ?? product.price;
+    const discountedPrice = product.discountedPrice ?? product.price;
     const colorNamesFromLegacyVariants = (product.variants ?? [])
         .map((variant) => variant.attributes?.find((a) => (a.name ?? "").toLowerCase() === "color")?.value)
         .filter((value): value is string => Boolean(value && value.trim()));
@@ -34,6 +37,11 @@ export default function ProductCard({
     return (
         <div className="group relative overflow-hidden rounded-2xl border border-[#5E5E5E]/30 bg-[#1a1a1a]/90 transition-colors hover:border-[#D12B28]/40 hover:bg-[#242424]/90">
             <div className="aspect-square relative overflow-hidden bg-[#121212]/80">
+                {effectiveDiscountPercent != null && effectiveDiscountPercent > 0 && (
+                    <div className="absolute top-3 right-3 z-10 rounded-full border border-[#D12B28]/35 bg-[#D12B28]/20 px-3 py-1 text-[10px] font-semibold text-[#F1F1F1] shadow-sm">
+                        Discount {effectiveDiscountPercent}%
+                    </div>
+                )}
                 <img
                     src={product.images?.[0] || "/placeholder.svg"}
                     alt={product.title}
@@ -65,9 +73,20 @@ export default function ProductCard({
                 </div>
 
                 <div className="flex items-center justify-between gap-2 pt-2">
-                    <p className="shrink-0 whitespace-nowrap text-lg font-bold leading-none text-[#F1F1F1]">
-                        LKR {product.price.toLocaleString()}
-                    </p>
+                    {effectiveDiscountPercent != null && effectiveDiscountPercent > 0 ? (
+                        <div className="shrink-0 whitespace-nowrap flex flex-col items-start leading-tight">
+                            <span className="text-xs text-[#8E8E8E] line-through">
+                                LKR {originalPrice.toLocaleString()}
+                            </span>
+                            <p className="text-lg font-bold leading-none text-[#F1F1F1]">
+                                LKR {discountedPrice.toLocaleString()}
+                            </p>
+                        </div>
+                    ) : (
+                        <p className="shrink-0 whitespace-nowrap text-lg font-bold leading-none text-[#F1F1F1]">
+                            LKR {product.price.toLocaleString()}
+                        </p>
+                    )}
                     {showOrderNowButton ? (
                         <Link
                             href={productPath}

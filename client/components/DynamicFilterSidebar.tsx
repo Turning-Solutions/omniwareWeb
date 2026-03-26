@@ -288,7 +288,7 @@ export default function DynamicFilterSidebar({
     };
 
     const handleCategoryChange = (value: string) => {
-        const next = { ...filters };
+        const next = { ...filters, page: 1 };
         if (filters.category === value) {
             delete next.category;
             delete next.brand;

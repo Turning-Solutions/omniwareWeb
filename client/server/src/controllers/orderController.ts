@@ -196,7 +196,10 @@ async function maybeCleanupOldReceipts() {
             .limit(50)
             .lean();
 
-        for (const order of staleOrders as Array<{ _id: string; bankTransferReceipt?: { publicId?: string; resourceType?: 'image' | 'raw' } }>) {
+        for (const order of staleOrders as Array<{
+            _id: mongoose.Types.ObjectId;
+            bankTransferReceipt?: { publicId?: string; resourceType?: 'image' | 'raw' };
+        }>) {
             const publicId = order.bankTransferReceipt?.publicId;
             if (!publicId) continue;
             const resourceType = order.bankTransferReceipt?.resourceType || 'raw';

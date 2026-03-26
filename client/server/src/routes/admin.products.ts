@@ -183,5 +183,48 @@ router.put('/categories/:id', async (req: Request, res: Response) => {
     }
 });
 
+// PUT /api/v1/admin/products/categories/:id/discount
+// Updates the category-wide discount percent that applies to all products in the category.
+router.put('/categories/:id/discount', async (req: Request, res: Response) => {
+    try {
+        const { discountPercent } = req.body as { discountPercent: number | null };
+
+        const before = await Category.findById(req.params.id).lean();
+        if (!before) return res.status(404).json({ message: 'Category not found' });
+
+        let normalized: number | null = null;
+        if (discountPercent == null || discountPercent === '') {
+            normalized = null;
+        } else {
+            const n = Number(discountPercent);
+            if (!Number.isFinite(n)) {
+                return res.status(400).json({ message: 'discountPercent must be a number (0-100) or null' });
+            }
+            if (n < 0 || n > 100) {
+                return res.status(400).json({ message: 'discountPercent must be between 0 and 100' });
+            }
+            normalized = Math.max(0, Math.min(100, Math.round(n)));
+        }
+
+        const updated = await Category.findByIdAndUpdate(
+            req.params.id,
+            { discountPercent: normalized },
+            { returnDocument: 'after' }
+        ).lean();
+
+        await createAuditLog(req, {
+            action: 'UPDATE_CATEGORY_DISCOUNT',
+            entityType: 'Category',
+            entityId: req.params.id,
+            before,
+            after: updated,
+        });
+
+        res.json(updated);
+    } catch (error) {
+        res.status(400).json({ message: (error as Error).message });
+    }
+});
+
 export default router;
 
