@@ -21,11 +21,12 @@ export default function AdminLayout({
     children: React.ReactNode;
 }) {
     const pathname = usePathname();
+    const safePathname = pathname ?? "";
     const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
     const isActive = (href: string) => {
-        if (href === "/admin") return pathname === "/admin";
-        return pathname.startsWith(href);
+        if (href === "/admin") return safePathname === "/admin";
+        return safePathname.startsWith(href);
     };
 
     const currentSection = navItems.find((item) => isActive(item.href))?.label ?? "Admin";

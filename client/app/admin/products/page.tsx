@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { Plus, Search, Edit, Trash2, ChevronLeft, ChevronRight, X } from "lucide-react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { Plus, Search, Edit, Trash2, ChevronLeft, ChevronRight, X, Star } from "lucide-react";
 import Link from "next/link";
 import api from "@/lib/api";
 import { isAxiosError } from "axios";
@@ -17,6 +17,7 @@ interface Product {
     categoryIds: { name: string }[] | null;
     slug: string;
     isActive: boolean;
+    isFeatured?: boolean;
 }
 
 interface Category {
@@ -38,6 +39,8 @@ interface PaginationState {
 
 export default function ProductsPage() {
     const router = useRouter();
+    const pathname = usePathname();
+    const searchParams = useSearchParams();
     const [products, setProducts] = useState<Product[]>([]);
     const [loading, setLoading] = useState(true);
     const [isFetching, setIsFetching] = useState(false);
@@ -46,11 +49,13 @@ export default function ProductsPage() {
     const [brands, setBrands] = useState<Brand[]>([]);
     const [selectedCategory, setSelectedCategory] = useState("");
     const [selectedBrand, setSelectedBrand] = useState("");
+    const [featuredOnly, setFeaturedOnly] = useState(false);
     const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
     const [productToDeleteId, setProductToDeleteId] = useState<string | null>(null);
     const [deletePopup, setDeletePopup] = useState<{ title: string; message: string; tone: "success" | "danger" } | null>(null);
     const [deletingId, setDeletingId] = useState<string | null>(null);
+    const [recentlyUpdatedId, setRecentlyUpdatedId] = useState<string | null>(null);
     const [pagination, setPagination] = useState<PaginationState>({
         page: 1,
         pages: 1,
@@ -76,18 +81,57 @@ export default function ProductsPage() {
     }, []);
 
     useEffect(() => {
+        const updatedId = searchParams?.get("updated");
+        setRecentlyUpdatedId(updatedId || null);
+        if (!updatedId) return;
+        const timer = window.setTimeout(() => setRecentlyUpdatedId(null), 12000);
+        return () => window.clearTimeout(timer);
+    }, [searchParams]);
+
+    useEffect(() => {
+        const applyUpdatedSignal = (updatedId: string | null | undefined) => {
+            if (!updatedId) return;
+            setRecentlyUpdatedId(updatedId);
+            void fetchProducts();
+            window.setTimeout(() => setRecentlyUpdatedId((prev) => (prev === updatedId ? null : prev)), 12000);
+        };
+
+        const onStorage = (event: StorageEvent) => {
+            if (event.key !== "admin-products-updated" || !event.newValue) return;
+            try {
+                const parsed = JSON.parse(event.newValue) as { productId?: string };
+                applyUpdatedSignal(parsed.productId);
+            } catch {
+                // Ignore malformed storage payloads.
+            }
+        };
+
+        const onCustomUpdated = (event: Event) => {
+            const customEvent = event as CustomEvent<{ productId?: string }>;
+            applyUpdatedSignal(customEvent.detail?.productId);
+        };
+
+        window.addEventListener("storage", onStorage);
+        window.addEventListener("admin-products-updated", onCustomUpdated as EventListener);
+        return () => {
+            window.removeEventListener("storage", onStorage);
+            window.removeEventListener("admin-products-updated", onCustomUpdated as EventListener);
+        };
+    }, [selectedCategory, selectedBrand, debouncedSearchTerm, featuredOnly, currentPage]);
+
+    useEffect(() => {
         const handle = window.setTimeout(() => setDebouncedSearchTerm(searchTerm.trim()), 350);
         return () => window.clearTimeout(handle);
     }, [searchTerm]);
 
     useEffect(() => {
         setCurrentPage(1);
-    }, [debouncedSearchTerm, selectedCategory, selectedBrand]);
+    }, [debouncedSearchTerm, selectedCategory, selectedBrand, featuredOnly]);
 
     // Single effect: fetch products on mount and when filters/search change (avoids duplicate calls on load)
     useEffect(() => {
         fetchProducts();
-    }, [selectedCategory, selectedBrand, debouncedSearchTerm, currentPage]);
+    }, [selectedCategory, selectedBrand, debouncedSearchTerm, featuredOnly, currentPage]);
 
     const fetchProducts = async () => {
         setIsFetching(true);
@@ -98,6 +142,7 @@ export default function ProductsPage() {
                 ...(debouncedSearchTerm && { q: debouncedSearchTerm }),
                 ...(selectedCategory && { category: selectedCategory }),
                 ...(selectedBrand && { brand: selectedBrand }),
+                ...(featuredOnly && { isFeatured: "true" }),
                 _t: String(Date.now()),
             });
 
@@ -152,9 +197,25 @@ export default function ProductsPage() {
         }
     };
 
+    const toggleFeatured = async (product: Product) => {
+        try {
+            const next = !product.isFeatured;
+            setProducts((prev) =>
+                prev.map((p) => (p._id === product._id ? { ...p, isFeatured: next } : p))
+            );
+            await api.patch(`/admin/products/${product._id}`, { isFeatured: next });
+        } catch (error) {
+            setProducts((prev) =>
+                prev.map((p) => (p._id === product._id ? { ...p, isFeatured: product.isFeatured } : p))
+            );
+            console.error("Failed to update featured flag", error);
+        }
+    };
+
     const filteredProducts = products; // Filtering handled by API now
-    const hasFilters = Boolean(searchTerm || selectedCategory || selectedBrand);
+    const hasFilters = Boolean(searchTerm || selectedCategory || selectedBrand || featuredOnly);
     const activeCount = filteredProducts.filter((p) => p.isActive).length;
+    const featuredCount = filteredProducts.filter((p) => p.isFeatured).length;
     const inactiveCount = filteredProducts.length - activeCount;
     const lowStockCount = filteredProducts.filter((p) => (p.stock?.qty || 0) > 0 && (p.stock?.qty || 0) <= 5).length;
     const outOfStockCount = filteredProducts.filter((p) => (p.stock?.qty || 0) === 0).length;
@@ -166,6 +227,7 @@ export default function ProductsPage() {
         setDebouncedSearchTerm("");
         setSelectedCategory("");
         setSelectedBrand("");
+        setFeaturedOnly(false);
         setCurrentPage(1);
     };
 
@@ -208,7 +270,7 @@ export default function ProductsPage() {
                             }}
                         />
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-[1fr_1fr_auto] gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-[1fr_1fr_auto_auto] gap-3">
                         <select
                             className="bg-base border border-border-soft rounded-lg px-4 py-2.5 text-main focus:outline-none focus:border-accent [&>option]:text-white"
                             value={selectedCategory}
@@ -235,6 +297,21 @@ export default function ProductsPage() {
                                 <option key={b._id} value={b._id}>{b.name}</option>
                             ))}
                         </select>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setCurrentPage(1);
+                                setFeaturedOnly((prev) => !prev);
+                            }}
+                            className={`inline-flex items-center justify-center gap-2 rounded-lg border px-4 py-2.5 text-sm transition-colors ${
+                                featuredOnly
+                                    ? "border-yellow-400/60 bg-yellow-500/15 text-yellow-300"
+                                    : "border-border-soft text-main hover:bg-base"
+                            }`}
+                        >
+                            <Star className="h-4 w-4" />
+                            {featuredOnly ? "Featured only" : "All products"}
+                        </button>
                         <button
                             type="button"
                             onClick={clearFilters}
@@ -267,6 +344,11 @@ export default function ProductsPage() {
                             Brand: {selectedBrandName || "Selected"}
                         </span>
                     ) : null}
+                    {featuredOnly ? (
+                        <span className="text-xs px-2 py-1 rounded-full bg-yellow-500/10 text-yellow-300 border border-yellow-500/25">
+                            Featured only
+                        </span>
+                    ) : null}
                 </div>
             ) : null}
 
@@ -286,18 +368,33 @@ export default function ProductsPage() {
                                 <th className="px-4 sm:px-6 py-4">Brand</th>
                                 <th className="px-4 sm:px-6 py-4">Category</th>
                                 <th className="px-4 sm:px-6 py-4">Status</th>
+                                <th className="px-4 sm:px-6 py-4">Featured</th>
                                 <th className="px-4 sm:px-6 py-4 text-right">Actions</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-border-soft text-main">
                             {loading ? (
-                                <tr><td colSpan={7} className="px-6 py-8 text-center text-sub">Loading...</td></tr>
+                                <tr><td colSpan={8} className="px-6 py-8 text-center text-sub">Loading...</td></tr>
                             ) : filteredProducts.length === 0 ? (
-                                <tr><td colSpan={7} className="px-6 py-8 text-center text-sub">No products found</td></tr>
+                                <tr><td colSpan={8} className="px-6 py-8 text-center text-sub">No products found</td></tr>
                             ) : (
-                                filteredProducts.map((product) => (
-                                    <tr key={product._id} className="hover:bg-base/50 transition-colors">
-                                        <td className="px-4 sm:px-6 py-4 font-medium max-w-[260px] truncate" title={product.title}>{product.title}</td>
+                                filteredProducts.map((product) => {
+                                    const isRecentlyUpdated = recentlyUpdatedId === product._id;
+                                    const queryString = searchParams?.toString() || "";
+                                    const returnTo = encodeURIComponent(`${pathname}${queryString ? `?${queryString}` : ""}`);
+                                    return (
+                                    <tr
+                                        key={product._id}
+                                        className={`transition-colors ${isRecentlyUpdated ? "bg-accent/10 ring-1 ring-inset ring-accent/50" : "hover:bg-base/50"}`}
+                                    >
+                                        <td className="px-4 sm:px-6 py-4 font-medium max-w-[260px] truncate" title={product.title}>
+                                            <span>{product.title}</span>
+                                            {isRecentlyUpdated ? (
+                                                <span className="ml-2 inline-flex items-center rounded-full bg-accent/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent">
+                                                    Recently updated
+                                                </span>
+                                            ) : null}
+                                        </td>
                                         <td className="px-4 sm:px-6 py-4 whitespace-nowrap">LKR {product.price.toLocaleString()}</td>
                                         <td className="px-4 sm:px-6 py-4 whitespace-nowrap">{product.stock?.qty || 0}</td>
                                         <td className="px-4 sm:px-6 py-4 whitespace-nowrap">{product.brandId?.name || '-'}</td>
@@ -309,9 +406,23 @@ export default function ProductsPage() {
                                                 {product.isActive ? 'Active' : 'Inactive'}
                                             </span>
                                         </td>
+                                        <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
+                                            <button
+                                                type="button"
+                                                onClick={() => void toggleFeatured(product)}
+                                                className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
+                                                    product.isFeatured
+                                                        ? "bg-yellow-500/15 text-yellow-300 hover:bg-yellow-500/20"
+                                                        : "bg-base text-sub hover:text-main"
+                                                }`}
+                                            >
+                                                <Star className={`h-3.5 w-3.5 ${product.isFeatured ? "fill-yellow-300 text-yellow-300" : "text-sub"}`} />
+                                                {product.isFeatured ? "Featured" : "Add"}
+                                            </button>
+                                        </td>
                                         <td className="px-4 sm:px-6 py-4 text-right">
                                             <div className="flex justify-end gap-2">
-                                                <Link href={`/admin/products/${product._id}`} className="p-2 hover:bg-base rounded-lg text-accent transition-colors" title="Edit product">
+                                                <Link href={`/admin/products/${product._id}?returnTo=${returnTo}`} className="p-2 hover:bg-base rounded-lg text-accent transition-colors" title="Edit product">
                                                     <Edit className="h-4 w-4" />
                                                 </Link>
                                                 <button
@@ -325,7 +436,7 @@ export default function ProductsPage() {
                                             </div>
                                         </td>
                                     </tr>
-                                ))
+                                )})
                             )}
                         </tbody>
                     </table>

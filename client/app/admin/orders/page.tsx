@@ -8,6 +8,7 @@ import api from "@/lib/api";
 interface Order {
     _id: string;
     user: { name: string; email: string } | null;
+    customer?: { name?: string; email?: string; phone?: string };
     totalPrice: number;
     status: string;
     isPaid: boolean;
@@ -66,14 +67,18 @@ export default function AdminOrdersPage() {
 
     const getStatusColor = (status: string) => {
         switch (status) {
-            case 'paid': return 'text-green-400 bg-green-400/10';
+            case 'confirmed': return 'text-blue-400 bg-blue-400/10';
+            case 'preparing': return 'text-purple-400 bg-purple-400/10';
+            case 'ready_for_pickup': return 'text-cyan-400 bg-cyan-400/10';
+            case 'out_for_delivery': return 'text-indigo-400 bg-indigo-400/10';
             case 'delivered': return 'text-green-400 bg-green-400/10';
-            case 'shipped': return 'text-blue-400 bg-blue-400/10';
-            case 'pending': return 'text-yellow-400 bg-yellow-400/10';
-            case 'cancelled': return 'text-red-400 bg-red-400/10';
+            case 'waiting_confirmation': return 'text-yellow-400 bg-yellow-400/10';
+            case 'rejected': return 'text-red-400 bg-red-400/10';
             default: return 'text-gray-400 bg-gray-400/10';
         }
     };
+
+    const formatOrderNumber = (orderId: string) => `ORD-${orderId.slice(-8).toUpperCase()}`;
 
     return (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -99,11 +104,13 @@ export default function AdminOrdersPage() {
                         onChange={(e) => setStatus(e.target.value)}
                     >
                         <option value="">All Statuses</option>
-                        <option value="pending">Pending</option>
-                        <option value="paid">Paid</option>
-                        <option value="shipped">Shipped</option>
+                        <option value="waiting_confirmation">Waiting Confirmation</option>
+                        <option value="confirmed">Confirmed</option>
+                        <option value="preparing">Preparing</option>
+                        <option value="ready_for_pickup">Ready for Pickup</option>
+                        <option value="out_for_delivery">Out for Delivery</option>
                         <option value="delivered">Delivered</option>
-                        <option value="cancelled">Cancelled</option>
+                        <option value="rejected">Rejected</option>
                     </select>
                     <select
                         className="bg-base border border-border-soft rounded-lg px-4 py-2 text-main text-sm focus:outline-none focus:border-accent [&>option]:text-white"
@@ -123,7 +130,7 @@ export default function AdminOrdersPage() {
                     <table className="w-full text-left">
                         <thead className="bg-base text-sub uppercase text-xs">
                             <tr>
-                                <th className="px-4 sm:px-6 py-4">Order ID</th>
+                                <th className="px-4 sm:px-6 py-4">Order No</th>
                                 <th className="px-4 sm:px-6 py-4">Customer</th>
                                 <th className="px-4 sm:px-6 py-4">Date</th>
                                 <th className="px-4 sm:px-6 py-4">Total</th>
@@ -139,16 +146,22 @@ export default function AdminOrdersPage() {
                             ) : (
                                 orders.map((order) => (
                                     <tr key={order._id} className="hover:bg-base/50 transition-colors">
-                                        <td className="px-4 sm:px-6 py-4 font-mono text-xs whitespace-nowrap">{order._id}</td>
+                                        <td className="px-4 sm:px-6 py-4 font-mono text-xs whitespace-nowrap">
+                                            {formatOrderNumber(order._id)}
+                                        </td>
                                         <td className="px-4 sm:px-6 py-4 min-w-[180px]">
-                                            <div className="text-sm font-medium">{order.user?.name || 'Unknown'}</div>
-                                            <div className="text-xs text-sub">{order.user?.email}</div>
+                                            <div className="text-sm font-medium">
+                                                {order.customer?.name || order.user?.name || 'Unknown'}
+                                            </div>
+                                            <div className="text-xs text-sub">
+                                                {order.user?.email || order.customer?.email || 'N/A'}
+                                            </div>
                                         </td>
                                         <td className="px-4 sm:px-6 py-4 text-sm whitespace-nowrap">{new Date(order.createdAt).toLocaleDateString()}</td>
                                         <td className="px-4 sm:px-6 py-4 text-sm whitespace-nowrap">LKR {order.totalPrice.toLocaleString()}</td>
                                         <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
                                             <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
-                                                {order.status}
+                                                {order.status.replace(/_/g, ' ')}
                                             </span>
                                         </td>
                                         <td className="px-4 sm:px-6 py-4 text-right">

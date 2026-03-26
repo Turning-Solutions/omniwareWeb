@@ -41,6 +41,19 @@ interface ColorVariant {
 }
 
 const DEFAULT_ATTRIBUTE_GROUP_NAME = "Specifications";
+const WARRANTY_OPTIONS = [
+    "6 Months",
+    "1 Year",
+    "2 Years",
+    "3 Years",
+    "4 Years",
+    "5 Years",
+    "6 Years",
+    "7 Years",
+    "8 Years",
+    "9 Years",
+    "10 Years",
+] as const;
 
 const COLOR_NAME_TO_HEX: Record<string, string> = {
     black: "#000000",
@@ -122,6 +135,17 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
     const [selectedAttributeKeys, setSelectedAttributeKeys] = useState<Set<string>>(new Set());
     const previewTarget = !isNew ? (formData.slug?.trim() || id) : "";
     const previewPath = previewTarget ? `/product/${previewTarget}?preview=${previewRefreshKey}` : "";
+
+    const notifyProductsListUpdated = (productId: string) => {
+        if (typeof window === "undefined") return;
+        const payload = { productId, at: Date.now() };
+        try {
+            window.localStorage.setItem("admin-products-updated", JSON.stringify(payload));
+        } catch {
+            // Ignore storage failures; same-tab custom event still updates listeners.
+        }
+        window.dispatchEvent(new CustomEvent("admin-products-updated", { detail: payload }));
+    };
 
     useEffect(() => {
         const fetchData = async () => {
@@ -253,6 +277,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
             } else {
                 await api.patch(`/admin/products/${id}`, payload);
                 toast.success("Product saved successfully");
+                notifyProductsListUpdated(id);
                 setPreviewRefreshKey((prev) => prev + 1);
             }
         } catch (error) {
@@ -664,6 +689,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
     if (initialLoading && !isNew) return <div className="p-10 text-center text-main">Loading...</div>;
 
     const sectionClass = "rounded-xl border border-border-soft bg-base/30 p-4 sm:p-6";
+    const warrantyValueExists = WARRANTY_OPTIONS.includes(formData.warranty as (typeof WARRANTY_OPTIONS)[number]);
 
     return (
         <div className="mx-auto w-full max-w-[1500px] px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
@@ -740,13 +766,23 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                         </div>
                         <div className="space-y-2">
                             <label className="text-sub text-sm">Warranty (Optional)</label>
-                            <input
-                                type="text"
-                                placeholder="e.g. 12 Months"
+                            <select
                                 className="w-full bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent"
                                 value={formData.warranty}
                                 onChange={(e) => setFormData({ ...formData, warranty: e.target.value })}
-                            />
+                            >
+                                <option value="">Select warranty</option>
+                                {!warrantyValueExists && formData.warranty ? (
+                                    <option value={formData.warranty}>
+                                        {formData.warranty}
+                                    </option>
+                                ) : null}
+                                {WARRANTY_OPTIONS.map((option) => (
+                                    <option key={option} value={option}>
+                                        {option}
+                                    </option>
+                                ))}
+                            </select>
                         </div>
 
                         <div className="space-y-2">

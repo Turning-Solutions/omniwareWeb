@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { ShoppingCart, User, Menu, X } from "lucide-react";
+import { ShoppingCart, Menu, X } from "lucide-react";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useCart } from "@/context/CartContext";
@@ -78,13 +78,6 @@ export default function Navbar() {
                                 </span>
                             )}
                         </Link>
-                        <Link
-                            href="/account"
-                            className="flex h-9 w-9 items-center justify-center rounded-full text-zinc-400 transition-colors hover:bg-white/[0.08] hover:text-white"
-                            aria-label="Account"
-                        >
-                            <User className="h-[1.125rem] w-[1.125rem]" strokeWidth={1.75} />
-                        </Link>
                     </div>
                 </div>
 
@@ -140,15 +133,6 @@ export default function Navbar() {
                                     </Link>
                                 );
                             })}
-                            <div className="my-2 border-t border-white/[0.06] pt-2">
-                                <Link
-                                    href="/account"
-                                    className="block rounded-xl px-3 py-2.5 text-[15px] font-medium text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-100"
-                                    onClick={() => setIsOpen(false)}
-                                >
-                                    Account
-                                </Link>
-                            </div>
                         </div>
                     </motion.div>
                 )}

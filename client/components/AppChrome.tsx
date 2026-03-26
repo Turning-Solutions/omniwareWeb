@@ -6,7 +6,7 @@ import Footer from "@/components/Footer";
 
 export default function AppChrome({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
-    const isAdminRoute = pathname.startsWith("/admin");
+    const isAdminRoute = (pathname ?? "").startsWith("/admin");
 
     return (
         <>

@@ -1,8 +1,8 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { motion } from "framer-motion";
+import { useRouter } from "next/navigation";
 import {
     ArrowRight,
     Cpu,
@@ -12,36 +12,58 @@ import {
     Search,
     ShieldCheck,
     Truck,
-    Zap
+    X,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useProducts } from "@/hooks/useProducts";
 import ProductCard from "@/components/ProductCard";
-import ImageSlider from "@/components/ImageSlider";
 import PromotionStripe from "@/components/PromotionStripe";
 import LoadingAnimation from "@/components/LoadingAnimation";
 
+const SEARCH_PREVIEW_DEBOUNCE_MS = 320;
+
 export default function Home() {
     const router = useRouter();
-    const [searchQuery, setSearchQuery] = useState("");
+    const [searchDraft, setSearchDraft] = useState("");
+    const [previewQuery, setPreviewQuery] = useState("");
 
-    // Fetch featured products (assuming we can filter by isFeatured or just take latest)
-    // For now, let's take latest products as "featured" or "special offers"
-    const { data: featuredData, isLoading: loadingFeatured, isFetching: fetchingFeatured } = useProducts({ limit: 4, sort: 'newest' });
+    const { data: featuredData, isLoading: loadingFeatured, isFetching: fetchingFeatured } = useProducts({
+        limit: 4,
+        sort: "newest",
+        isFeatured: true,
+        includeFacets: false,
+    });
     const featuredProducts = featuredData?.products || [];
+    const normalizedPreviewQuery = previewQuery.trim();
+    const shouldShowPreview = normalizedPreviewQuery.length > 0;
+    const { data: previewData, isFetching: loadingPreview } = useProducts({
+        search: shouldShowPreview ? normalizedPreviewQuery : undefined,
+        limit: 4,
+        sort: "newest",
+    });
+    const previewProducts = shouldShowPreview ? (previewData?.products || []).slice(0, 4) : [];
 
-    const handleSearch = (e: FormEvent) => {
-        e.preventDefault();
-        if (searchQuery.trim()) {
-            router.push(`/shop?search=${encodeURIComponent(searchQuery)}`);
-        }
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setPreviewQuery(searchDraft);
+        }, SEARCH_PREVIEW_DEBOUNCE_MS);
+        return () => clearTimeout(timer);
+    }, [searchDraft]);
+
+    const clearSearch = () => {
+        setSearchDraft("");
+        setPreviewQuery("");
     };
 
-    const heroSlides = [
-        "https://images.unsplash.com/photo-1587202372775-e229f172b9d7?q=80&w=2574&auto=format&fit=crop",
-        "https://images.unsplash.com/photo-1593640408182-31c70c8268f5?q=80&w=2574&auto=format&fit=crop",
-        "https://images.unsplash.com/photo-1624705002806-5d72df19c3ad?q=80&w=2664&auto=format&fit=crop"
-    ];
+    const runFullSearch = () => {
+        const q = searchDraft.trim();
+        if (q) {
+            router.push(`/shop?search=${encodeURIComponent(q)}`);
+        }
+    };
+    const handleSearchSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        runFullSearch();
+    };
 
     /** Paths use Category.slug from your database (see /admin categories). */
     const categories = [
@@ -72,119 +94,187 @@ export default function Home() {
 
     return (
         <div className="flex flex-col min-h-screen bg-[#121212] text-[#F1F1F1]">
-            {/* Store Hero — split layout + sliding imagery */}
-            <section className="relative isolate pt-6 pb-12 sm:pt-8 sm:pb-14 lg:pt-10 lg:pb-16">
-                <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(209,43,40,0.12),transparent)]" />
-                <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-                    <div className="overflow-hidden rounded-[1.75rem] border border-[#5E5E5E]/40 bg-[#181818] shadow-[0_24px_80px_rgba(0,0,0,0.45)] lg:grid lg:min-h-[min(560px,78vh)] lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)]">
-                        {/* Copy + actions */}
-                        <div className="order-2 flex flex-col justify-center border-t border-[#5E5E5E]/30 p-6 sm:p-8 lg:order-1 lg:border-t-0 lg:border-r lg:border-[#5E5E5E]/30 lg:p-10 xl:p-12">
-                            <motion.div
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ duration: 0.5 }}
-                            >
-                                <span className="inline-flex items-center gap-2 rounded-full border border-[#5E5E5E]/70 bg-[#242424] px-3 py-1 text-xs font-medium uppercase tracking-[0.14em] text-[#B0B0B0]">
-                                    <Zap className="h-3.5 w-3.5 text-[#D12B28]" />
-                                    Performance Storefront
-                                </span>
+            <PromotionStripe asHero />
 
-                                <h1 className="mt-5 text-4xl font-extrabold tracking-tight text-[#F1F1F1] sm:text-5xl lg:text-[2.75rem] lg:leading-[1.1] xl:text-6xl">
-                                    Build around
-                                    <span className="block text-[#D12B28]">better hardware.</span>
-                                </h1>
+            {/* Search & Browse */}
+            <section className="pb-8 pt-2 sm:pb-10">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <div className="relative overflow-hidden rounded-[1.75rem] border border-white/[0.08] bg-[#0D0D0D] shadow-[0_24px_80px_rgba(0,0,0,0.55)]">
 
-                                <p className="mt-4 max-w-md text-[15px] leading-7 text-[#B0B0B0]">
-                                    GPUs, CPUs, memory, and storage, browse a focused catalog with live sliding highlights from the shop floor.
-                                </p>
+                        {/* top accent line */}
+                        <div className="absolute inset-x-0 top-0 h-px bg-[linear-gradient(to_right,transparent_5%,rgba(209,43,40,0.7)_50%,transparent_95%)]" />
+                        {/* ambient glows */}
+                        <div className="pointer-events-none absolute -right-32 -top-32 h-72 w-72 rounded-full bg-[#D12B28]/10 blur-3xl" />
+                        <div className="pointer-events-none absolute -left-24 bottom-0 h-56 w-56 rounded-full bg-[#D12B28]/6 blur-3xl" />
 
-                                <motion.form
-                                    initial={{ opacity: 0, y: 12 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ delay: 0.12 }}
-                                    onSubmit={handleSearch}
-                                    className="relative mt-7 max-w-md"
-                                >
-                                    <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[#8E8E8E]" />
+                        {/* Search area */}
+                        <div className="p-5 sm:p-7 lg:p-8">
+
+                            {/* label row */}
+                            <div className="mb-4 flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <span className="inline-flex h-1.5 w-1.5 rounded-full bg-[#D12B28] shadow-[0_0_6px_#D12B28]" />
+                                    <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.22em] text-[#D12B28]/80">
+                                        Find Items
+                                    </span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <Link
+                                        href="/shop"
+                                        className="inline-flex items-center gap-1.5 rounded-lg bg-[#D12B28] px-3.5 py-1.5 text-xs font-semibold text-white shadow-[0_0_14px_rgba(209,43,40,0.4)] transition hover:bg-[#E53A36]"
+                                    >
+                                        Shop All <ArrowRight className="h-3.5 w-3.5" />
+                                    </Link>
+                                    <Link
+                                        href="/services"
+                                        className="inline-flex items-center gap-1.5 rounded-lg border border-white/12 bg-white/[0.04] px-3.5 py-1.5 text-xs font-semibold text-white/80 transition hover:border-[#D12B28]/40 hover:text-white"
+                                    >
+                                        Build Help
+                                    </Link>
+                                </div>
+                            </div>
+
+                            {/* Search bar — matches shop page behaviour */}
+                            <form id="home-search-form" role="search" onSubmit={handleSearchSubmit} className="relative">
+                                <label className="sr-only" htmlFor="home-search">Search products</label>
+                                <div className="group relative flex min-h-[3.25rem] items-center gap-3 rounded-2xl border border-white/10 bg-[#161616] px-4 py-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition-[border-color,box-shadow] focus-within:border-[#D12B28]/60 focus-within:shadow-[0_0_0_3px_rgba(209,43,40,0.18),inset_0_1px_0_rgba(255,255,255,0.05)]">
+                                    <Search
+                                        className="pointer-events-none h-5 w-5 shrink-0 text-[#555] transition-colors group-focus-within:text-[#D12B28]"
+                                        aria-hidden
+                                    />
                                     <input
+                                        id="home-search"
                                         type="text"
+                                        name="q"
                                         enterKeyHint="search"
                                         autoComplete="off"
                                         autoCorrect="off"
                                         spellCheck={false}
-                                        placeholder="Search RTX, Ryzen, DDR5, NVMe..."
-                                        value={searchQuery}
-                                        onChange={(e) => setSearchQuery(e.target.value)}
-                                        className="w-full rounded-2xl border border-[#5E5E5E] bg-[#121212] py-3.5 pl-12 pr-[5.5rem] text-[#F1F1F1] caret-[#D12B28] placeholder:text-[#8E8E8E] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] focus:outline-none focus:ring-2 focus:ring-[#D12B28]/60"
+                                        placeholder="Search GPUs, CPUs, RAM, SSDs, PSUs..."
+                                        value={searchDraft}
+                                        onChange={(e) => setSearchDraft(e.target.value)}
+                                        className="min-w-0 flex-1 border-0 bg-transparent py-1 text-[15px] text-[#F1F1F1] caret-[#D12B28] placeholder:text-[#444] focus:outline-none focus:ring-0 sm:text-base"
                                     />
+                                    {searchDraft && (
+                                        <button
+                                            type="button"
+                                            onClick={clearSearch}
+                                            aria-label="Clear search"
+                                            className="rounded-lg p-1.5 text-[#555] transition hover:bg-white/10 hover:text-[#F1F1F1]"
+                                        >
+                                            <X className="h-4 w-4" />
+                                        </button>
+                                    )}
                                     <button
                                         type="submit"
-                                        className="absolute right-2 top-1/2 -translate-y-1/2 rounded-xl bg-[#D12B28] px-4 py-2 text-sm font-semibold text-[#F1F1F1] transition hover:bg-[#E53A36]"
+                                        className="shrink-0 rounded-xl bg-[#D12B28] px-5 py-2 text-sm font-bold text-white shadow-[0_0_16px_rgba(209,43,40,0.35)] transition hover:bg-[#E53A36] hover:shadow-[0_0_24px_rgba(209,43,40,0.5)]"
                                     >
                                         Search
                                     </button>
-                                </motion.form>
+                                </div>
 
-                                <motion.div
-                                    initial={{ opacity: 0, y: 12 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ delay: 0.2 }}
-                                    className="mt-6 flex flex-wrap gap-3"
-                                >
-                                    <Link
-                                        href="/shop"
-                                        className="inline-flex items-center gap-2 rounded-xl bg-[#D12B28] px-5 py-3 text-sm font-semibold text-[#F1F1F1] transition hover:bg-[#E53A36] hover:shadow-[0_0_24px_rgba(209,43,40,0.35)]"
-                                    >
-                                        Shop All Parts <ArrowRight className="h-4 w-4" />
-                                    </Link>
-                                    <Link
-                                        href="/services"
-                                        className="inline-flex items-center gap-2 rounded-xl border border-[#5E5E5E] bg-[#242424] px-5 py-3 text-sm font-semibold text-[#F1F1F1] transition hover:border-[#D12B28]/50"
-                                    >
-                                        Build Consultation
-                                    </Link>
-                                </motion.div>
+                                {shouldShowPreview && (
+                                    <div className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-30 overflow-hidden rounded-xl border border-white/[0.08] bg-[#131313] shadow-[0_20px_50px_rgba(0,0,0,0.6)]">
+                                        {loadingPreview ? (
+                                            <div className="space-y-2 p-3">
+                                                {[...Array(4)].map((_, idx) => (
+                                                    <div key={idx} className="h-16 animate-pulse rounded-lg border border-white/8 bg-white/[0.03]" />
+                                                ))}
+                                            </div>
+                                        ) : previewProducts.length === 0 ? (
+                                            <div className="p-4 text-sm text-[#8E8E8E]">No matching products found.</div>
+                                        ) : (
+                                            <>
+                                                <ul className="max-h-80 overflow-y-auto p-2">
+                                                    {previewProducts.map((product) => {
+                                                        const productPath = `/product/${product.slug || product._id}`;
+                                                        const brandLabel = typeof product.brand === "object" && product.brand !== null
+                                                            ? product.brand.name
+                                                            : product.brand;
 
-                                {/* Category strip */}
-                                <motion.div
-                                    initial={{ opacity: 0, y: 12 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ delay: 0.28 }}
-                                    className="mt-8 flex flex-wrap gap-2"
-                                >
-                                    {categories.map((category) => {
-                                        const Icon = category.icon;
-                                        return (
-                                            <Link
-                                                key={category.label}
-                                                href={category.href}
-                                                className="inline-flex items-center gap-2 rounded-full border border-[#5E5E5E]/60 bg-[#242424] px-3.5 py-1.5 text-xs font-medium text-[#B0B0B0] transition hover:border-[#D12B28]/50 hover:text-[#F1F1F1]"
-                                            >
-                                                <Icon className="h-3.5 w-3.5 text-[#D12B28]" />
-                                                {category.label}
-                                            </Link>
-                                        );
-                                    })}
-                                    <Link
-                                        href="/shop"
-                                        className="inline-flex items-center gap-1.5 rounded-full border border-transparent px-3 py-1.5 text-xs text-[#8E8E8E] transition hover:text-[#F1F1F1]"
+                                                        return (
+                                                            <li key={product._id}>
+                                                                <Link
+                                                                    href={productPath}
+                                                                    className="group flex items-center gap-3 rounded-lg p-2 transition hover:bg-white/[0.06]"
+                                                                >
+                                                                    <img
+                                                                        src={product.images?.[0] || "/placeholder.svg"}
+                                                                        alt={product.title}
+                                                                        className="h-12 w-12 rounded-md object-cover"
+                                                                    />
+                                                                    <div className="min-w-0">
+                                                                        <p className="truncate text-[11px] text-[#8E8E8E]">{brandLabel}</p>
+                                                                        <p className="line-clamp-1 text-sm font-semibold text-[#F1F1F1]">{product.title}</p>
+                                                                        <p className="mt-0.5 text-xs font-semibold text-[#D12B28]">
+                                                                            LKR {product.price.toLocaleString()}
+                                                                        </p>
+                                                                    </div>
+                                                                </Link>
+                                                            </li>
+                                                        );
+                                                    })}
+                                                </ul>
+                                                <button
+                                                    type="button"
+                                                    onClick={runFullSearch}
+                                                    className="w-full border-t border-white/[0.06] px-4 py-2.5 text-sm font-semibold text-[#D12B28] transition hover:bg-white/[0.03] hover:text-[#F1F1F1]"
+                                                >
+                                                    View all results for &quot;{normalizedPreviewQuery}&quot;
+                                                </button>
+                                            </>
+                                        )}
+                                    </div>
+                                )}
+                            </form>
+
+                            {/* Trending chips */}
+                            <div className="mt-3 flex flex-wrap items-center gap-2">
+                                <span className="font-mono text-[10px] uppercase tracking-widest text-[#444]">Hot:</span>
+                                {["RTX 5090", "Ryzen 9 9950X", "DDR5 32GB", "Gen5 NVMe", "X870E"].map((term) => (
+                                    <button
+                                        key={term}
+                                        type="button"
+                                        onClick={() => setSearchDraft(term)}
+                                        className="rounded-md border border-white/[0.07] bg-white/[0.03] px-2.5 py-1 font-mono text-[11px] text-[#888] transition hover:border-[#D12B28]/40 hover:bg-[#D12B28]/8 hover:text-[#F1F1F1]"
                                     >
-                                        More <ArrowRight className="h-3 w-3" />
-                                    </Link>
-                                </motion.div>
-                            </motion.div>
+                                        {term}
+                                    </button>
+                                ))}
+                            </div>
+
                         </div>
 
-                        {/* Sliding hero visuals */}
-                        <div className="relative order-1 min-h-[220px] h-[38vh] sm:min-h-[280px] sm:h-[42vh] lg:order-2 lg:h-full lg:min-h-0">
-                            <ImageSlider images={heroSlides} variant="hero" autoPlayInterval={5500} />
+                        {/* Category cards */}
+                        <div className="border-t border-white/[0.05] px-5 pb-5 pt-4 sm:px-7 sm:pb-7 lg:px-8 lg:pb-8">
+                            <p className="mb-3 font-mono text-[10px] uppercase tracking-widest text-[#3A3A3A]">// Browse by category</p>
+                            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                                {categories.map((category) => {
+                                    const Icon = category.icon;
+                                    return (
+                                        <Link
+                                            key={category.label}
+                                            href={category.href}
+                                            className="group relative flex flex-col items-start gap-3 overflow-hidden rounded-xl border border-white/[0.07] bg-[#161616] p-4 transition hover:border-[#D12B28]/40 hover:bg-[#1A1A1A]"
+                                        >
+                                            <div className="pointer-events-none absolute right-0 top-0 h-20 w-20 translate-x-6 -translate-y-6 rounded-full bg-[#D12B28]/0 blur-2xl transition-all duration-500 group-hover:bg-[#D12B28]/15" />
+                                            <div className="rounded-lg border border-white/[0.07] bg-white/[0.04] p-2.5 transition group-hover:border-[#D12B28]/30 group-hover:bg-[#D12B28]/10">
+                                                <Icon className="h-4 w-4 text-[#D12B28]" />
+                                            </div>
+                                            <div>
+                                                <p className="text-sm font-semibold text-[#E0E0E0] transition group-hover:text-white">{category.label}</p>
+                                                <p className="mt-0.5 flex items-center gap-1 text-[11px] text-[#555] transition group-hover:text-[#D12B28]/80">
+                                                    Browse <ArrowRight className="h-3 w-3" />
+                                                </p>
+                                            </div>
+                                        </Link>
+                                    );
+                                })}
+                            </div>
                         </div>
                     </div>
                 </div>
             </section>
-
-            {/* Promotion Stripe — only renders when there are active promotions */}
-            <PromotionStripe />
 
             {/* Featured Shelf */}
             <section className="border-y border-[#5E5E5E]/30 bg-[#181818] py-14">
@@ -193,7 +283,7 @@ export default function Home() {
                         <div className="mb-8 flex justify-between items-end">
                             <div>
                                 <h2 className="text-3xl font-bold text-[#F1F1F1] mb-2">Featured Components</h2>
-                                <p className="text-[#B0B0B0]">Current standout picks for modern high-performance builds.</p>
+                                
                             </div>
                             <Link href="/shop" className="text-[#D12B28] hover:text-[#F1F1F1] transition-colors flex items-center gap-2">
                                 View All <ArrowRight className="h-4 w-4" />
@@ -206,11 +296,20 @@ export default function Home() {
                                     <div key={i} className="rounded-xl aspect-[3/4] animate-pulse border border-[#5E5E5E]/40 bg-[#242424]" />
                                 ))}
                             </div>
+                        ) : featuredProducts.length === 0 ? (
+                            <div className="rounded-2xl border border-[#5E5E5E]/35 bg-[#181818] px-6 py-10 text-center text-[#8E8E8E]">
+                                No featured products.
+                            </div>
                         ) : (
                             <div className="relative">
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                                     {featuredProducts.map((product) => (
-                                        <ProductCard key={product._id} product={product} />
+                                        <ProductCard
+                                            key={product._id}
+                                            product={product}
+                                            showWhatsAppButton={false}
+                                            showOrderNowButton
+                                        />
                                     ))}
                                 </div>
                                 {fetchingFeatured && (

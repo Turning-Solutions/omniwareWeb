@@ -1,14 +1,15 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
+import { useState, useEffect, useRef, use } from "react";
 import Link from "next/link";
-import { ArrowLeft, Package, User, MapPin, CreditCard, Calendar } from "lucide-react";
+import { ArrowLeft, Package, User, MapPin, CreditCard, Calendar, ChevronDown, Check } from "lucide-react";
 import api from "@/lib/api";
 import PopupDialog from "@/components/PopupDialog";
 
 interface OrderDetails {
     _id: string;
     user: { name: string; email: string } | null;
+    customer?: { name?: string; email?: string; phone?: string };
     orderItems: Array<{
         name: string;
         qty: number;
@@ -23,6 +24,14 @@ interface OrderDetails {
         country: string;
     };
     paymentMethod: string;
+    bankTransferReceipt?: {
+        url?: string;
+        publicId?: string;
+        resourceType?: "image" | "raw";
+        format?: string;
+        bytes?: number;
+        uploadedAt?: string;
+    };
     itemsPrice: number;
     taxPrice: number;
     shippingPrice: number;
@@ -33,6 +42,64 @@ interface OrderDetails {
     deliveredAt?: string;
     status: string;
     createdAt: string;
+}
+
+const STATUS_LABELS: Record<string, string> = {
+    waiting_confirmation: "Waiting Confirmation",
+    confirmed: "Confirmed",
+    rejected: "Rejected",
+    preparing: "Preparing",
+    ready_for_pickup: "Ready for Pickup",
+    out_for_delivery: "Out for Delivery",
+    delivered: "Delivered",
+    pending: "Pending",
+    paid: "Paid",
+    shipped: "Shipped",
+    cancelled: "Cancelled",
+    refunded: "Refunded",
+};
+
+const STATUS_TRANSITIONS: Record<string, string[]> = {
+    waiting_confirmation: ["confirmed", "rejected"],
+    confirmed: ["preparing", "ready_for_pickup", "out_for_delivery", "delivered", "rejected"],
+    preparing: ["ready_for_pickup", "out_for_delivery", "delivered"],
+    ready_for_pickup: ["delivered"],
+    out_for_delivery: ["delivered"],
+    delivered: [],
+    rejected: [],
+    pending: ["confirmed", "rejected"],
+    paid: ["preparing", "ready_for_pickup", "out_for_delivery", "delivered", "rejected"],
+    shipped: ["delivered"],
+    cancelled: [],
+    refunded: [],
+};
+
+function statusLabel(status: string): string {
+    return STATUS_LABELS[status] || status.replace(/_/g, " ");
+}
+
+function normalizeReceiptUrl(url: string, publicId?: string, resourceType?: "image" | "raw"): string {
+    if (!url) return "";
+
+    // Repair older records that accidentally stored duplicated folder segments.
+    const deduped = url.replace(
+        "/omniware/order-receipts/omniware/order-receipts/",
+        "/omniware/order-receipts/"
+    );
+
+    // If we have publicId + cloud name, build canonical delivery URL.
+    try {
+        const parsed = new URL(deduped);
+        const cloudName = parsed.pathname.split("/")[1];
+        if (cloudName && publicId) {
+            const safePublicId = publicId.replace(/^\/+/, "");
+            const type = resourceType === "raw" ? "raw" : "image";
+            return `https://res.cloudinary.com/${cloudName}/${type}/upload/${safePublicId}`;
+        }
+    } catch {
+        // fall through
+    }
+    return deduped;
 }
 
 interface PageProps {
@@ -48,10 +115,24 @@ export default function AdminOrderDetailsPage({ params }: PageProps) {
     const [updating, setUpdating] = useState(false);
     const [pendingStatus, setPendingStatus] = useState<string | null>(null);
     const [statusErrorOpen, setStatusErrorOpen] = useState(false);
+    const [statusMenuOpen, setStatusMenuOpen] = useState(false);
+    const statusMenuRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         fetchOrder();
     }, [id]);
+
+    useEffect(() => {
+        const onDocMouseDown = (e: MouseEvent) => {
+            if (statusMenuRef.current && !statusMenuRef.current.contains(e.target as Node)) {
+                setStatusMenuOpen(false);
+            }
+        };
+        if (statusMenuOpen) {
+            document.addEventListener("mousedown", onDocMouseDown);
+            return () => document.removeEventListener("mousedown", onDocMouseDown);
+        }
+    }, [statusMenuOpen]);
 
     const fetchOrder = async () => {
         try {
@@ -77,6 +158,17 @@ export default function AdminOrderDetailsPage({ params }: PageProps) {
         }
     };
 
+    const receiptUrl = normalizeReceiptUrl(
+        order?.bankTransferReceipt?.url || "",
+        order?.bankTransferReceipt?.publicId,
+        order?.bankTransferReceipt?.resourceType
+    );
+    const isPdfReceipt =
+        order?.bankTransferReceipt?.format?.toLowerCase() === "pdf" ||
+        order?.bankTransferReceipt?.resourceType === "raw" ||
+        /\.pdf(\?|$)/i.test(receiptUrl) ||
+        /\/raw\/upload\//i.test(receiptUrl);
+
     if (loading) return <div className="text-center py-20 text-main">Loading Order...</div>;
     if (!order) return <div className="text-center py-20 text-red-400">Order not found</div>;
 
@@ -92,21 +184,62 @@ export default function AdminOrderDetailsPage({ params }: PageProps) {
                         <span className="text-lg font-normal text-sub font-mono">({order._id})</span>
                     </h1>
                     <div className="flex items-center gap-2">
-                        <div className="admin-card rounded-lg px-2">
-                            <span className="text-sm text-sub mr-2">Status:</span>
-                            <select
-                                value={order.status}
-                                onChange={(e) => setPendingStatus(e.target.value)}
-                                disabled={updating}
-                                className="bg-transparent text-main font-medium py-2 focus:outline-none [&>option]:text-white"
-                            >
-                                <option value="pending">Pending</option>
-                                <option value="paid">Paid</option>
-                                <option value="shipped">Shipped</option>
-                                <option value="delivered">Delivered</option>
-                                <option value="cancelled">Cancelled</option>
-                                <option value="refunded">Refunded</option>
-                            </select>
+                        <div className="flex items-center gap-2" ref={statusMenuRef}>
+                            <span className="text-sm text-sub shrink-0 hidden sm:inline">Status:</span>
+                            {/* Menu is `absolute` + `top-full` on this wrapper only so the panel always opens below the trigger */}
+                            <div className="relative">
+                                <button
+                                    type="button"
+                                    disabled={updating}
+                                    onClick={() => setStatusMenuOpen((o) => !o)}
+                                    className="admin-card inline-flex w-full min-w-[200px] items-center justify-between gap-2 rounded-lg border border-border-soft px-3 py-2 text-left text-sm font-medium text-main hover:border-accent/50 focus:outline-none focus:ring-2 focus:ring-accent/40 disabled:opacity-50"
+                                    aria-haspopup="listbox"
+                                    aria-expanded={statusMenuOpen}
+                                >
+                                    <span>{statusLabel(order.status)}</span>
+                                    <ChevronDown className={`h-4 w-4 shrink-0 text-sub transition-transform ${statusMenuOpen ? "rotate-180" : ""}`} />
+                                </button>
+                            {statusMenuOpen && (
+                                <div
+                                    className="absolute left-0 top-full z-[100] mt-1 w-full min-w-[260px] max-w-[min(100vw-2rem,320px)] origin-top overflow-hidden rounded-xl border border-border-soft bg-surface shadow-2xl ring-1 ring-black/40 md:left-auto md:right-0"
+                                    role="listbox"
+                                >
+                                    <div className="border-b border-border-soft bg-base/80 px-3 py-2">
+                                        <p className="text-[10px] font-semibold uppercase tracking-wider text-sub">Current</p>
+                                        <p className="flex items-center gap-2 text-sm font-medium text-main mt-0.5">
+                                            <Check className="h-4 w-4 shrink-0 text-accent" aria-hidden />
+                                            {statusLabel(order.status)}
+                                        </p>
+                                    </div>
+                                    <div className="max-h-64 overflow-y-auto py-1">
+                                        {(STATUS_TRANSITIONS[order.status] || []).length === 0 ? (
+                                            <p className="px-3 py-3 text-sm text-sub">No status changes available.</p>
+                                        ) : (
+                                            <>
+                                                <p className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-sub">
+                                                    Change to
+                                                </p>
+                                                {(STATUS_TRANSITIONS[order.status] || []).map((nextStatus) => (
+                                                    <button
+                                                        key={nextStatus}
+                                                        type="button"
+                                                        role="option"
+                                                        aria-selected={false}
+                                                        className="flex w-full items-center px-3 py-2.5 text-left text-sm text-main hover:bg-accent/10 focus:bg-accent/15 focus:outline-none"
+                                                        onClick={() => {
+                                                            setStatusMenuOpen(false);
+                                                            setPendingStatus(nextStatus);
+                                                        }}
+                                                    >
+                                                        {statusLabel(nextStatus)}
+                                                    </button>
+                                                ))}
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -169,11 +302,15 @@ export default function AdminOrderDetailsPage({ params }: PageProps) {
                         <div className="space-y-3">
                             <div className="flex flex-col">
                                 <span className="text-xs text-sub uppercase">Name</span>
-                                <span className="text-main">{order.user?.name || 'Unknown'}</span>
+                                <span className="text-main">{order.user?.name || order.customer?.name || 'Unknown'}</span>
                             </div>
                             <div className="flex flex-col">
                                 <span className="text-xs text-sub uppercase">Email</span>
-                                <span className="text-main">{order.user?.email || 'N/A'}</span>
+                                <span className="text-main">{order.user?.email || order.customer?.email || 'N/A'}</span>
+                            </div>
+                            <div className="flex flex-col">
+                                <span className="text-xs text-sub uppercase">Phone</span>
+                                <span className="text-main">{order.customer?.phone || 'N/A'}</span>
                             </div>
                         </div>
                     </div>
@@ -216,6 +353,36 @@ export default function AdminOrderDetailsPage({ params }: PageProps) {
                                         : 'Not Paid'}
                                 </span>
                             </div>
+                            {order.paymentMethod === "bank_transfer" && (
+                                <div className="mt-4 rounded-lg border border-border-soft bg-base/40 p-3">
+                                    <p className="text-xs text-sub uppercase mb-2">Receipt Verification</p>
+                                    {order.bankTransferReceipt?.url ? (
+                                        <div className="space-y-2">
+                                            <a
+                                                href={receiptUrl}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="text-accent hover:underline text-sm"
+                                            >
+                                                View uploaded receipt
+                                            </a>
+                                            {isPdfReceipt ? (
+                                                <div className="rounded border border-border-soft bg-base p-3 text-sm text-sub">
+                                                    PDF receipt uploaded. Click View uploaded receipt to open it.
+                                                </div>
+                                            ) : (
+                                                <img
+                                                    src={receiptUrl}
+                                                    alt="Bank transfer receipt"
+                                                    className="w-full max-h-60 object-contain rounded border border-border-soft bg-base"
+                                                />
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <p className="text-sm text-red-400">No receipt uploaded by customer.</p>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -230,7 +397,7 @@ export default function AdminOrderDetailsPage({ params }: PageProps) {
             <PopupDialog
                 open={Boolean(pendingStatus)}
                 title="Change order status"
-                message={pendingStatus ? `Are you sure you want to change status to ${pendingStatus}?` : ""}
+                message={pendingStatus ? `Change status to "${statusLabel(pendingStatus)}"?` : ""}
                 tone="danger"
                 confirmText="Confirm"
                 cancelText="Cancel"

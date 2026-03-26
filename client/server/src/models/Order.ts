@@ -2,7 +2,12 @@ import mongoose from 'mongoose';
 
 const orderSchema = new mongoose.Schema(
     {
-        user: { type: mongoose.Schema.Types.ObjectId, required: true, ref: 'User' },
+        user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        customer: {
+            name: { type: String, required: true, trim: true },
+            email: { type: String, required: true, trim: true, lowercase: true },
+            phone: { type: String, trim: true },
+        },
         orderItems: [
             {
                 name: { type: String, required: true },
@@ -23,6 +28,14 @@ const orderSchema = new mongoose.Schema(
             country: { type: String, required: true },
         },
         paymentMethod: { type: String, required: true },
+        bankTransferReceipt: {
+            url: { type: String },
+            publicId: { type: String },
+            resourceType: { type: String, enum: ['image', 'raw'] },
+            format: { type: String },
+            bytes: { type: Number },
+            uploadedAt: { type: Date },
+        },
         paymentResult: {
             id: { type: String },
             status: { type: String },
@@ -40,8 +53,22 @@ const orderSchema = new mongoose.Schema(
         // Admin-facing fields
         status: {
             type: String,
-            enum: ['pending', 'paid', 'shipped', 'delivered', 'cancelled', 'refunded'],
-            default: 'pending',
+            enum: [
+                'waiting_confirmation',
+                'confirmed',
+                'rejected',
+                'preparing',
+                'ready_for_pickup',
+                'out_for_delivery',
+                'delivered',
+                // Legacy statuses (kept for older records)
+                'pending',
+                'paid',
+                'shipped',
+                'cancelled',
+                'refunded',
+            ],
+            default: 'waiting_confirmation',
             index: true,
         },
         paymentStatus: {
@@ -61,5 +88,10 @@ const orderSchema = new mongoose.Schema(
 orderSchema.index({ createdAt: -1 });
 orderSchema.index({ status: 1, createdAt: -1 });
 
-const Order = mongoose.models.Order ?? mongoose.model('Order', orderSchema);
+// In Next.js dev/HMR, the old compiled model can linger with stale enums.
+// Re-register to ensure latest schema changes are applied immediately.
+if (mongoose.models.Order) {
+    delete mongoose.models.Order;
+}
+const Order = mongoose.model('Order', orderSchema);
 export default Order;

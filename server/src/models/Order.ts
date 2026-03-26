@@ -2,7 +2,12 @@ import mongoose from 'mongoose';
 
 const orderSchema = new mongoose.Schema(
     {
-        user: { type: mongoose.Schema.Types.ObjectId, required: true, ref: 'User' },
+        user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        customer: {
+            name: { type: String, required: true, trim: true },
+            email: { type: String, required: true, trim: true, lowercase: true },
+            phone: { type: String, trim: true },
+        },
         orderItems: [
             {
                 name: { type: String, required: true },
@@ -40,8 +45,22 @@ const orderSchema = new mongoose.Schema(
         // Admin-facing fields
         status: {
             type: String,
-            enum: ['pending', 'paid', 'shipped', 'delivered', 'cancelled', 'refunded'],
-            default: 'pending',
+            enum: [
+                'waiting_confirmation',
+                'confirmed',
+                'rejected',
+                'preparing',
+                'ready_for_pickup',
+                'out_for_delivery',
+                'delivered',
+                // Legacy statuses (kept for older records)
+                'pending',
+                'paid',
+                'shipped',
+                'cancelled',
+                'refunded',
+            ],
+            default: 'waiting_confirmation',
             index: true,
         },
         paymentStatus: {
@@ -61,5 +80,8 @@ const orderSchema = new mongoose.Schema(
 orderSchema.index({ createdAt: -1 });
 orderSchema.index({ status: 1, createdAt: -1 });
 
+if (mongoose.models.Order) {
+    delete mongoose.models.Order;
+}
 const Order = mongoose.model('Order', orderSchema);
 export default Order;

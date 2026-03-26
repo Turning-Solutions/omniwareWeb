@@ -28,7 +28,7 @@ export const buildProductMatchStage = async (
     exclude: string[] = [],
     cache?: MatchStageCache
 ) => {
-    const { search, minPrice, maxPrice, brand, category, availability, inStock, ...dynamicFilters } = req.query;
+    const { search, minPrice, maxPrice, brand, category, availability, inStock, isFeatured, ...dynamicFilters } = req.query;
     const matchStage: any = { isActive: true };
 
     if (search && !exclude.includes('search')) {
@@ -48,6 +48,11 @@ export const buildProductMatchStage = async (
     if (availability && !exclude.includes('availability')) {
         const availabilities = (availability as string).split(',');
         matchStage.availability = { $in: availabilities };
+    }
+    if (typeof isFeatured === 'string' && !exclude.includes('isFeatured')) {
+        if (isFeatured === 'true' || isFeatured === 'false') {
+            matchStage.isFeatured = isFeatured === 'true';
+        }
     }
 
     if (brand && !exclude.includes('brand')) {

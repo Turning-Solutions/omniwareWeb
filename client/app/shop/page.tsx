@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, Suspense, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import { useProducts, useProductFacets } from "@/hooks/useProducts";
 import ProductCard from "@/components/ProductCard";
 import DynamicFilterSidebar, { countActiveFilters } from "@/components/DynamicFilterSidebar";
@@ -490,6 +491,9 @@ export function ShopSkeleton() {
 }
 
 export default function ShopPage() {
+    const searchParams = useSearchParams();
+    const initialSearch = (searchParams.get("search") ?? searchParams.get("q") ?? "").trim();
+
     return (
         <div className="min-h-screen bg-[#121212] pb-16 pt-6 sm:pt-10">
             <div
@@ -500,6 +504,7 @@ export default function ShopPage() {
                 <Suspense fallback={<ShopSkeleton />}>
                     <ShopContent
                         heading="Shop"
+                        initialFilters={{ search: initialSearch }}
                     />
                 </Suspense>
             </div>

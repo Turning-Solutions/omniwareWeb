@@ -14,6 +14,7 @@ export interface UseProductsOptions {
     spec?: Record<string, string>;
     availability?: string;
     inStock?: string;
+    isFeatured?: boolean;
     includeFacets?: boolean;
 }
 
@@ -48,6 +49,7 @@ export interface Product {
         stock?: { qty?: number };
     }[];
     warranty?: string;
+    isFeatured?: boolean;
     specs?: Record<string, string>;
     attributes?: { name?: string; value: string }[];
     /** Grouped attributes for product details (e.g. General, Cable Specs). Falls back to attributes as one group. */
@@ -92,6 +94,7 @@ function buildProductsQueryString(options: UseProductsOptions): string {
     if (options.page) params.append('page', options.page.toString());
     if (options.availability) params.append('availability', options.availability);
     if (options.inStock) params.append('inStock', options.inStock);
+    if (options.isFeatured != null) params.append('isFeatured', String(options.isFeatured));
     if (options.includeFacets === false) params.append('facets', 'false');
     // Spec filters: API expects spec[key]=value (e.g. spec[vram]=16GB)
     if (options.spec && typeof options.spec === 'object') {
@@ -127,6 +130,7 @@ export const useProductFacets = (options: UseProductsOptions = {}) => {
             if (options.maxPrice != null) params.append('maxPrice', options.maxPrice.toString());
             if (options.availability) params.append('availability', options.availability);
             if (options.inStock) params.append('inStock', options.inStock);
+            if (options.isFeatured != null) params.append('isFeatured', String(options.isFeatured));
             if (options.spec && typeof options.spec === 'object') {
                 for (const [key, value] of Object.entries(options.spec)) {
                     if (value != null && value !== '') params.append(`spec[${key}]`, value);

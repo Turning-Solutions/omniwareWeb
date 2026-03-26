@@ -20,8 +20,8 @@ function buildProductSortStage(sort: unknown): Record<string, 1 | -1> {
 }
 
 const hasFilters = (req: Request): boolean => {
-    const { search, minPrice, maxPrice, brand, category, availability, inStock } = req.query;
-    if (search || minPrice || maxPrice || brand || category || availability || inStock) return true;
+    const { search, minPrice, maxPrice, brand, category, availability, inStock, isFeatured } = req.query;
+    if (search || minPrice || maxPrice || brand || category || availability || inStock || isFeatured) return true;
     const keys = Object.keys(req.query).filter((k) => k.startsWith('spec['));
     return keys.length > 0;
 };

@@ -13,7 +13,7 @@ router.use(requireAuth, requireAdmin, adminRateLimit);
 
 // GET /api/v1/admin/products
 router.get('/', async (req: Request, res: Response) => {
-    const { q, category, brand, isActive, page = '1', limit = '20' } = req.query;
+    const { q, category, brand, isActive, isFeatured, page = '1', limit = '20' } = req.query;
     res.set('Cache-Control', 'private, max-age=30, stale-while-revalidate=60');
     res.vary('Authorization');
 
@@ -26,6 +26,9 @@ router.get('/', async (req: Request, res: Response) => {
     const match: Record<string, unknown> = {};
     if (typeof isActive === 'string' && (isActive === 'true' || isActive === 'false')) {
         match.isActive = isActive === 'true';
+    }
+    if (typeof isFeatured === 'string' && (isFeatured === 'true' || isFeatured === 'false')) {
+        match.isFeatured = isFeatured === 'true';
     }
     if (q && String(q).trim()) {
         match.title = { $regex: String(q).trim(), $options: 'i' };
