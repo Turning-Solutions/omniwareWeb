@@ -187,7 +187,7 @@ router.put('/categories/:id', async (req: Request, res: Response) => {
 // Updates the category-wide discount percent that applies to all products in the category.
 router.put('/categories/:id/discount', async (req: Request, res: Response) => {
     try {
-        const { discountPercent } = req.body as { discountPercent: number | null };
+        const { discountPercent } = req.body as { discountPercent?: number | string | null };
 
         const before = await Category.findById(req.params.id).lean();
         if (!before) return res.status(404).json({ message: 'Category not found' });
@@ -215,7 +215,7 @@ router.put('/categories/:id/discount', async (req: Request, res: Response) => {
         await createAuditLog(req, {
             action: 'UPDATE_CATEGORY_DISCOUNT',
             entityType: 'Category',
-            entityId: req.params.id,
+            entityId: String(req.params.id),
             before,
             after: updated,
         });
