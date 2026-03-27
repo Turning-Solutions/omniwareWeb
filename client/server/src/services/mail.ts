@@ -225,6 +225,11 @@ async function sendMailMessage(message: MailMessage): Promise<void> {
     await sendMessageViaSmtp(message);
 }
 
+function logSettledMailFailure(result: PromiseSettledResult<void>, context: string): void {
+    if (result.status !== 'rejected') return;
+    console.error(`[mail] ${context} failed:`, result.reason);
+}
+
 export async function sendContactFormEmail(opts: {
     name: string;
     email: string;
@@ -593,7 +598,7 @@ export async function sendOrderPlacedEmails(payload: OrderMailPayload): Promise<
         .filter(Boolean)
         .join('\n');
 
-    await Promise.allSettled([
+    const [customerResult, salesResult] = await Promise.allSettled([
         sendMailMessage({
             from,
             to: [payload.customerEmail],
@@ -630,4 +635,7 @@ export async function sendOrderPlacedEmails(payload: OrderMailPayload): Promise<
             }),
         }),
     ]);
+
+    logSettledMailFailure(customerResult, 'customer order placed email');
+    logSettledMailFailure(salesResult, 'sales order notification email');
 }
