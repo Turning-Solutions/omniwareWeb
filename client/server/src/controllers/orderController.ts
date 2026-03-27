@@ -366,23 +366,27 @@ export const addOrderItems = async (req: Request, res: Response) => {
             props: { total: totalPrice, itemsCount: orderItems.length }
         });
 
-        void sendOrderPlacedEmails({
-            orderId: String(createdOrder._id),
-            orderStatus: String(createdOrder.status),
-            customerName,
-            customerEmail,
-            customerPhone: customerPhone || undefined,
-            totalPrice,
-            paymentMethod,
-            shippingAddress,
-            orderItems,
-        });
-        void sendOrderPlacedWhatsApp({
-            customerName,
-            customerPhone: customerPhone || undefined,
-            orderId: String(createdOrder._id),
-            status: String(createdOrder.status),
-        });
+        // Await before responding: Vercel serverless suspends the runtime after the response is
+        // sent, so fire-and-forget void promises often never finish (emails/WhatsApp never send).
+        await Promise.allSettled([
+            sendOrderPlacedEmails({
+                orderId: String(createdOrder._id),
+                orderStatus: String(createdOrder.status),
+                customerName,
+                customerEmail,
+                customerPhone: customerPhone || undefined,
+                totalPrice,
+                paymentMethod,
+                shippingAddress,
+                orderItems,
+            }),
+            sendOrderPlacedWhatsApp({
+                customerName,
+                customerPhone: customerPhone || undefined,
+                orderId: String(createdOrder._id),
+                status: String(createdOrder.status),
+            }),
+        ]);
 
         res.status(201).json(createdOrder);
     } catch (error) {
@@ -637,6 +641,7 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
             const customerName = (cust?.name || u?.name || 'Customer').trim() || 'Customer';
             const customerPhone = (cust?.phone || u?.phone || '').trim();
 
+            const notifyAfterStatus: Promise<void>[] = [];
             if (customerEmail) {
                 const addr = updatedOrder.shippingAddress;
                 const orderItemsForMail = (updatedOrder.orderItems || []).map((item) => ({
@@ -644,30 +649,37 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
                     qty: Number(item.qty),
                     price: Number(item.price),
                 }));
-                void sendOrderStatusUpdatedEmail({
-                    orderId: String(updatedOrder._id),
-                    customerName,
-                    customerEmail,
-                    customerPhone: cust?.phone?.trim() || undefined,
-                    newStatus: status,
-                    totalPrice: Number(updatedOrder.totalPrice),
-                    paymentMethod: String(updatedOrder.paymentMethod),
-                    shippingAddress: {
-                        address: String(addr?.address ?? ''),
-                        city: String(addr?.city ?? ''),
-                        postalCode: String(addr?.postalCode ?? ''),
-                        country: String(addr?.country ?? ''),
-                    },
-                    orderItems: orderItemsForMail,
-                });
+                notifyAfterStatus.push(
+                    sendOrderStatusUpdatedEmail({
+                        orderId: String(updatedOrder._id),
+                        customerName,
+                        customerEmail,
+                        customerPhone: cust?.phone?.trim() || undefined,
+                        newStatus: status,
+                        totalPrice: Number(updatedOrder.totalPrice),
+                        paymentMethod: String(updatedOrder.paymentMethod),
+                        shippingAddress: {
+                            address: String(addr?.address ?? ''),
+                            city: String(addr?.city ?? ''),
+                            postalCode: String(addr?.postalCode ?? ''),
+                            country: String(addr?.country ?? ''),
+                        },
+                        orderItems: orderItemsForMail,
+                    })
+                );
             }
             if (customerPhone) {
-                void sendOrderStatusUpdatedWhatsApp({
-                    customerName,
-                    customerPhone,
-                    orderId: String(updatedOrder._id),
-                    status,
-                });
+                notifyAfterStatus.push(
+                    sendOrderStatusUpdatedWhatsApp({
+                        customerName,
+                        customerPhone,
+                        orderId: String(updatedOrder._id),
+                        status,
+                    })
+                );
+            }
+            if (notifyAfterStatus.length) {
+                await Promise.allSettled(notifyAfterStatus);
             }
 
             res.json(updatedOrder);

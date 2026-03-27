@@ -572,7 +572,12 @@ function buildOrderMailHtml(opts: {
 }
 
 export async function sendOrderPlacedEmails(payload: OrderMailPayload): Promise<void> {
-    if (!isMailConfigured()) return;
+    if (!isMailConfigured()) {
+        console.warn(
+            '[mail] sendOrderPlacedEmails skipped: not configured. Set RESEND_API_KEY or SMTP_HOST+SMTP_USER+SMTP_PASS in Vercel Environment Variables.'
+        );
+        return;
+    }
 
     const salesInbox = process.env.ORDER_MAIL_TO?.trim() || 'sales@omniware.lk';
     const from = getSalesFromHeader();
