@@ -155,10 +155,14 @@ export default function CartPage() {
                             type="button"
                             onClick={downloadQuotationPdf}
                             disabled={downloadingQuote}
-                            className="w-full bg-accent/20 hover:bg-accent/30 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors mt-4 disabled:opacity-60"
+                            className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-accent/20 py-3 font-bold text-white transition-colors hover:bg-accent/30 disabled:opacity-60"
                         >
                             {downloadingQuote ? "Generating..." : "Download Quotation (PDF)"}
                         </button>
+                        <p className="text-center text-[11px] leading-relaxed text-gray-500">
+                            PDF lists your items and date issued. Final invoice may differ; the quote is valid only for that
+                            day.
+                        </p>
 
                         {hasPreOrder && preorderWhatsappUrl ? (
                             <a

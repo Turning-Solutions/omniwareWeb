@@ -87,8 +87,8 @@ export default function PromotionStripe({ asHero = false }: PromotionStripeProps
 
     if (loading) {
         return (
-            <section className={`relative overflow-hidden bg-[#080808] ${asHero ? "py-6 sm:py-8 lg:py-10" : "border-y border-[#D12B28]/20 py-10 sm:py-14"}`}>
-                <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <section className={`relative overflow-hidden bg-[#080808] ${asHero ? "py-4 sm:py-8 lg:py-10" : "border-y border-[#D12B28]/20 py-10 sm:py-14"}`}>
+                <div className={`relative mx-auto max-w-7xl sm:px-6 lg:px-8 ${asHero ? "px-3" : "px-4"}`}>
                     <div className={`rounded-2xl border border-white/[0.06] bg-[#121212] ${asHero ? "py-24 sm:py-28 lg:py-32" : "py-16"}`}>
                         <LoadingAnimation size="md" label="Loading promotions..." />
                     </div>
@@ -319,7 +319,9 @@ export default function PromotionStripe({ asHero = false }: PromotionStripeProps
     );
 
     return (
-        <section className={`relative overflow-hidden bg-[#080808] ${asHero ? "pb-8 pt-6 sm:pb-10 sm:pt-8 lg:pb-12 lg:pt-10" : "border-y border-[#D12B28]/20 py-10 sm:py-14"}`}>
+        <section
+            className={`relative overflow-hidden bg-[#080808] ${asHero ? "pb-5 pt-4 sm:pb-10 sm:pt-8 lg:pb-12 lg:pt-10" : "border-y border-[#D12B28]/20 py-10 sm:py-14"}`}
+        >
             {/* ambient red glow — gives the section its own visual identity */}
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_90%_60%_at_50%_50%,rgba(209,43,40,0.09),transparent)]" />
             <div className="pointer-events-none absolute -left-24 top-0 h-64 w-64 rounded-full bg-[#D12B28]/10 blur-[80px]" />
@@ -333,7 +335,7 @@ export default function PromotionStripe({ asHero = false }: PromotionStripeProps
                 </div>
             )}
 
-            <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div className={`relative mx-auto max-w-7xl sm:px-6 lg:px-8 ${asHero ? "px-3" : "px-4"}`}>
                 <div
                     role="button"
                     tabIndex={0}

@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import PDFDocument from 'pdfkit';
 import Quotation from '../models/Quotation';
+import { buildQuotationPdfBuffer } from '../utils/quotationPdf';
 
 const quotationItemSchema = z.object({
     productId: z.string().optional(),
@@ -14,11 +14,6 @@ const quotationItemSchema = z.object({
 const createQuotationBodySchema = z.object({
     items: z.array(quotationItemSchema).min(1).max(200),
 });
-
-function formatLkr(n: number) {
-    if (!Number.isFinite(n)) return '0';
-    return `LKR ${n.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
-}
 
 export async function createQuotationPdf(req: Request, res: Response, next: NextFunction) {
     try {
@@ -44,45 +39,20 @@ export async function createQuotationPdf(req: Request, res: Response, next: Next
             subtotal,
         });
 
+        const createdAt = quotation.createdAt ? new Date(quotation.createdAt) : new Date();
+
+        const pdfBuffer = await buildQuotationPdfBuffer({
+            items: items.map((i) => ({ title: i.title, qty: i.qty, unitPrice: i.unitPrice })),
+            subtotal,
+            quotationId: String(quotation._id),
+            quotationDate: createdAt,
+        });
+
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename="quotation-${quotation._id}.pdf"`);
-
-        const doc = new PDFDocument({ size: 'A4', margin: 50 });
-        doc.pipe(res);
-
-        const now = new Date();
-
-        doc.fontSize(20).text('Quotation', { align: 'center' });
-        doc.moveDown(0.5);
-        doc.fontSize(10).text(`Quotation ID: ${quotation._id}`, { align: 'left' });
-        doc.text(`Created At: ${now.toLocaleString()}`, { align: 'left' });
-
-        doc.moveDown();
-        doc.fontSize(12).text('Items', { underline: false });
-        doc.moveDown(0.3);
-
-        doc.fontSize(10);
-        const maxWidth = 500;
-
-        items.forEach((item, idx) => {
-            const lineTotal = item.unitPrice * item.qty;
-
-            doc.text(`${idx + 1}. ${item.title}`, { width: maxWidth });
-            doc.text(`   Qty: ${item.qty}   Unit: ${formatLkr(item.unitPrice)}`);
-            doc.text(`   Line Total: ${formatLkr(lineTotal)}`);
-            doc.moveDown(0.4);
-        });
-
-        doc.moveDown();
-        doc.fontSize(12).text(`Subtotal: ${formatLkr(subtotal)}`, { align: 'right' });
-
-        doc.moveDown(0.8);
-        doc.fontSize(9).fillColor('gray').text('Thank you for considering Omniware. This quotation is generated from your cart items.', {
-            align: 'center',
-        });
-
-        doc.end();
+        res.send(pdfBuffer);
     } catch (error) {
+        console.error('[quotation pdf]', error);
         next(error);
     }
 }

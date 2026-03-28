@@ -51,7 +51,11 @@ export default function AdminPage() {
     };
 
     if (loading && !summary) {
-        return <div className="p-12 text-center text-main">Loading dashboard...</div>;
+        return (
+            <div className="flex min-h-[40vh] flex-col items-center justify-center px-4 py-16 text-center text-main">
+                <p className="text-sm text-sub">Loading dashboard…</p>
+            </div>
+        );
     }
 
     const rangeLabel = range === "today" ? "Today" : range === "7d" ? "Last 7 days" : "Last 30 days";
@@ -63,18 +67,23 @@ export default function AdminPage() {
     const formatStatus = (status: string) => status.charAt(0).toUpperCase() + status.slice(1);
 
     return (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-            <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center mb-8">
-                <div>
-                    <h1 className="text-3xl font-bold text-main">Dashboard</h1>
-                    <p className="text-sub mt-1 text-sm">A quick snapshot of sales and store activity for {rangeLabel.toLowerCase()}.</p>
+        <div className="mx-auto max-w-7xl px-3 py-6 sm:px-6 sm:py-8 lg:px-8 lg:py-12">
+            <div className="mb-6 flex flex-col gap-4 sm:mb-8 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                    <h1 className="text-2xl font-bold text-main sm:text-3xl">Dashboard</h1>
+                    <p className="mt-1 text-xs text-sub sm:text-sm">
+                        Sales and store activity for {rangeLabel.toLowerCase()}.
+                    </p>
                 </div>
-                <div className="flex w-full sm:w-auto bg-base rounded-lg p-1 border border-border-soft overflow-x-auto">
+                <div className="grid w-full grid-cols-3 gap-1 rounded-lg border border-border-soft bg-base p-1 sm:flex sm:w-auto sm:gap-1">
                     {['today', '7d', '30d'].map((r) => (
                         <button
                             key={r}
+                            type="button"
                             onClick={() => setRange(r)}
-                            className={`px-3 sm:px-4 py-1.5 rounded-md text-sm font-medium transition-colors shrink-0 ${range === r ? 'bg-accent text-white' : 'text-sub hover:text-main'}`}
+                            className={`w-full rounded-md py-2 text-center text-xs font-medium transition-colors sm:w-auto sm:px-4 sm:py-1.5 sm:text-sm ${
+                                range === r ? "bg-accent text-white" : "text-sub hover:text-main"
+                            }`}
                         >
                             {r === 'today' ? 'Today' : r === '7d' ? '7 Days' : '30 Days'}
                         </button>
@@ -87,106 +96,128 @@ export default function AdminPage() {
             ) : null}
 
             {/* Stats Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-6 mb-12">
-                <div className="admin-card p-5 sm:p-6 rounded-xl flex items-center space-x-4 shadow-sm">
-                    <div className="h-12 w-12 bg-accent/20 text-accent rounded-lg flex items-center justify-center">
-                        <DollarSign className="h-6 w-6" />
+            <div className="mb-8 grid grid-cols-1 gap-3 sm:mb-12 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4 xl:gap-6">
+                <div className="admin-card flex items-center gap-3 rounded-xl p-4 shadow-sm sm:gap-4 sm:p-6">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-accent/20 text-accent sm:h-12 sm:w-12">
+                        <DollarSign className="h-5 w-5 sm:h-6 sm:w-6" />
                     </div>
-                    <div>
-                        <p className="text-sm text-sub">Revenue</p>
-                        <h3 className="text-2xl font-bold text-main">LKR {summary?.revenue.toLocaleString() || 0}</h3>
-                    </div>
-                </div>
-                <div className="admin-card p-5 sm:p-6 rounded-xl flex items-center space-x-4 shadow-sm">
-                    <div className="h-12 w-12 bg-accent/20 text-accent rounded-lg flex items-center justify-center">
-                        <ShoppingBag className="h-6 w-6" />
-                    </div>
-                    <div>
-                        <p className="text-sm text-sub">Orders</p>
-                        <h3 className="text-2xl font-bold text-main">{summary?.orders || 0}</h3>
+                    <div className="min-w-0 flex-1">
+                        <p className="text-xs text-sub sm:text-sm">Revenue</p>
+                        <h3 className="break-words text-lg font-bold tabular-nums text-main sm:text-2xl">
+                            LKR {summary?.revenue.toLocaleString() || 0}
+                        </h3>
                     </div>
                 </div>
-                <div className="admin-card p-5 sm:p-6 rounded-xl flex items-center space-x-4 shadow-sm">
-                    <div className="h-12 w-12 bg-accent/20 text-accent rounded-lg flex items-center justify-center">
-                        <Eye className="h-6 w-6" />
+                <div className="admin-card flex items-center gap-3 rounded-xl p-4 shadow-sm sm:gap-4 sm:p-6">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-accent/20 text-accent sm:h-12 sm:w-12">
+                        <ShoppingBag className="h-5 w-5 sm:h-6 sm:w-6" />
                     </div>
-                    <div>
-                        <p className="text-sm text-sub">Product Views</p>
-                        <h3 className="text-2xl font-bold text-main">{summary?.productViews || 0}</h3>
+                    <div className="min-w-0 flex-1">
+                        <p className="text-xs text-sub sm:text-sm">Orders</p>
+                        <h3 className="text-lg font-bold tabular-nums text-main sm:text-2xl">{summary?.orders || 0}</h3>
                     </div>
                 </div>
-                <div className="admin-card p-5 sm:p-6 rounded-xl flex items-center space-x-4 shadow-sm">
-                    <div className="h-12 w-12 bg-accent/20 text-accent rounded-lg flex items-center justify-center">
-                        <Activity className="h-6 w-6" />
+                <div className="admin-card flex items-center gap-3 rounded-xl p-4 shadow-sm sm:gap-4 sm:p-6">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-accent/20 text-accent sm:h-12 sm:w-12">
+                        <Eye className="h-5 w-5 sm:h-6 sm:w-6" />
                     </div>
-                    <div>
-                        <p className="text-sm text-sub">Conversion Rate</p>
-                        <h3 className="text-2xl font-bold text-main">{conversionRate}%</h3>
+                    <div className="min-w-0 flex-1">
+                        <p className="text-xs text-sub sm:text-sm">Product Views</p>
+                        <h3 className="text-lg font-bold tabular-nums text-main sm:text-2xl">{summary?.productViews || 0}</h3>
+                    </div>
+                </div>
+                <div className="admin-card flex items-center gap-3 rounded-xl p-4 shadow-sm sm:gap-4 sm:p-6">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-accent/20 text-accent sm:h-12 sm:w-12">
+                        <Activity className="h-5 w-5 sm:h-6 sm:w-6" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                        <p className="text-xs text-sub sm:text-sm">Conversion</p>
+                        <h3 className="text-lg font-bold tabular-nums text-main sm:text-2xl">{conversionRate}%</h3>
                     </div>
                 </div>
             </div>
 
-            <div className="mb-10">
-                <h2 className="text-lg font-semibold text-main mb-4">Quick actions</h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <Link href="/admin/orders" className="admin-card p-5 rounded-xl hover:border-accent/50 transition-colors group">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <div className="h-10 w-10 bg-accent/20 text-accent rounded-lg flex items-center justify-center">
+            <div className="mb-8 sm:mb-10">
+                <h2 className="mb-3 text-base font-semibold text-main sm:mb-4 sm:text-lg">Quick actions</h2>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
+                    <Link href="/admin/orders" className="admin-card group rounded-xl p-4 transition-colors hover:border-accent/50 sm:p-5">
+                        <div className="flex items-start justify-between gap-3">
+                            <div className="flex min-w-0 flex-1 items-start gap-3">
+                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent/20 text-accent">
                                     <ShoppingBag className="h-5 w-5" />
                                 </div>
-                                <div>
+                                <div className="min-w-0">
                                     <p className="font-semibold text-main">Manage orders</p>
-                                    <p className="text-xs text-sub">Update order statuses and view details.</p>
+                                    <p className="mt-0.5 text-xs leading-relaxed text-sub">Statuses and order details.</p>
                                 </div>
                             </div>
-                            <ArrowRight className="h-4 w-4 text-sub group-hover:text-main transition-colors" />
+                            <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-sub transition-colors group-hover:text-main" />
                         </div>
                     </Link>
-                    <Link href="/admin/products" className="admin-card p-5 rounded-xl hover:border-accent/50 transition-colors group">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <div className="h-10 w-10 bg-accent/20 text-accent rounded-lg flex items-center justify-center">
+                    <Link href="/admin/products" className="admin-card group rounded-xl p-4 transition-colors hover:border-accent/50 sm:p-5">
+                        <div className="flex items-start justify-between gap-3">
+                            <div className="flex min-w-0 flex-1 items-start gap-3">
+                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent/20 text-accent">
                                     <Package className="h-5 w-5" />
                                 </div>
-                                <div>
+                                <div className="min-w-0">
                                     <p className="font-semibold text-main">Manage products</p>
-                                    <p className="text-xs text-sub">Add, edit, and organize inventory.</p>
+                                    <p className="mt-0.5 text-xs leading-relaxed text-sub">Add, edit, and organize stock.</p>
                                 </div>
                             </div>
-                            <ArrowRight className="h-4 w-4 text-sub group-hover:text-main transition-colors" />
+                            <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-sub transition-colors group-hover:text-main" />
                         </div>
                     </Link>
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-                <div className="admin-card rounded-2xl overflow-hidden flex flex-col">
-                    <div className="p-6 border-b border-border-soft flex justify-between items-center">
-                        <h2 className="text-xl font-bold text-main">Recent Orders</h2>
-                        <Link href="/admin/orders" className="text-sm text-accent hover:text-accent/80">View All</Link>
+            <div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-8">
+                <div className="admin-card flex flex-col overflow-hidden rounded-2xl">
+                    <div className="flex flex-col gap-3 border-b border-border-soft p-4 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+                        <h2 className="text-lg font-bold text-main sm:text-xl">Recent Orders</h2>
+                        <Link href="/admin/orders" className="text-sm font-medium text-accent hover:text-accent/80">
+                            View all
+                        </Link>
                     </div>
-                    <div className="overflow-x-auto flex-1">
-                        <table className="w-full text-left">
-                            <thead className="bg-base text-sub uppercase text-xs">
+                    <div className="-mx-px flex-1 overflow-x-auto sm:mx-0">
+                        <table className="w-full min-w-[28rem] text-left text-sm">
+                            <thead className="bg-base text-xs uppercase tracking-wide text-sub">
                                 <tr>
-                                    <th className="px-6 py-4">ID</th>
-                                    <th className="px-6 py-4">Customer</th>
-                                    <th className="px-6 py-4">Total</th>
-                                    <th className="px-6 py-4">Status</th>
+                                    <th className="whitespace-nowrap px-3 py-3 sm:px-6 sm:py-4">ID</th>
+                                    <th className="px-3 py-3 sm:px-6 sm:py-4">Customer</th>
+                                    <th className="whitespace-nowrap px-3 py-3 sm:px-6 sm:py-4">Total</th>
+                                    <th className="whitespace-nowrap px-3 py-3 sm:px-6 sm:py-4">Status</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-border-soft text-main">
                                 {recentOrders.length === 0 ? (
-                                    <tr><td colSpan={4} className="p-6 text-center text-sub">No recent orders</td></tr>
+                                    <tr>
+                                        <td colSpan={4} className="px-4 py-8 text-center text-sm text-sub sm:px-6">
+                                            No recent orders
+                                        </td>
+                                    </tr>
                                 ) : (
                                     recentOrders.map((order: RecentOrder) => (
                                         <tr key={order.id} className="hover:bg-base/50">
-                                            <td className="px-6 py-4 font-mono text-xs">{order.id.slice(-6)}</td>
-                                            <td className="px-6 py-4">{order.customer}</td>
-                                            <td className="px-6 py-4">LKR {order.total.toLocaleString()}</td>
-                                            <td className="px-6 py-4">
-                                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${order.status === 'paid' || order.status === 'delivered' ? 'bg-accent/20 text-accent' : order.status === 'pending' ? 'bg-amber-500/20 text-amber-400' : 'bg-base text-sub'}`}>
+                                            <td className="whitespace-nowrap px-3 py-3 font-mono text-xs sm:px-6 sm:py-4">
+                                                {order.id.slice(-6)}
+                                            </td>
+                                            <td className="max-w-[8rem] truncate px-3 py-3 sm:max-w-none sm:px-6 sm:py-4" title={order.customer}>
+                                                {order.customer}
+                                            </td>
+                                            <td className="whitespace-nowrap px-3 py-3 tabular-nums sm:px-6 sm:py-4">
+                                                LKR {order.total.toLocaleString()}
+                                            </td>
+                                            <td className="px-3 py-3 sm:px-6 sm:py-4">
+                                                <span
+                                                    className={`inline-block max-w-full truncate rounded-full px-2 py-1 text-[11px] font-medium sm:text-xs ${
+                                                        order.status === "paid" || order.status === "delivered"
+                                                            ? "bg-accent/20 text-accent"
+                                                            : order.status === "pending"
+                                                              ? "bg-amber-500/20 text-amber-400"
+                                                              : "bg-base text-sub"
+                                                    }`}
+                                                >
                                                     {formatStatus(order.status)}
                                                 </span>
                                             </td>
@@ -198,28 +229,38 @@ export default function AdminPage() {
                     </div>
                 </div>
 
-                <div className="admin-card rounded-2xl overflow-hidden flex flex-col">
-                    <div className="p-6 border-b border-border-soft">
-                        <h2 className="text-xl font-bold text-main">Top Products</h2>
+                <div className="admin-card flex flex-col overflow-hidden rounded-2xl">
+                    <div className="border-b border-border-soft p-4 sm:p-6">
+                        <h2 className="text-lg font-bold text-main sm:text-xl">Top Products</h2>
                     </div>
-                    <div className="overflow-x-auto flex-1">
-                        <table className="w-full text-left">
-                            <thead className="bg-base text-sub uppercase text-xs">
+                    <div className="-mx-px flex-1 overflow-x-auto sm:mx-0">
+                        <table className="w-full min-w-[22rem] text-left text-sm">
+                            <thead className="bg-base text-xs uppercase tracking-wide text-sub">
                                 <tr>
-                                    <th className="px-6 py-4">Product</th>
-                                    <th className="px-6 py-4 text-right">Views</th>
-                                    <th className="px-6 py-4 text-right">Sales</th>
+                                    <th className="px-3 py-3 sm:px-6 sm:py-4">Product</th>
+                                    <th className="whitespace-nowrap px-3 py-3 text-right sm:px-6 sm:py-4">Views</th>
+                                    <th className="whitespace-nowrap px-3 py-3 text-right sm:px-6 sm:py-4">Sales</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-border-soft text-main">
-                                {summary?.topProducts?.length === 0 ? (
-                                    <tr><td colSpan={3} className="p-6 text-center text-sub">No data available</td></tr>
+                                {!summary?.topProducts?.length ? (
+                                    <tr>
+                                        <td colSpan={3} className="px-4 py-8 text-center text-sm text-sub sm:px-6">
+                                            No data available
+                                        </td>
+                                    </tr>
                                 ) : (
-                                    summary?.topProducts?.map((p) => (
+                                    summary.topProducts.map((p) => (
                                         <tr key={p.productId} className="hover:bg-base/50">
-                                            <td className="px-6 py-4 max-w-[200px] truncate" title={p.title}>{p.title}</td>
-                                            <td className="px-6 py-4 text-right">{p.views}</td>
-                                            <td className="px-6 py-4 text-right">{p.purchases}</td>
+                                            <td className="max-w-[11rem] px-3 py-3 sm:max-w-[16rem] sm:px-6 sm:py-4" title={p.title}>
+                                                <span className="line-clamp-2 break-words">{p.title}</span>
+                                            </td>
+                                            <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums sm:px-6 sm:py-4">
+                                                {p.views}
+                                            </td>
+                                            <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums sm:px-6 sm:py-4">
+                                                {p.purchases}
+                                            </td>
                                         </tr>
                                     ))
                                 )}

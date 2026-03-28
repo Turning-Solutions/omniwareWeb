@@ -27,7 +27,7 @@ export default function FlowSectionHeader({
         <div className={`relative mb-8 sm:mb-10 lg:mb-12 ${className ?? ""}`}>
             {watermark ? (
                 <p
-                    className={`pointer-events-none absolute -top-2 select-none font-bold uppercase tracking-tight text-[#D12B28]/[0.06] sm:text-[#D12B28]/[0.085] ${watermarkAlign === "left" ? "-left-1 sm:-left-2" : "-right-1 sm:-right-2 text-right"} text-[clamp(2.75rem,11vw,8.5rem)] leading-[0.85] whitespace-nowrap`}
+                    className={`pointer-events-none absolute -top-2 select-none font-bold uppercase tracking-tight text-[#D12B28]/[0.075] sm:text-[#D12B28]/[0.10] ${watermarkAlign === "left" ? "-left-1 sm:-left-2" : "-right-1 sm:-right-2 text-right"} text-[clamp(2.75rem,11vw,8.5rem)] leading-[0.85] whitespace-nowrap`}
                     aria-hidden
                 >
                     {watermark}
@@ -39,12 +39,12 @@ export default function FlowSectionHeader({
                 </span>
                 <Heading
                     id={titleId}
-                    className="mt-2 text-balance text-2xl font-bold tracking-tight text-[#F1F1F1] sm:text-3xl lg:text-4xl"
+                    className="mt-2 text-balance text-xl font-bold leading-snug tracking-tight text-[#F1F1F1] sm:text-3xl sm:leading-tight lg:text-4xl"
                 >
                     {title}
                 </Heading>
                 {description ? (
-                    <p className="mt-2 max-w-2xl text-sm leading-relaxed text-[#B0B0B0] sm:text-base">
+                    <p className="mt-2 max-w-2xl text-[13px] leading-relaxed text-[#B0B0B0] sm:text-base">
                         {description}
                     </p>
                 ) : null}
