@@ -17,6 +17,8 @@ export class DatabaseError extends Error {
     }
 }
 
+let reviewIndexesPromise: Promise<void> | null = null;
+
 async function connectDB(): Promise<typeof mongoose> {
     if (cached.conn) return cached.conn;
     if (!process.env.MONGODB_URI) {
@@ -38,6 +40,16 @@ async function connectDB(): Promise<typeof mongoose> {
 
 export async function ensureDb(): Promise<void> {
     await connectDB();
+    if (!reviewIndexesPromise) {
+        reviewIndexesPromise = import('../models/Review')
+            .then(({ ensureReviewIndexes }) => ensureReviewIndexes())
+            .catch((err) => {
+                reviewIndexesPromise = null;
+                console.error('[Review] ensureReviewIndexes', err);
+                throw err;
+            });
+    }
+    await reviewIndexesPromise;
 }
 
 export default connectDB;

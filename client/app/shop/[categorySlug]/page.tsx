@@ -3,14 +3,6 @@
 import { Suspense, use } from "react";
 import { ShopContent, ShopSkeleton } from "../page";
 
-function titleFromSlug(slug: string) {
-    return slug
-        .split("-")
-        .filter(Boolean)
-        .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
-        .join(" ");
-}
-
 interface CategoryShopPageProps {
     params: Promise<{
         categorySlug: string;
@@ -19,7 +11,7 @@ interface CategoryShopPageProps {
 
 export default function CategoryShopPage({ params }: CategoryShopPageProps) {
     const { categorySlug } = use(params);
-    const heading = titleFromSlug(categorySlug);
+    const normalizedSlug = decodeURIComponent(categorySlug).trim().toLowerCase();
 
     return (
         <div className="min-h-screen bg-[#121212] pb-16 pt-6 sm:pt-10">
@@ -30,9 +22,9 @@ export default function CategoryShopPage({ params }: CategoryShopPageProps) {
             <div className="mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-10">
                 <Suspense fallback={<ShopSkeleton />}>
                     <ShopContent
-                        basePath={`/shop/${categorySlug}`}
-                        initialFilters={{ category: categorySlug }}
-                        heading={heading}
+                        basePath={`/shop/${normalizedSlug}`}
+                        initialFilters={{ category: normalizedSlug }}
+                        heading="Shop"
                         subheading="Products in this category. Refine with filters on the left."
                     />
                 </Suspense>

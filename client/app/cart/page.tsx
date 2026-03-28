@@ -4,15 +4,33 @@ import { useCart } from "@/context/CartContext";
 import api from "@/lib/api";
 import Link from "next/link";
 import Image from "next/image";
-import { Trash2, ArrowRight } from "lucide-react";
-import { useState } from "react";
+import { Trash2, ArrowRight, AlertCircle } from "lucide-react";
+import { useMemo, useState } from "react";
 import toast from "react-hot-toast";
+import { buildCartPreOrderWhatsAppUrl } from "@/lib/whatsapp";
+import WhatsAppLogo from "@/components/WhatsAppLogo";
 
 export default function CartPage() {
     const { cartItems, removeFromCart } = useCart();
 
     const total = cartItems.reduce((acc, item) => acc + item.price * item.qty, 0);
     const [downloadingQuote, setDownloadingQuote] = useState(false);
+
+    const hasPreOrder = useMemo(
+        () => cartItems.some((item) => item.availability === "pre_order"),
+        [cartItems]
+    );
+
+    const preorderWhatsappUrl = useMemo(() => {
+        if (!hasPreOrder) return "";
+        return buildCartPreOrderWhatsAppUrl({
+            items: cartItems.map((item) => ({
+                title: item.title,
+                qty: item.qty,
+                isPreOrder: item.availability === "pre_order",
+            })),
+        });
+    }, [cartItems, hasPreOrder]);
 
     const downloadQuotationPdf = async () => {
         if (cartItems.length === 0) return;
@@ -85,7 +103,14 @@ export default function CartPage() {
                                     )}
                                 </div>
                                 <div>
-                                    <h3 className="font-bold text-white">{item.title}</h3>
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <h3 className="font-bold text-white">{item.title}</h3>
+                                        {item.availability === "pre_order" && (
+                                            <span className="rounded-md border border-yellow-400/40 bg-yellow-400/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-yellow-200">
+                                                Pre-order
+                                            </span>
+                                        )}
+                                    </div>
                                     <p className="text-sm text-gray-400">LKR {item.price.toLocaleString()} x {item.qty}</p>
                                 </div>
                             </div>
@@ -114,6 +139,18 @@ export default function CartPage() {
                             <span>Total</span>
                             <span>LKR {total.toLocaleString()}</span>
                         </div>
+
+                        {hasPreOrder && (
+                            <div className="flex gap-3 rounded-xl border border-amber-500/35 bg-amber-500/10 p-3 text-sm text-amber-100/95">
+                                <AlertCircle className="h-5 w-5 shrink-0 text-amber-400" aria-hidden />
+                                <p>
+                                    Your cart includes pre-order item(s). Online checkout is disabled until those items are
+                                    fulfilled or removed. You can still download a quotation, or contact us on WhatsApp to
+                                    arrange your order.
+                                </p>
+                            </div>
+                        )}
+
                         <button
                             type="button"
                             onClick={downloadQuotationPdf}
@@ -123,12 +160,33 @@ export default function CartPage() {
                             {downloadingQuote ? "Generating..." : "Download Quotation (PDF)"}
                         </button>
 
-                        <Link
-                            href="/checkout"
-                            className="w-full bg-primary text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-primary/90 mt-3"
-                        >
-                            Proceed to Checkout <ArrowRight className="h-4 w-4" />
-                        </Link>
+                        {hasPreOrder && preorderWhatsappUrl ? (
+                            <a
+                                href={preorderWhatsappUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="w-full bg-[#25D366]/15 hover:bg-[#25D366]/25 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 border border-[#25D366]/40 transition-colors mt-3"
+                            >
+                                <WhatsAppLogo size={22} />
+                                WhatsApp inquiry
+                            </a>
+                        ) : null}
+
+                        {hasPreOrder ? (
+                            <div
+                                className="flex w-full cursor-not-allowed items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 py-3 text-sm font-bold text-gray-500 opacity-80"
+                                title="Checkout is unavailable while pre-order items are in your cart"
+                            >
+                                Proceed to Checkout <ArrowRight className="h-4 w-4" />
+                            </div>
+                        ) : (
+                            <Link
+                                href="/checkout"
+                                className="w-full bg-primary text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-primary/90 mt-3"
+                            >
+                                Proceed to Checkout <ArrowRight className="h-4 w-4" />
+                            </Link>
+                        )}
                     </div>
                 </div>
             </div>

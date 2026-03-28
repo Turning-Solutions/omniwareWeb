@@ -1,16 +1,18 @@
 "use client";
 
 import { useState, useEffect, use } from "react";
-import { ShoppingCart, Check, Shield, AlertCircle, Clock, Package, MessageCircle, ArrowLeft } from "lucide-react";
+import { ShoppingCart, Check, AlertCircle, Clock, Package, ArrowLeft, X } from "lucide-react";
 import Image from "next/image";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { useCart } from "@/context/CartContext";
 import { useRouter } from "next/navigation";
 
 import { useProduct } from "@/hooks/useProducts";
 import { buildProductWhatsAppUrl } from "@/lib/whatsapp";
 import LoadingAnimation from "@/components/LoadingAnimation";
-import PopupDialog from "@/components/PopupDialog";
+import WhatsAppLogo from "@/components/WhatsAppLogo";
+import FlowSectionHeader from "@/components/FlowSectionHeader";
+import ProductReviewsSection from "@/components/ProductReviewsSection";
 
 interface ProductVariant {
     sku?: string;
@@ -38,7 +40,7 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
     const [selectedVariant, setSelectedVariant] = useState<ProductVariant | ProductColorVariant | null>(null);
     const { addToCart } = useCart();
     const [qty, setQty] = useState(1);
-    const [cartPopupOpen, setCartPopupOpen] = useState(false);
+    const [cartToastVisible, setCartToastVisible] = useState(false);
 
     // Reset local state when product changes
     useEffect(() => {
@@ -48,18 +50,76 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
         setQty(1);
     }, [product]);
 
-    // Error UI
-    if (error) return <div className="min-h-screen pt-20 text-center text-white">Error loading product</div>;
+    useEffect(() => {
+        if (!cartToastVisible) return undefined;
+        const id = window.setTimeout(() => setCartToastVisible(false), 4000);
+        return () => window.clearTimeout(id);
+    }, [cartToastVisible]);
 
-    if (loading) {
+    const shellDecor = (
+        <>
+            <div
+                className="pointer-events-none absolute inset-x-0 top-0 h-px bg-[linear-gradient(to_right,transparent_8%,rgba(209,43,40,0.35)_50%,transparent_92%)]"
+                aria-hidden
+            />
+            <div
+                className="pointer-events-none absolute -right-40 top-[18%] h-[min(80vw,28rem)] w-[min(80vw,28rem)] rounded-full bg-[#D12B28]/[0.04] blur-[100px]"
+                aria-hidden
+            />
+            <div
+                className="pointer-events-none absolute -left-32 top-[55%] h-72 w-72 rounded-full bg-[#D12B28]/[0.035] blur-[90px]"
+                aria-hidden
+            />
+        </>
+    );
+
+    if (error) {
         return (
-            <div className="min-h-screen pt-20">
-                <LoadingAnimation size="lg" label="Loading product..." className="h-56" />
+            <div className="relative flex min-h-screen flex-col overflow-x-hidden bg-[#0a0a0a] text-[#F1F1F1]">
+                <div className="relative flex flex-1 flex-col bg-[linear-gradient(180deg,#080808_0%,#0c0c0c_18%,#101010_45%,#0d0d0d_72%,#0a0a0a_100%)] pt-24 pb-16">
+                    {shellDecor}
+                    <div className="mx-auto max-w-7xl flex-1 px-4 sm:px-6 lg:px-8">
+                        <div className="rounded-[1.75rem] border border-white/[0.07] bg-[#0c0c0c]/85 px-6 py-16 text-center shadow-[0_24px_70px_rgba(0,0,0,0.45)]">
+                            <p className="text-lg font-semibold text-[#F1F1F1]">Couldn&apos;t load this product</p>
+                            <p className="mt-2 text-sm text-[#B0B0B0]">Check your connection and try again.</p>
+                        </div>
+                    </div>
+                </div>
             </div>
         );
     }
 
-    if (!product) return <div className="min-h-screen pt-20 text-center text-white">Product not found</div>;
+    if (loading) {
+        return (
+            <div className="relative flex min-h-screen flex-col overflow-x-hidden bg-[#0a0a0a] text-[#F1F1F1]">
+                <div className="relative flex flex-1 flex-col bg-[linear-gradient(180deg,#080808_0%,#0c0c0c_18%,#101010_45%,#0d0d0d_72%,#0a0a0a_100%)] pt-24 pb-16">
+                    {shellDecor}
+                    <div className="mx-auto max-w-7xl flex-1 px-4 sm:px-6 lg:px-8">
+                        <div className="relative overflow-hidden rounded-[1.75rem] border border-white/[0.07] bg-[#0c0c0c]/85 p-12 shadow-[0_24px_70px_rgba(0,0,0,0.45)]">
+                            <div className="pointer-events-none absolute -right-20 top-1/2 h-48 w-48 -translate-y-1/2 rounded-full bg-[#D12B28]/[0.06] blur-3xl" aria-hidden />
+                            <LoadingAnimation size="lg" label="Loading product..." className="h-56" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    if (!product) {
+        return (
+            <div className="relative flex min-h-screen flex-col overflow-x-hidden bg-[#0a0a0a] text-[#F1F1F1]">
+                <div className="relative flex flex-1 flex-col bg-[linear-gradient(180deg,#080808_0%,#0c0c0c_18%,#101010_45%,#0d0d0d_72%,#0a0a0a_100%)] pt-24 pb-16">
+                    {shellDecor}
+                    <div className="mx-auto max-w-7xl flex-1 px-4 sm:px-6 lg:px-8">
+                        <div className="rounded-[1.75rem] border border-white/[0.07] bg-[#0c0c0c]/85 px-6 py-16 text-center shadow-[0_24px_70px_rgba(0,0,0,0.45)]">
+                            <p className="text-lg font-semibold text-[#F1F1F1]">Product not found</p>
+                            <p className="mt-2 text-sm text-[#B0B0B0]">This item may have been removed or the link is outdated.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     const selectedColorVariant =
         selectedVariant && "name" in selectedVariant && !("attributes" in selectedVariant)
@@ -96,6 +156,26 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
         productTitle: product.title,
         productPath,
     });
+    const preorderWhatsappUrl = buildProductWhatsAppUrl({
+        productTitle: product.title,
+        productPath,
+        intent: "pre_order",
+        quantity: qty,
+    });
+
+    const brandLabel =
+        typeof product.brand === "object" && product.brand !== null && "name" in product.brand
+            ? (product.brand as { name: string }).name
+            : typeof product.brand === "string"
+              ? product.brand
+              : typeof product.brandId !== "string" && product.brandId?.name
+                ? product.brandId.name
+                : "Product";
+
+    const headerDescription =
+        product.categoryIds && product.categoryIds.length > 0
+            ? product.categoryIds.map((c: { name: string }) => c.name).join(" · ")
+            : undefined;
 
     const handleAddToCart = () => {
         const selectedLabel =
@@ -114,29 +194,55 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
         };
 
         addToCart(itemToAdd, qty);
-        setCartPopupOpen(true);
+        setCartToastVisible(true);
     };
 
     return (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-            <div className="mb-6">
-                <button
-                    type="button"
-                    onClick={() => router.back()}
-                    className="inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/5 px-4 py-2 text-sm text-gray-200 transition-colors hover:bg-white/10"
-                >
-                    <ArrowLeft className="h-4 w-4" />
-                    Back
-                </button>
-            </div>
+        <div className="relative flex min-h-screen flex-col overflow-x-hidden bg-[#0a0a0a] text-[#F1F1F1]">
+            <div className="relative flex flex-col bg-[linear-gradient(180deg,#080808_0%,#0c0c0c_18%,#101010_45%,#0d0d0d_72%,#0a0a0a_100%)] pb-12 sm:pb-16 lg:pb-20">
+                <div
+                    className="pointer-events-none absolute inset-x-0 top-0 h-px bg-[linear-gradient(to_right,transparent_8%,rgba(209,43,40,0.35)_50%,transparent_92%)]"
+                    aria-hidden
+                />
+                <div
+                    className="pointer-events-none absolute -right-40 top-[18%] h-[min(80vw,28rem)] w-[min(80vw,28rem)] rounded-full bg-[#D12B28]/[0.04] blur-[100px]"
+                    aria-hidden
+                />
+                <div
+                    className="pointer-events-none absolute -left-32 top-[55%] h-72 w-72 rounded-full bg-[#D12B28]/[0.035] blur-[90px]"
+                    aria-hidden
+                />
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+                <section className="relative pt-8 sm:pt-10 lg:pt-12">
+                    <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+                        <button
+                            type="button"
+                            onClick={() => router.back()}
+                            className="mb-8 inline-flex items-center gap-2 rounded-xl border border-white/[0.08] bg-white/[0.04] px-4 py-2.5 text-sm font-medium text-[#E8E8E8] transition-colors hover:border-[#D12B28]/35 hover:bg-[#D12B28]/10 hover:text-white"
+                        >
+                            <ArrowLeft className="h-4 w-4" />
+                            Back
+                        </button>
+
+                        <FlowSectionHeader
+                            eyebrow={brandLabel}
+                            title={product.title}
+                            description={headerDescription}
+                            titleTag="h1"
+                        />
+
+                        <div className="relative overflow-hidden rounded-[1.75rem] border border-white/[0.07] bg-[#0c0c0c]/85 p-5 shadow-[0_24px_70px_rgba(0,0,0,0.45)] sm:p-7 lg:p-8">
+                            <div className="absolute inset-x-0 top-0 h-px bg-[linear-gradient(to_right,transparent_5%,rgba(209,43,40,0.65)_50%,transparent_95%)]" />
+                            <div className="pointer-events-none absolute -right-28 -top-28 h-64 w-64 rounded-full bg-[#D12B28]/10 blur-3xl" aria-hidden />
+                            <div className="pointer-events-none absolute -bottom-20 -left-20 h-52 w-52 rounded-full bg-[#D12B28]/6 blur-3xl" aria-hidden />
+
+                            <div className="relative grid grid-cols-1 gap-10 md:grid-cols-2 md:gap-12 lg:gap-14">
                 {/* Image Gallery */}
                 <div>
                     <motion.div
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
-                        className="bg-white/5 rounded-2xl aspect-square flex items-center justify-center border border-white/10 mb-4 overflow-hidden"
+                        className="mb-4 flex aspect-square items-center justify-center overflow-hidden rounded-2xl border border-white/[0.07] bg-[#121212]/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
                     >
                         {currentImage ? (
                             <div className="relative w-full h-full">
@@ -149,7 +255,7 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
                                 />
                             </div>
                         ) : (
-                            <span className="text-gray-500 text-lg">No Image Available</span>
+                            <span className="text-lg text-[#8E8E8E]">No Image Available</span>
                         )}
                     </motion.div>
 
@@ -159,9 +265,11 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
                                 <div
                                     key={idx}
                                     onClick={() => setSelectedImage(idx)}
-                                    className={`w-20 h-20 rounded-lg flex-shrink-0 border ${
-                                        selectedImage === idx ? "border-primary" : "border-transparent"
-                                    } bg-white/5 overflow-hidden`}
+                                    className={`h-20 w-20 flex-shrink-0 overflow-hidden rounded-xl border transition-colors ${
+                                        selectedImage === idx
+                                            ? "border-[#D12B28]/60 bg-[#D12B28]/10 ring-1 ring-[#D12B28]/25"
+                                            : "border-white/[0.06] bg-[#161616] hover:border-white/15"
+                                    }`}
                                 >
                                     <div className="relative w-full h-full">
                                         <Image
@@ -179,15 +287,18 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
 
                     {/* Specs Map (filter specs) */}
                     {product.specs && Object.keys(product.specs).length > 0 && (
-                        <div className="mt-6 p-4 bg-white/5 rounded-xl">
-                            <h3 className="text-sm font-medium text-white mb-3 flex items-center gap-2">
-                                <AlertCircle className="h-4 w-4" /> Specifications
+                        <div className="mt-6 rounded-2xl border border-white/[0.07] bg-[#121212]/90 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                            <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-[#F1F1F1]">
+                                <AlertCircle className="h-4 w-4 text-[#D12B28]" aria-hidden />
+                                Specifications
                             </h3>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                            <div className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
                                 {Object.entries(product.specs).map(([key, value]) => (
                                     <div key={key}>
-                                        <span className="block text-gray-500 text-xs uppercase">{key}</span>
-                                        <span className="text-gray-300">{value as string}</span>
+                                        <span className="block text-[11px] font-medium uppercase tracking-wide text-[#8E8E8E]">
+                                            {key}
+                                        </span>
+                                        <span className="text-[#D4D4D4]">{value as string}</span>
                                     </div>
                                 ))}
                             </div>
@@ -196,45 +307,55 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
                 </div>
 
                 {/* Product Info */}
-                <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
-                    <div className="mb-2 text-sm text-blue-400 font-semibold tracking-wide uppercase">
-                        {typeof product.brandId !== "string" ? product.brandId?.name : ""}
-                    </div>
-                    <h1 className="text-3xl font-bold text-white mb-2">{product.title}</h1>
-
+                <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="min-w-0">
                     {/* Categories Tags */}
                     {product.categoryIds && product.categoryIds.length > 0 && (
-                        <div className="flex flex-wrap gap-2 mb-4">
+                        <div className="mb-6 flex flex-wrap gap-2">
                             {product.categoryIds.map((cat: any) => ( // eslint-disable-line @typescript-eslint/no-explicit-any
-                                <span key={cat._id} className="text-xs bg-white/10 px-2 py-1 rounded text-gray-300">
+                                <span
+                                    key={cat._id}
+                                    className="rounded-full border border-white/[0.08] bg-[#121212]/80 px-3 py-1 text-xs font-medium text-[#B0B0B0]"
+                                >
                                     {cat.name}
                                 </span>
                             ))}
                         </div>
                     )}
 
-                    <div className="flex items-center space-x-4 mb-6">
-                        <div className="flex items-baseline gap-3 flex-wrap">
-                            <span className="text-2xl font-bold text-primary">LKR {currentPrice.toLocaleString()}</span>
+                    <div className="mb-6 flex flex-wrap items-center gap-x-6 gap-y-3">
+                        <div className="flex flex-wrap items-baseline gap-3">
+                            <span className="text-3xl font-bold tabular-nums text-[#F1F1F1]">
+                                LKR {currentPrice.toLocaleString()}
+                            </span>
                             {effectiveDiscountPercent > 0 && (
-                                <span className="text-xs text-gray-400 line-through">
+                                <span className="text-sm text-[#8E8E8E] line-through">
                                     LKR {currentOriginalPrice.toLocaleString()}
                                 </span>
                             )}
                             {effectiveDiscountPercent > 0 && (
-                                <span className="text-xs bg-[#D12B28]/10 border border-[#D12B28]/20 text-[#D12B28] px-2 py-1 rounded-full font-bold">
-                                    Discount {effectiveDiscountPercent}%
+                                <span className="rounded-full border border-[#D12B28]/35 bg-[#D12B28]/15 px-2.5 py-1 text-xs font-bold text-[#F4C5C5]">
+                                    −{effectiveDiscountPercent}%
                                 </span>
                             )}
                         </div>
-                        <span className={`flex items-center text-sm font-medium ${availInfo.className}`}>
+                        <span className={`flex items-center text-sm font-semibold ${availInfo.className}`}>
                             <AvailIcon className="h-4 w-4 mr-1" />
                             {availInfo.label}
                         </span>
                     </div>
 
+                    {availability === "pre_order" && (
+                        <div className="mb-6 flex gap-3 rounded-2xl border border-yellow-400/25 bg-yellow-500/[0.07] px-4 py-3 text-sm text-yellow-100/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                            <Clock className="mt-0.5 h-4 w-4 shrink-0 text-yellow-400" aria-hidden />
+                            <p>
+                                <span className="font-semibold text-yellow-200">Pre-order.</span> Fulfillment is
+                                usually within ~72 hours after your order is confirmed.
+                            </p>
+                        </div>
+                    )}
+
                     {product.warranty && (
-                        <div className="mb-6 inline-flex items-center rounded-lg border border-emerald-400/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-300">
+                        <div className="mb-6 inline-flex items-center rounded-2xl border border-emerald-500/25 bg-emerald-500/[0.08] px-4 py-2.5 text-sm font-medium text-emerald-200/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
                             Warranty: {product.warranty}
                         </div>
                     )}
@@ -242,14 +363,19 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
                     {/* Variants Selection */}
                     {product.variants && product.variants.length > 0 && (
                         <div className="mb-8">
-                            <h3 className="text-sm font-medium text-gray-300 uppercase mb-3">Options</h3>
+                            <h3 className="mb-3 font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-[#D12B28]/80">
+                                Options
+                            </h3>
                             <div className="flex flex-wrap gap-3">
                                 {product.variants.map((variant: ProductVariant, idx: number) => (
                                     <button
                                         key={idx}
+                                        type="button"
                                         onClick={() => setSelectedVariant(variant)}
-                                        className={`px-4 py-2 rounded-lg border text-sm transition-all ${
-                                            selectedVariant === variant ? "border-primary bg-primary/10 text-white" : "border-white/10 bg-white/5 text-gray-400 hover:bg-white/10"
+                                        className={`rounded-xl border px-4 py-2.5 text-sm transition-all ${
+                                            selectedVariant === variant
+                                                ? "border-[#D12B28]/50 bg-[#D12B28]/12 text-[#F1F1F1] shadow-[0_0_20px_rgba(209,43,40,0.12)]"
+                                                : "border-white/[0.08] bg-[#161616] text-[#A8A8A8] hover:border-[#D12B28]/25 hover:bg-[#1a1a1a]"
                                         }`}
                                     >
                                         {(variant.attributes ?? []).map((a) => a.value).join(" / ")}
@@ -275,16 +401,19 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
 
                     {product.colorVariants && product.colorVariants.length > 0 && (
                         <div className="mb-8">
-                            <h3 className="text-sm font-medium text-gray-300 uppercase mb-3">Colors</h3>
+                            <h3 className="mb-3 font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-[#D12B28]/80">
+                                Colors
+                            </h3>
                             <div className="flex flex-wrap gap-3">
                                 {product.colorVariants.map((color: ProductColorVariant, idx: number) => (
                                     <button
                                         key={`${color.name}-${idx}`}
+                                        type="button"
                                         onClick={() => setSelectedVariant(color)}
-                                        className={`px-4 py-2 rounded-lg border text-sm transition-all inline-flex items-center gap-2 ${
+                                        className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm transition-all ${
                                             selectedVariant === color
-                                                ? "border-primary bg-primary/10 text-white"
-                                                : "border-white/10 bg-white/5 text-gray-300 hover:bg-white/10"
+                                                ? "border-[#D12B28]/50 bg-[#D12B28]/12 text-[#F1F1F1] shadow-[0_0_20px_rgba(209,43,40,0.12)]"
+                                                : "border-white/[0.08] bg-[#161616] text-[#B0B0B0] hover:border-[#D12B28]/25 hover:bg-[#1a1a1a]"
                                         }`}
                                     >
                                         <span
@@ -312,75 +441,87 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
                         </div>
                     )}
 
-                    <div className="mb-8">
-                        <div className="flex gap-4 items-center">
+                    <div className="mb-8 space-y-4">
+                        <div className="flex flex-wrap gap-3 items-center">
                             {canAddToCart && (
-                                <div className="flex items-center bg-white/5 rounded-xl border border-white/10">
+                                <div className="flex items-center rounded-xl border border-white/[0.08] bg-[#121212]/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
                                     <button
+                                        type="button"
                                         onClick={() => setQty(Math.max(1, qty - 1))}
-                                        className="px-3 py-2 text-gray-400 hover:text-white"
+                                        className="px-4 py-2.5 text-[#8E8E8E] transition-colors hover:text-white"
                                     >
-                                        -
+                                        −
                                     </button>
-                                    <span className="w-8 text-center text-white">{qty}</span>
+                                    <span className="min-w-[2.5rem] text-center font-semibold tabular-nums text-[#F1F1F1]">
+                                        {qty}
+                                    </span>
                                     <button
+                                        type="button"
                                         onClick={() => setQty(Math.min(currentStock || 99, qty + 1))}
-                                        className="px-3 py-2 text-gray-400 hover:text-white"
+                                        className="px-4 py-2.5 text-[#8E8E8E] transition-colors hover:text-white"
                                     >
                                         +
                                     </button>
                                 </div>
                             )}
 
-                            <button
-                                onClick={handleAddToCart}
-                                disabled={!canAddToCart}
-                                className={`flex-1 py-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all ${
-                                    availability === "in_stock"
-                                        ? "bg-primary text-white hover:bg-primary/90"
-                                        : availability === "pre_order"
-                                          ? "bg-yellow-500 text-white hover:bg-yellow-500/90"
-                                          : "bg-gray-600 text-gray-400 cursor-not-allowed"
-                                }`}
-                            >
-                                {availability === "in_stock" && (
-                                    <>
-                                        <ShoppingCart className="h-5 w-5" /> Add to Cart
-                                    </>
-                                )}
-                                {availability === "pre_order" && (
-                                    <>
-                                        <Clock className="h-5 w-5" /> Pre-Order Now
-                                    </>
-                                )}
-                                {availability === "out_of_stock" && (
-                                    <>
-                                        <AlertCircle className="h-5 w-5" /> Out of Stock
-                                    </>
-                                )}
-                                {availability === "coming_soon" && (
-                                    <>
-                                        <Package className="h-5 w-5" /> Coming Soon
-                                    </>
-                                )}
-                            </button>
-                            <button className="px-6 py-4 glass rounded-xl hover:bg-white/10 transition-all">
-                                <Shield className="h-5 w-5 text-gray-300" />
-                            </button>
+                            {availability === "pre_order" && canAddToCart && (
+                                <button
+                                    type="button"
+                                    onClick={handleAddToCart}
+                                    className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-white/[0.1] bg-[#161616] px-5 py-2.5 text-sm font-semibold text-[#F1F1F1] transition-colors hover:border-[#D12B28]/35 hover:bg-[#D12B28]/12"
+                                >
+                                    <ShoppingCart className="h-4 w-4" />
+                                    Add to cart
+                                </button>
+                            )}
+
+                            {availability !== "pre_order" && (
+                                <button
+                                    type="button"
+                                    onClick={handleAddToCart}
+                                    disabled={!canAddToCart}
+                                    className={`flex min-h-[3.5rem] min-w-[10rem] flex-1 items-center justify-center gap-2 rounded-xl py-4 text-base font-bold transition-all ${
+                                        availability === "in_stock"
+                                            ? "bg-[#D12B28] text-white shadow-lg shadow-[#D12B28]/25 hover:bg-[#B32522]"
+                                            : "cursor-not-allowed bg-[#3a3a3a] text-[#8E8E8E]"
+                                    }`}
+                                >
+                                    {availability === "in_stock" && (
+                                        <>
+                                            <ShoppingCart className="h-5 w-5" /> Add to Cart
+                                        </>
+                                    )}
+                                    {availability === "out_of_stock" && (
+                                        <>
+                                            <AlertCircle className="h-5 w-5" /> Out of Stock
+                                        </>
+                                    )}
+                                    {availability === "coming_soon" && (
+                                        <>
+                                            <Package className="h-5 w-5" /> Coming Soon
+                                        </>
+                                    )}
+                                </button>
+                            )}
                         </div>
 
                         <a
-                            href={whatsappUrl}
+                            href={availability === "pre_order" ? preorderWhatsappUrl : whatsappUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-green-500/35 bg-green-500/15 px-4 py-3 font-medium text-green-300 transition-colors hover:bg-green-500/25"
+                            className={
+                                availability === "pre_order"
+                                    ? "inline-flex w-full items-center justify-center gap-2 rounded-xl border border-yellow-400/40 bg-yellow-500 px-4 py-4 text-base font-bold text-black shadow-lg shadow-yellow-500/20 transition-colors hover:bg-yellow-400"
+                                    : "inline-flex w-full items-center justify-center gap-2 rounded-xl border border-green-600/35 bg-green-400 px-4 py-3 font-medium text-black transition-colors hover:bg-green-500"
+                            }
                         >
-                            <MessageCircle className="h-5 w-5" />
-                            WhatsApp Inquiry
+                            <WhatsAppLogo size={availability === "pre_order" ? 24 : 20} />
+                            WhatsApp inquiry
                         </a>
                     </div>
 
-                    <p className="text-gray-400 mb-8 leading-relaxed whitespace-pre-line">{product.description}</p>
+                    <p className="mb-8 whitespace-pre-line text-base leading-relaxed text-[#B0B0B0]">{product.description}</p>
 
                     {/* Product details (attributes by category) — one box, categories divided inside */}
                     {(() => {
@@ -394,28 +535,34 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
 
                         return (
                             <div className="mb-8">
-                                <h3 className="text-base font-semibold text-white mb-4 flex items-center gap-2">
-                                    <AlertCircle className="h-4 w-4 text-primary" /> Product details
+                                <h3 className="mb-4 flex items-center gap-2 text-base font-semibold text-[#F1F1F1]">
+                                    <AlertCircle className="h-4 w-4 text-[#D12B28]" aria-hidden /> Product details
                                 </h3>
-                                <div className="rounded-xl border border-white/15 bg-white/5 overflow-hidden">
+                                <div className="overflow-hidden rounded-2xl border border-white/[0.07] bg-[#121212]/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
                                     {groups.map((group, idx) => (
-                                        <div key={idx} className="px-4 py-4">
-                                            <div className="font-semibold text-white uppercase tracking-wide mb-3">{group.category}</div>
+                                        <div key={idx} className="px-4 py-4 sm:px-5">
+                                            <div className="mb-3 font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-[#D12B28]/85">
+                                                {group.category}
+                                            </div>
                                             <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
                                                 {group.attributes.map((attr, i) => (
                                                     <div key={i}>
                                                         {attr.name ? (
                                                             <>
-                                                                <span className="block text-gray-500 text-xs uppercase tracking-wider">{attr.name}</span>
-                                                                <span className="text-gray-300">{attr.value}</span>
+                                                                <span className="block text-[11px] uppercase tracking-wide text-[#8E8E8E]">
+                                                                    {attr.name}
+                                                                </span>
+                                                                <span className="text-[#D4D4D4]">{attr.value}</span>
                                                             </>
                                                         ) : (
-                                                            <span className="text-gray-300">{attr.value}</span>
+                                                            <span className="text-[#D4D4D4]">{attr.value}</span>
                                                         )}
                                                     </div>
                                                 ))}
                                             </div>
-                                            {idx < groups.length - 1 && <div className="border-b border-white/10 mt-4" aria-hidden />}
+                                            {idx < groups.length - 1 && (
+                                                <div className="mt-4 border-b border-white/[0.06]" aria-hidden />
+                                            )}
                                         </div>
                                     ))}
                                 </div>
@@ -423,17 +570,42 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
                         );
                     })()}
                 </motion.div>
+                            <ProductReviewsSection productId={product._id} />
+                            </div>
+                        </div>
+                    </div>
+                </section>
             </div>
 
-            <PopupDialog
-                open={cartPopupOpen}
-                title="Added to cart"
-                message="The selected item was added to your cart."
-                tone="success"
-                confirmText="OK"
-                onClose={() => setCartPopupOpen(false)}
-                onConfirm={() => setCartPopupOpen(false)}
-            />
+            <AnimatePresence>
+                {cartToastVisible && (
+                    <motion.div
+                        key="cart-toast"
+                        role="status"
+                        aria-live="polite"
+                        initial={{ opacity: 0, y: 24 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 12 }}
+                        transition={{ type: "spring", stiffness: 380, damping: 28 }}
+                        className="pointer-events-auto fixed bottom-6 left-1/2 z-[100] flex w-[min(100%-2rem,24rem)] -translate-x-1/2 items-center gap-3 rounded-xl border border-emerald-500/40 bg-[#1e1e1e]/95 px-4 py-3 shadow-[0_12px_40px_rgba(0,0,0,0.45)] backdrop-blur-md"
+                    >
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-500/20">
+                            <Check className="h-5 w-5 text-emerald-400" aria-hidden />
+                        </span>
+                        <p className="min-w-0 flex-1 text-sm font-medium leading-snug text-white">
+                            Added to cart — you can keep shopping or open your cart when you’re ready.
+                        </p>
+                        <button
+                            type="button"
+                            onClick={() => setCartToastVisible(false)}
+                            className="shrink-0 rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-white/10 hover:text-white"
+                            aria-label="Dismiss notification"
+                        >
+                            <X className="h-4 w-4" />
+                        </button>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 }

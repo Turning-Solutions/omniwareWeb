@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { ensureReviewIndexes } from '../models/Review';
 
 const connectDB = async () => {
     try {
@@ -7,6 +8,7 @@ const connectDB = async () => {
         }
         const conn = await mongoose.connect(process.env.MONGODB_URI);
         console.log(`MongoDB Connected: ${conn.connection.host}`);
+        await ensureReviewIndexes();
     } catch (error) {
         console.error(`Error: ${(error as Error).message}`);
         process.exit(1);

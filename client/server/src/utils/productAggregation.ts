@@ -76,12 +76,11 @@ export const buildProductMatchStage = async (
         if (cache && 'categoryIds' in cache && cache.categoryIds !== undefined) {
             if (cache.categoryIds.length > 0) matchStage.categoryIds = { $in: cache.categoryIds };
         } else {
-            const cats = (category as string).split(',');
+            const cats = (category as string).split(',').map((c) => c.trim()).filter(Boolean);
+            const objectIds = cats.filter((c: string) => mongoose.Types.ObjectId.isValid(c));
+            const slugParts = cats.filter((c: string) => !mongoose.Types.ObjectId.isValid(c)).map((c) => c.toLowerCase());
             const catDocs = await Category.find({
-                $or: [
-                    { slug: { $in: cats } },
-                    { _id: { $in: cats.filter((c: string) => mongoose.Types.ObjectId.isValid(c)) } }
-                ]
+                $or: [{ slug: { $in: slugParts } }, { _id: { $in: objectIds } }],
             });
             const ids = catDocs.map((c) => c._id);
             if (cache) cache.categoryIds = ids;

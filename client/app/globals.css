@@ -115,3 +115,116 @@ body {
     color: var(--foreground);
     font-family: Arial, Helvetica, sans-serif;
 }
+
+@keyframes brand-marquee {
+    from {
+        transform: translate3d(0, 0, 0);
+    }
+    to {
+        /* Three identical segments: move exactly one segment width for a seamless loop */
+        transform: translate3d(calc(-100% / 3), 0, 0);
+    }
+}
+
+.brand-marquee-track {
+    animation: brand-marquee 42s linear infinite;
+    will-change: transform;
+    backface-visibility: hidden;
+}
+
+@keyframes reviews-marquee {
+    from {
+        transform: translate3d(0, 0, 0);
+    }
+    to {
+        transform: translate3d(calc(-100% / 3), 0, 0);
+    }
+}
+
+.reviews-marquee-track {
+    animation: reviews-marquee 120s linear infinite;
+    will-change: transform;
+    backface-visibility: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .brand-marquee-track {
+        animation: none;
+        transform: none;
+        will-change: auto;
+        flex-wrap: wrap;
+        width: 100% !important;
+        max-width: 100%;
+        justify-content: center;
+        row-gap: 0.75rem;
+        column-gap: 0.75rem;
+    }
+
+    .brand-marquee-segment {
+        flex-wrap: wrap;
+        justify-content: center;
+        max-width: 100%;
+        padding-right: 0 !important;
+    }
+
+    .brand-marquee-segment-duplicate {
+        display: none;
+    }
+
+    .reviews-marquee-track {
+        animation: none;
+        transform: none;
+        will-change: auto;
+        flex-wrap: wrap;
+        width: 100% !important;
+        max-width: 100%;
+        justify-content: center;
+        row-gap: 0.75rem;
+        column-gap: 0.75rem;
+    }
+
+    .reviews-marquee-segment {
+        flex-wrap: wrap;
+        justify-content: center;
+        max-width: 100%;
+        padding-right: 0 !important;
+    }
+
+    .reviews-marquee-segment-duplicate {
+        display: none;
+    }
+}
+
+/* Dark storefront scrollbars — matches borders + accent (#D12B28), not default OS gray */
+html.dark .scrollbar-store {
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(209, 43, 40, 0.45) rgba(255, 255, 255, 0.06);
+}
+
+html.dark .scrollbar-store::-webkit-scrollbar {
+    width: 7px;
+    height: 7px;
+}
+
+html.dark .scrollbar-store::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 100px;
+}
+
+html.dark .scrollbar-store::-webkit-scrollbar-thumb {
+    background: rgba(209, 43, 40, 0.42);
+    border-radius: 100px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+}
+
+html.dark .scrollbar-store::-webkit-scrollbar-thumb:hover {
+    background: rgba(209, 43, 40, 0.65);
+    border: 2px solid transparent;
+    background-clip: padding-box;
+}
+
+html.dark .scrollbar-store::-webkit-scrollbar-corner {
+    background: transparent;
+}

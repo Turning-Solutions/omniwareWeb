@@ -2,12 +2,16 @@
 
 import { createContext, useContext, useState, useEffect } from "react";
 
-interface CartItem {
+export type CartItemAvailability = "in_stock" | "out_of_stock" | "pre_order" | "coming_soon";
+
+export interface CartItem {
     _id: string;
     title: string;
     price: number;
     image?: string;
     qty: number;
+    /** When set from product data; missing on older saved carts = not treated as pre-order */
+    availability?: CartItemAvailability;
 }
 
 interface CartContextType {
@@ -39,7 +43,13 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
             const existItem = prev.find((x) => x._id === product._id);
             if (existItem) {
                 return prev.map((x) =>
-                    x._id === product._id ? { ...x, qty: x.qty + qty } : x
+                    x._id === product._id
+                        ? {
+                              ...x,
+                              qty: x.qty + qty,
+                              availability: product.availability ?? x.availability,
+                          }
+                        : x
                 );
             } else {
                 return [...prev, {
@@ -47,7 +57,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
                     title: product.title,
                     price: product.price,
                     image: product.images?.[0],
-                    qty
+                    qty,
+                    availability: product.availability as CartItemAvailability | undefined,
                 }];
             }
         });

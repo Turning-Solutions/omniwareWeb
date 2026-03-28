@@ -56,15 +56,14 @@ export const buildProductMatchStage = async (req: Request, exclude: string[] = [
     }
 
     if (category && !exclude.includes('category')) {
-        const cats = (category as string).split(',');
+        const cats = (category as string).split(',').map((c) => c.trim()).filter(Boolean);
+        const objectIds = cats.filter((c) => mongoose.Types.ObjectId.isValid(c));
+        const slugParts = cats.filter((c) => !mongoose.Types.ObjectId.isValid(c)).map((c) => c.toLowerCase());
         const catDocs = await Category.find({
-            $or: [
-                { slug: { $in: cats } },
-                { _id: { $in: cats.filter(c => mongoose.Types.ObjectId.isValid(c)) } }
-            ]
+            $or: [{ slug: { $in: slugParts } }, { _id: { $in: objectIds } }],
         });
         if (catDocs.length > 0) {
-            matchStage.categoryIds = { $in: catDocs.map(c => c._id) };
+            matchStage.categoryIds = { $in: catDocs.map((c) => c._id) };
         }
     }
 

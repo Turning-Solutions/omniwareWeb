@@ -19,6 +19,13 @@ function buildProductSortStage(sort: unknown): Record<string, 1 | -1> {
     return { createdAt: -1 };
 }
 
+/** Matches admin `categoryKey` on CategoryFeaturedSpecs (typically lowercase slugs). */
+function normalizeCategoryKeyForFeaturedSpecs(category: unknown): string | null {
+    if (category == null || typeof category !== 'string') return null;
+    const first = category.split(',')[0]?.trim();
+    return first ? first.toLowerCase() : null;
+}
+
 export const getProducts = async (req: Request, res: Response) => {
     try {
         const { search, minPrice, maxPrice, brand, category, sort, page = 1, limit = 20, ...dynamicFilters } = req.query;
@@ -135,8 +142,9 @@ export const getProducts = async (req: Request, res: Response) => {
         let featuredMode: 'restricted' | 'none' = 'none';
         let featuredSpecKeys: string[] = [];
 
-        if (category) {
-            const featuredConfig = await CategoryFeaturedSpecs.findOne({ categoryKey: category });
+        const categoryKeyForSpecs = normalizeCategoryKeyForFeaturedSpecs(category);
+        if (categoryKeyForSpecs) {
+            const featuredConfig = await CategoryFeaturedSpecs.findOne({ categoryKey: categoryKeyForSpecs });
             if (featuredConfig && Array.isArray(featuredConfig.featuredSpecKeys) && featuredConfig.featuredSpecKeys.length > 0) {
                 featuredSpecKeys = featuredConfig.featuredSpecKeys;
                 featuredMode = 'restricted';
@@ -170,7 +178,7 @@ export const getProducts = async (req: Request, res: Response) => {
                 limit: Number(limit),
                 pages: Math.ceil(total / Number(limit))
             },
-            categoryKey: category || null,
+            categoryKey: categoryKeyForSpecs ?? (typeof category === 'string' ? category : null),
             featuredMode,
             featuredSpecKeys,
             facets: finalFacets
@@ -248,8 +256,9 @@ export const getProductFacets = async (req: Request, res: Response) => {
         let featuredMode: 'restricted' | 'none' = 'none';
         let featuredSpecKeys: string[] = [];
 
-        if (category) {
-            const featuredConfig = await CategoryFeaturedSpecs.findOne({ categoryKey: category });
+        const categoryKeyForSpecsFacets = normalizeCategoryKeyForFeaturedSpecs(category);
+        if (categoryKeyForSpecsFacets) {
+            const featuredConfig = await CategoryFeaturedSpecs.findOne({ categoryKey: categoryKeyForSpecsFacets });
             if (featuredConfig && Array.isArray(featuredConfig.featuredSpecKeys) && featuredConfig.featuredSpecKeys.length > 0) {
                 featuredSpecKeys = featuredConfig.featuredSpecKeys;
                 featuredMode = 'restricted';
@@ -275,7 +284,7 @@ export const getProductFacets = async (req: Request, res: Response) => {
         };
 
         res.json({
-            categoryKey: category || null,
+            categoryKey: categoryKeyForSpecsFacets ?? (typeof category === 'string' ? category : null),
             featuredMode,
             featuredSpecKeys,
             facets: finalFacets

@@ -54,6 +54,11 @@ export default function CheckoutPage() {
         [cartItems]
     );
 
+    const hasPreOrder = useMemo(
+        () => cartItems.some((item) => item.availability === "pre_order"),
+        [cartItems]
+    );
+
     const convenienceFee =
         paymentMethod === "card_webx" ? Math.round(subtotal * WEBX_IPG_CONVENIENCE_FEE_RATE * 100) / 100 : 0;
 
@@ -79,6 +84,11 @@ export default function CheckoutPage() {
         e.preventDefault();
         setSubmitting(true);
         try {
+            if (cartItems.some((item) => item.availability === "pre_order")) {
+                toast.error("Your cart includes pre-order items. Online checkout is not available for those lines.");
+                return;
+            }
+
             const fullName = `${formData.firstName.trim()} ${formData.lastName.trim()}`.trim();
 
             if (!fullName || !formData.email.trim()) {
@@ -253,6 +263,21 @@ export default function CheckoutPage() {
                 <p className="text-gray-400 mb-8">Your cart is empty. Add items before checking out.</p>
                 <Link href="/cart" className="px-8 py-3 bg-primary text-white rounded-xl font-bold hover:bg-primary/90">
                     View cart
+                </Link>
+            </div>
+        );
+    }
+
+    if (hasPreOrder) {
+        return (
+            <div className="min-h-screen flex flex-col items-center justify-center text-center px-4">
+                <h1 className="text-3xl font-bold text-white mb-4">Checkout unavailable</h1>
+                <p className="text-gray-400 mb-8 max-w-md">
+                    Your cart includes pre-order item(s). Online checkout is disabled — use WhatsApp from your cart to
+                    arrange the order, or remove pre-order lines and try again.
+                </p>
+                <Link href="/cart" className="px-8 py-3 bg-primary text-white rounded-xl font-bold hover:bg-primary/90">
+                    Back to cart
                 </Link>
             </div>
         );

@@ -91,6 +91,11 @@ function normalizeSortForApi(sort: string): string {
     return sort.trim().toLowerCase().replace(/-/g, '_');
 }
 
+function normalizeCategoryForApi(category: string): string {
+    const c = category.trim();
+    return /^[a-fA-F0-9]{24}$/.test(c) ? c : c.toLowerCase();
+}
+
 function buildProductsQueryString(options: UseProductsOptions): string {
     const params = new URLSearchParams();
     // Always send limit so server returns full facets when limit >= 20 (shop page)
@@ -98,7 +103,7 @@ function buildProductsQueryString(options: UseProductsOptions): string {
     params.append('limit', limit.toString());
     if (options.sort) params.append('sort', normalizeSortForApi(options.sort));
     if (options.search) params.append('search', options.search);
-    if (options.category) params.append('category', options.category);
+    if (options.category) params.append('category', normalizeCategoryForApi(String(options.category)));
     if (options.brand) params.append('brand', options.brand);
     if (options.minPrice != null) params.append('minPrice', options.minPrice.toString());
     if (options.maxPrice != null) params.append('maxPrice', options.maxPrice.toString());
@@ -135,7 +140,7 @@ export const useProductFacets = (options: UseProductsOptions = {}) => {
         queryFn: async () => {
             const params = new URLSearchParams();
             if (options.search) params.append('search', options.search);
-            if (options.category) params.append('category', options.category);
+            if (options.category) params.append('category', normalizeCategoryForApi(String(options.category)));
             if (options.brand) params.append('brand', options.brand);
             if (options.minPrice != null) params.append('minPrice', options.minPrice.toString());
             if (options.maxPrice != null) params.append('maxPrice', options.maxPrice.toString());
