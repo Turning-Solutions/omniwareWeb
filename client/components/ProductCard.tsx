@@ -1,6 +1,6 @@
 "use client";
 
-import type { MouseEvent } from "react";
+import type { CSSProperties, MouseEvent } from "react";
 import Link from "next/link";
 import { ShoppingCart, ShieldCheck } from "lucide-react";
 import toast from "react-hot-toast";
@@ -49,6 +49,15 @@ export default function ProductCard({
     const cartPrice =
         effectiveDiscountPercent != null && effectiveDiscountPercent > 0 ? discountedPrice : product.price;
     const canAddToCart = availability === "in_stock" || availability === "pre_order";
+
+    // Hard clamp the title to 2 lines so cards in a grid keep a consistent height,
+    // even if Tailwind's `line-clamp-*` utilities aren't active for some builds.
+    const titleClampStyle = {
+        display: "-webkit-box",
+        overflow: "hidden",
+        WebkitLineClamp: 2,
+        WebkitBoxOrient: "vertical",
+    } as unknown as CSSProperties;
 
     const handleQuickAddToCart = (e: MouseEvent<HTMLButtonElement>) => {
         e.preventDefault();
@@ -120,11 +129,12 @@ export default function ProductCard({
                                 ? (product.brand as any).name
                                 : product.brand}
                         </p>
-                        <h3 className="text-[14px] font-semibold leading-snug text-[#C8C8C8] transition-colors duration-500 ease-in-out group-hover:text-[#E6E6E6] sm:text-[15px]">
+                        <h3 className="text-[14px] font-semibold leading-snug text-[#C8C8C8] transition-colors duration-500 ease-in-out group-hover:text-[#E6E6E6] sm:text-[15px] min-h-[2.9rem] sm:min-h-[3.1rem]">
                             <Link
                                 href={`/product/${product.slug || product._id}`}
                                 onClick={onNavigateToProduct}
-                                className="line-clamp-2 min-w-0 max-w-full break-words text-left"
+                                className="min-w-0 max-w-full break-words text-left"
+                                style={titleClampStyle}
                             >
                                 <span aria-hidden="true" className="absolute inset-0 z-0" />
                                 {product.title}
