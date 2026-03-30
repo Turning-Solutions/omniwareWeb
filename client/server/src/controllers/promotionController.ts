@@ -68,14 +68,18 @@ export const getActivePromotions = async (req: Request, res: Response, next: any
 
             if (isNaN(start.getTime()) || isNaN(end.getTime())) continue;
 
-            // Timezone-safe "date-only validTo" handling: if the stored time is midnight in UTC,
-            // treat it as the end of that UTC date.
-            if (
-                end.getUTCHours() === 0 &&
-                end.getUTCMinutes() === 0 &&
-                end.getUTCSeconds() === 0 &&
-                end.getUTCMilliseconds() === 0
-            ) {
+            // "Date-only validTo" handling:
+            // Some admins store `validTo` as a date at midnight (00:00:00) with no explicit time.
+            // Interpreting that midnight as the start of the day makes it look expired for the rest of the day.
+            // So if we detect a midnight time component, treat it as end-of-day.
+            const isMidnightLocal =
+                end.getHours() === 0 && end.getMinutes() === 0 && end.getSeconds() === 0 && end.getMilliseconds() === 0;
+            const isMidnightUTC =
+                end.getUTCHours() === 0 && end.getUTCMinutes() === 0 && end.getUTCSeconds() === 0 && end.getUTCMilliseconds() === 0;
+
+            if (isMidnightLocal) {
+                end.setHours(23, 59, 59, 999);
+            } else if (isMidnightUTC) {
                 end.setUTCHours(23, 59, 59, 999);
             }
 
@@ -86,7 +90,7 @@ export const getActivePromotions = async (req: Request, res: Response, next: any
         }
 
         activePromotionsCache = {
-            expiresAt: Date.now() + 30_000,
+            expiresAt: Date.now() + 10_000,
             data: promotions,
         };
 
