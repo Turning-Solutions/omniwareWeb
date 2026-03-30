@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
+import { useState, useEffect } from "react";
 import { ShoppingCart, Check, AlertCircle, Clock, Package, ArrowLeft, X } from "lucide-react";
 import Image from "next/image";
 import { AnimatePresence, motion } from "framer-motion";
@@ -30,8 +30,8 @@ interface ProductColorVariant {
     stock?: { qty?: number };
 }
 
-export default function ProductPage({ params }: { params: Promise<{ slug: string }> }) {
-    const { slug } = use(params);
+export default function ProductPage({ params }: { params: { slug: string } }) {
+    const { slug } = params;
     const router = useRouter();
     const { data: product, isLoading: loading, error } = useProduct(slug);
 
