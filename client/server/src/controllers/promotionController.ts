@@ -3,6 +3,15 @@ import { z } from 'zod';
 import Promotion from '../models/Promotion';
 import { AppError } from '../middleware/errorMiddleware';
 
+// Short in-memory cache to avoid re-querying the DB on every page load.
+// This is safe because promotions only change occasionally (admin actions).
+let activePromotionsCache:
+    | {
+        expiresAt: number;
+        data: any[];
+      }
+    | undefined;
+
 const promotionSchema = z.object({
     title: z.string().min(1, 'Title is required'),
     description: z.string().default(''),
@@ -21,26 +30,65 @@ const updateSchema = promotionSchema.partial();
 export const getActivePromotions = async (req: Request, res: Response, next: any): Promise<void> => {
     try {
         const now = new Date();
-        const candidates = await Promotion.find({ isActive: true }).sort({ sortOrder: 1, createdAt: -1 });
 
-        const promotions = candidates.filter((promotion) => {
+        // Cache for 30s to keep the home page snappy.
+        if (activePromotionsCache && Date.now() < activePromotionsCache.expiresAt) {
+            res.json(activePromotionsCache.data);
+            return;
+        }
+
+        // To keep this endpoint fast, first limit the candidate set using indexes.
+        // We also use a small "sliding window" for validTo because date-only validTo values
+        // are typically stored at midnight and are inclusive for the whole day.
+        const nowMinusOneDay = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+        const candidates = await Promotion.find({
+            isActive: true,
+            validFrom: { $lte: now },
+            validTo: { $gte: nowMinusOneDay },
+        })
+            .sort({ sortOrder: 1, createdAt: -1 })
+            .select({
+                title: 1,
+                description: 1,
+                imageUrl: 1,
+                link: 1,
+                badgeText: 1,
+                validFrom: 1,
+                validTo: 1,
+            })
+            .lean();
+
+        const MAX_PROMOTIONS = 10;
+        const promotions: any[] = [];
+
+        for (const promotion of candidates) {
             const start = new Date(promotion.validFrom);
             const end = new Date(promotion.validTo);
 
-            if (isNaN(start.getTime()) || isNaN(end.getTime())) return false;
+            if (isNaN(start.getTime()) || isNaN(end.getTime())) continue;
 
-            // If validTo is stored as midnight, treat it as "end of that date" to avoid premature expiry.
+            // Timezone-safe "date-only validTo" handling: if the stored time is midnight in UTC,
+            // treat it as the end of that UTC date.
             if (
-                end.getHours() === 0 &&
-                end.getMinutes() === 0 &&
-                end.getSeconds() === 0 &&
-                end.getMilliseconds() === 0
+                end.getUTCHours() === 0 &&
+                end.getUTCMinutes() === 0 &&
+                end.getUTCSeconds() === 0 &&
+                end.getUTCMilliseconds() === 0
             ) {
-                end.setHours(23, 59, 59, 999);
+                end.setUTCHours(23, 59, 59, 999);
             }
 
-            return start <= now && end >= now;
-        });
+            if (start <= now && end >= now) {
+                promotions.push(promotion);
+                if (promotions.length >= MAX_PROMOTIONS) break;
+            }
+        }
+
+        activePromotionsCache = {
+            expiresAt: Date.now() + 30_000,
+            data: promotions,
+        };
 
         res.json(promotions);
     } catch (error) {
