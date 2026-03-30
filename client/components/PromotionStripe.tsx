@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { ArrowRight, ChevronLeft, ChevronRight, Clock, X, Zap } from "lucide-react";
 import api from "@/lib/api";
 import { AnimatePresence, motion } from "framer-motion";
@@ -116,16 +115,16 @@ export default function PromotionStripe({ asHero = false }: PromotionStripeProps
                     animate="center"
                     exit="exit"
                     transition={transition}
-                    className="absolute inset-0"
+                    className="absolute inset-0 z-0"
                 >
                     {promo.imageUrl ? (
-                        <Image
+                        <img
                             src={promo.imageUrl}
                             alt={promo.title}
-                            fill
-                            className="object-cover object-center"
-                            sizes="100vw"
-                            priority={safeIndex === 0}
+                            className="h-full w-full object-cover object-center"
+                            loading={safeIndex === 0 ? "eager" : "lazy"}
+                            referrerPolicy="no-referrer"
+                            draggable={false}
                         />
                     ) : (
                         <div className="absolute inset-0 bg-[#181818]" />
@@ -137,14 +136,14 @@ export default function PromotionStripe({ asHero = false }: PromotionStripeProps
             <div
                 className={
                     asHero
-                        ? "pointer-events-none absolute inset-0 bg-[linear-gradient(to_top,rgba(8,8,8,0.32)_0%,rgba(8,8,8,0.05)_45%,transparent_100%)]"
-                        : "pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,rgba(8,8,8,0.92)_0%,rgba(8,8,8,0.72)_38%,rgba(8,8,8,0.2)_65%,transparent_100%)]"
+                        ? "pointer-events-none absolute inset-0 z-[1] bg-[linear-gradient(to_top,rgba(8,8,8,0.32)_0%,rgba(8,8,8,0.05)_45%,transparent_100%)]"
+                        : "pointer-events-none absolute inset-0 z-[1] bg-[linear-gradient(to_right,rgba(8,8,8,0.92)_0%,rgba(8,8,8,0.72)_38%,rgba(8,8,8,0.2)_65%,transparent_100%)]"
                 }
             />
-            <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_top,rgba(8,8,8,0.75)_0%,transparent_45%)]" />
+            <div className="pointer-events-none absolute inset-0 z-[1] bg-[linear-gradient(to_top,rgba(8,8,8,0.75)_0%,transparent_45%)]" />
 
             {/* Content — layered over image */}
-            <div className="relative flex h-full min-h-[inherit] flex-col justify-between p-6 sm:p-8 lg:p-10">
+            <div className="relative z-10 flex h-full min-h-[inherit] flex-col justify-between p-6 sm:p-8 lg:p-10">
 
                 {!asHero && (
                     <>
@@ -305,7 +304,7 @@ export default function PromotionStripe({ asHero = false }: PromotionStripeProps
 
             {/* Progress bar along the bottom edge */}
             {hasMulti && (
-                <div className="absolute bottom-0 left-0 right-0 h-[2px] overflow-hidden bg-white/8">
+                <div className="absolute bottom-0 left-0 right-0 z-10 h-[2px] overflow-hidden bg-white/8">
                     <motion.div
                         key={promo._id + "-bar"}
                         initial={{ width: "0%" }}
