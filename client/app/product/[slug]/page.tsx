@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Suspense, use, useEffect, useState } from "react";
 import { ShoppingCart, Check, AlertCircle, Clock, Package, ArrowLeft, X } from "lucide-react";
 import Image from "next/image";
 import { AnimatePresence, motion } from "framer-motion";
@@ -30,8 +30,8 @@ interface ProductColorVariant {
     stock?: { qty?: number };
 }
 
-export default function ProductPage({ params }: { params: { slug: string } }) {
-    const { slug } = params;
+function ProductPageInner({ params }: { params: Promise<{ slug: string }> }) {
+    const { slug } = use(params);
     const router = useRouter();
     const { data: product, isLoading: loading, error } = useProduct(slug);
 
@@ -607,6 +607,16 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
                 )}
             </AnimatePresence>
         </div>
+    );
+}
+
+export default function ProductPage({ params }: { params: Promise<{ slug: string }> }) {
+    // Keep this page responsive while `params` resolves, without triggering the global
+    // `client/app/loading.tsx` (so we don't show 2 loaders at once).
+    return (
+        <Suspense fallback={null}>
+            <ProductPageInner params={params} />
+        </Suspense>
     );
 }
 
