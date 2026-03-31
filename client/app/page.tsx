@@ -28,10 +28,7 @@ import ReviewForm from "@/components/reviews/ReviewForm";
 const SEARCH_PREVIEW_DEBOUNCE_MS = 320;
 
 /**
- * Partner logos on the home page are listed in `topBrands` below; each `logo` path is served from
- * `client/public/logos/` (URLs like `/logos/...`). If you overwrite a file but keep the same name,
- * Next.js Image cache and the browser may still show the old file — set `NEXT_PUBLIC_LOGO_ASSET_VERSION`
- * in `.env.local` to a new value (e.g. `2`) or delete `.next` and hard-refresh.
+ * Appends an optional cache-busting query string to partner logo URLs.
  */
 function withLogoCacheBust(path: string): string {
     const v = process.env.NEXT_PUBLIC_LOGO_ASSET_VERSION?.trim();
@@ -42,6 +39,7 @@ export default function Home() {
     const router = useRouter();
     const [searchDraft, setSearchDraft] = useState("");
     const [previewQuery, setPreviewQuery] = useState("");
+    const [topBrands, setTopBrands] = useState<Array<{ _id?: string; name: string; logoUrl?: string }>>([]);
 
     const { data: featuredData, isLoading: loadingFeatured, isFetching: fetchingFeatured } = useProducts({
         limit: 4,
@@ -92,14 +90,42 @@ export default function Home() {
         { label: "Headset", slug: "headset", icon: Headphones },
     ];
 
-    const topBrands = [
-        { name: "NVIDIA", logo: "/logos/nvidia-logo-vert.png" },
-        { name: "AMD", logo: "/logos/AMD_Logo.svg.png" },
-        { name: "Intel", logo: "/logos/Intel_logo_2023.svg.png" },
-        { name: "Corsair", logo: "/logos/CORSAIRLogo.png" },
-        { name: "Samsung", logo: "/logos/Samsung_old_logo_before_year_2015.svg.png" },
-        { name: "MSI", logo: "/logos/Msi_Logo.png" },
-    ] as const;
+    useEffect(() => {
+        let isMounted = true;
+        const loadPartners = async () => {
+            try {
+                const res = await fetch("/api/v1/partners/active", { cache: "no-store" });
+                if (!res.ok) throw new Error("Failed to load partners");
+                const data = await res.json();
+                if (isMounted) {
+                    setTopBrands(Array.isArray(data) ? data : []);
+                }
+            } catch {
+                if (!isMounted) return;
+                setTopBrands([
+                    { name: "AMD" },
+                    { name: "INTEL" },
+                    { name: "NVIDIA" },
+                    { name: "ASUS" },
+                    { name: "MSI" },
+                    { name: "GIGABYTE" },
+                    { name: "ZOTAG" },
+                    { name: "CORSAIR" },
+                    { name: "NZXT" },
+                    { name: "ANTEC" },
+                    { name: "PROLINK" },
+                    { name: "OMIKUMA" },
+                    { name: "WD" },
+                    { name: "SAMSUNG" },
+                ]);
+            }
+        };
+
+        void loadPartners();
+        return () => {
+            isMounted = false;
+        };
+    }, []);
     const servicePillars = [
         {
             title: "Trusted Inventory",
@@ -501,20 +527,24 @@ export default function Home() {
                                 className={`brand-marquee-segment flex shrink-0 items-center gap-6 pr-6 sm:gap-9 sm:pr-9 ${copyIndex > 0 ? "brand-marquee-segment-duplicate" : ""}`}
                                 aria-hidden={copyIndex > 0 ? true : undefined}
                             >
-                                {topBrands.map((brand) => (
+                                {topBrands.map((brand, brandIndex) => (
                                     <div
-                                        key={`${copyIndex}-${brand.name}`}
+                                        key={`${copyIndex}-${brand._id || `${brand.name}-${brandIndex}`}`}
                                         className="group flex h-[4.5rem] w-[10.5rem] shrink-0 items-center justify-center rounded-2xl border border-white/[0.08] bg-[#141414] px-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition-[border-color,background-color] duration-300 hover:border-[#D12B28]/30 hover:bg-[#181818] sm:h-[5.25rem] sm:w-[12.25rem] sm:rounded-[1.35rem] sm:px-5"
                                     >
-                                        <div className="relative h-10 w-[8rem] sm:h-12 sm:w-[9.5rem]">
-                                            <Image
-                                                src={withLogoCacheBust(brand.logo)}
-                                                alt={copyIndex === 0 ? `${brand.name} logo` : ""}
-                                                fill
-                                                className="object-contain object-center transition-transform duration-300 group-hover:scale-[1.04]"
-                                                sizes="(max-width: 640px) 160px, 200px"
-                                            />
-                                        </div>
+                                        {brand.logoUrl ? (
+                                            <div className="relative h-10 w-[8rem] sm:h-12 sm:w-[9.5rem]">
+                                                <Image
+                                                    src={withLogoCacheBust(brand.logoUrl)}
+                                                    alt={copyIndex === 0 ? `${brand.name} logo` : ""}
+                                                    fill
+                                                    className="object-contain object-center transition-transform duration-300 group-hover:scale-[1.04]"
+                                                    sizes="(max-width: 640px) 160px, 200px"
+                                                />
+                                            </div>
+                                        ) : (
+                                            <span className="text-sm font-semibold tracking-wide text-white/85">{brand.name}</span>
+                                        )}
                                     </div>
                                 ))}
                             </div>

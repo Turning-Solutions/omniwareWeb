@@ -1,8 +1,9 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { Clock, Loader2, Mail, MapPin, MessageSquare, Phone, Send, Sparkles } from "lucide-react";
+import { Loader2, Mail, MapPin, MessageSquare, Phone, Send, Sparkles } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 import { useState } from "react";
 import { isAxiosError } from "axios";
 import api from "@/lib/api";
@@ -110,10 +111,21 @@ export default function ContactPage() {
                                     <Mail className="h-5 w-5 shrink-0 text-[#D12B28]/90" aria-hidden />
                                     support@omniware.lk
                                 </a>
+                                
                             </div>
                         </div>
 
                        
+
+                        <a
+                            href="https://wa.me/94740523439?text=Hi%20Omniware%2C%20I%20need%20help%20with%20a%20product."
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center justify-center gap-2 rounded-2xl border border-[#25D366]/55 bg-[#25D366]/10 px-6 py-4 text-sm font-semibold text-[#D8FFE6] transition hover:bg-[#25D366]/20 sm:px-8"
+                        >
+                            <Image src="/whatsapp-logo.svg" alt="WhatsApp" width={18} height={18} />
+                            Contact on WhatsApp
+                        </a>
 
                         <div className="rounded-2xl border border-[#5E5E5E]/35 bg-[#181818]/60 px-6 py-5 sm:px-8">
                             <p className="text-xs font-semibold uppercase tracking-wider text-[#8E8E8E]">Quick links</p>
@@ -245,18 +257,20 @@ export default function ContactPage() {
                                         placeholder="Tell us what you need, timeline, budget, current hardware if any."
                                     />
                                 </div>
-                                <button
-                                    type="submit"
-                                    disabled={sending}
-                                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#D12B28] py-3.5 text-sm font-semibold text-white shadow-lg shadow-[#D12B28]/20 transition hover:bg-[#b82523] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#D12B28] enabled:cursor-pointer disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto sm:px-10"
-                                >
-                                    {sending ? (
-                                        <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-                                    ) : (
-                                        <Send className="h-4 w-4" aria-hidden />
-                                    )}
-                                    {sending ? "Sending…" : "Send message"}
-                                </button>
+                                <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
+                                    <button
+                                        type="submit"
+                                        disabled={sending}
+                                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#D12B28] py-3.5 text-sm font-semibold text-white shadow-lg shadow-[#D12B28]/20 transition hover:bg-[#b82523] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#D12B28] enabled:cursor-pointer disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto sm:px-10"
+                                    >
+                                        {sending ? (
+                                            <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                                        ) : (
+                                            <Send className="h-4 w-4" aria-hidden />
+                                        )}
+                                        {sending ? "Sending..." : "Send message"}
+                                    </button>
+                                </div>
                             </form>
                         </div>
                     </motion.div>

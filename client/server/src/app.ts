@@ -12,6 +12,7 @@ import featuredSpecsRoutes from './routes/featuredSpecsRoutes';
 import uploadRoutes from './routes/uploadRoutes';
 import contactRoutes from './routes/contactRoutes';
 import promotionRoutes from './routes/promotionRoutes';
+import partnerRoutes from './routes/partnerRoutes';
 import quoteRoutes from './routes/quoteRoutes';
 import adminQuotesRoutes from './routes/admin.quotes';
 import reviewRoutes from './routes/reviewRoutes';
@@ -60,6 +61,7 @@ function createApp() {
     app.use('/api/v1/builder', builderRoutes);
     app.use('/api/v1/analytics', analyticsRoutes);
     app.use('/api/v1/promotions', promotionRoutes);
+    app.use('/api/v1/partners', partnerRoutes);
     app.use('/api/v1/quotes', quoteRoutes);
     app.use('/api/v1/reviews', reviewRoutes);
 
