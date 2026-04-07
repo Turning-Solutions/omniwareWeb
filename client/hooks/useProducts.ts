@@ -16,6 +16,7 @@ export interface UseProductsOptions {
     inStock?: string;
     isFeatured?: boolean;
     includeFacets?: boolean;
+    enabled?: boolean;
 }
 
 export interface Product {
@@ -129,6 +130,7 @@ export const useProducts = (options: UseProductsOptions = {}) => {
             const { data } = await api.get(`/products?${query}`);
             return data;
         },
+        enabled: options.enabled ?? true,
         staleTime: 2 * 60 * 1000, // 2 minutes — avoid refetch on every mount
         placeholderData: (previousData) => previousData, // show previous list while refetching
     });

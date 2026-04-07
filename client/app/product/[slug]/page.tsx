@@ -1,18 +1,18 @@
 "use client";
 
-import { Suspense, use, useEffect, useState } from "react";
+import { Suspense, use, useEffect, useMemo, useState } from "react";
 import { ShoppingCart, Check, AlertCircle, Clock, Package, ArrowLeft, X } from "lucide-react";
 import Image from "next/image";
 import { AnimatePresence, motion } from "framer-motion";
 import { useCart } from "@/context/CartContext";
 import { useRouter } from "next/navigation";
 
-import { useProduct } from "@/hooks/useProducts";
+import ProductCard from "@/components/ProductCard";
+import { useProduct, useProducts } from "@/hooks/useProducts";
 import { buildProductWhatsAppUrl } from "@/lib/whatsapp";
 import LoadingAnimation from "@/components/LoadingAnimation";
 import WhatsAppLogo from "@/components/WhatsAppLogo";
 import FlowSectionHeader from "@/components/FlowSectionHeader";
-import ProductReviewsSection from "@/components/ProductReviewsSection";
 
 interface ProductVariant {
     sku?: string;
@@ -34,6 +34,24 @@ function ProductPageInner({ params }: { params: Promise<{ slug: string }> }) {
     const { slug } = use(params);
     const router = useRouter();
     const { data: product, isLoading: loading, error } = useProduct(slug);
+    const primaryCategoryId = product?.categoryIds?.[0]?._id;
+    const primaryCategoryName = product?.categoryIds?.[0]?.name;
+    const { data: sameCategoryData, isLoading: loadingSameCategory } = useProducts({
+        category: primaryCategoryId,
+        limit: 12,
+        includeFacets: false,
+        enabled: Boolean(primaryCategoryId),
+    });
+    const sameCategoryProducts = useMemo(() => {
+        const currentProductId = product?._id;
+        const candidates = (sameCategoryData?.products ?? []).filter((item) => item._id !== currentProductId);
+        const shuffled = [...candidates];
+        for (let i = shuffled.length - 1; i > 0; i -= 1) {
+            const randomIndex = Math.floor(Math.random() * (i + 1));
+            [shuffled[i], shuffled[randomIndex]] = [shuffled[randomIndex], shuffled[i]];
+        }
+        return shuffled.slice(0, 4);
+    }, [product?._id, sameCategoryData?.products]);
 
     // Local state for image and variants (only when product loads)
     const [selectedImage, setSelectedImage] = useState(0);
@@ -570,7 +588,41 @@ function ProductPageInner({ params }: { params: Promise<{ slug: string }> }) {
                         );
                     })()}
                 </motion.div>
-                            <ProductReviewsSection productId={product._id} />
+                            <div className="col-span-full mt-10 border-t border-white/[0.08] pt-10 md:col-span-2">
+                                <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+                                    <div>
+                                        <h2 className="text-xl font-bold tracking-tight text-[#F1F1F1] sm:text-2xl">
+                                            More from this category
+                                        </h2>
+                                        <p className="mt-2 text-sm text-[#8E8E8E]">
+                                            {primaryCategoryName
+                                                ? `A few more picks from ${primaryCategoryName}.`
+                                                : "Explore similar products from the same category."}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {loadingSameCategory ? (
+                                    <div className="rounded-2xl border border-white/[0.07] bg-[#121212]/40 p-6">
+                                        <LoadingAnimation size="md" label="Loading similar products..." className="h-40" />
+                                    </div>
+                                ) : sameCategoryProducts.length > 0 ? (
+                                    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
+                                        {sameCategoryProducts.map((item) => (
+                                            <ProductCard
+                                                key={item._id}
+                                                product={item}
+                                                showOrderNowButton
+                                                showWhatsAppButton={false}
+                                            />
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="rounded-2xl border border-white/[0.07] bg-[#121212]/40 px-5 py-6 text-sm text-[#8E8E8E]">
+                                        No other products are available in this category right now.
+                                    </div>
+                                )}
+                            </div>
                             </div>
                         </div>
                     </div>

@@ -5,9 +5,11 @@ import {
     createShopReview,
     createProductReview,
 } from '../controllers/reviewController';
+import { getGoogleBusinessReviews } from '../controllers/googleBusinessReviewController';
 
 const router = express.Router();
 
+router.get('/google', getGoogleBusinessReviews);
 router.get('/shop', getShopReviews);
 router.post('/shop', createShopReview);
 router.get('/product/:productId', getProductReviews);

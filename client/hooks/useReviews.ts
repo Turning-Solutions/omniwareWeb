@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 
@@ -10,6 +11,8 @@ export type Review = {
     comment: string;
     createdAt: string;
     status?: "pending" | "approved" | "rejected";
+    /** Present when loaded from Google Business (Places API). */
+    source?: "google";
 };
 
 export function useShopReviews(limit = 24) {
@@ -22,6 +25,47 @@ export function useShopReviews(limit = 24) {
         staleTime: 0,
         refetchOnMount: "always",
     });
+}
+
+function interleaveReviews(google: Review[], site: Review[]): Review[] {
+    const out: Review[] = [];
+    const n = Math.max(google.length, site.length);
+    for (let i = 0; i < n; i++) {
+        if (i < google.length) out.push(google[i]);
+        if (i < site.length) out.push(site[i]);
+    }
+    return out;
+}
+
+/**
+ * Approved site shop reviews plus Google Business reviews (when API is configured), interleaved for the marquee.
+ */
+export function useShopReviewsForMarquee(limit = 24) {
+    const shopQuery = useShopReviews(limit);
+    const googleQuery = useQuery({
+        queryKey: ["reviews", "google"],
+        queryFn: async () => {
+            try {
+                const { data } = await api.get<{ reviews: Review[] }>("/reviews/google");
+                return data.reviews ?? [];
+            } catch {
+                return [];
+            }
+        },
+        staleTime: 1000 * 60 * 30,
+        retry: 1,
+    });
+
+    const data = useMemo(
+        () => interleaveReviews(googleQuery.data ?? [], shopQuery.data ?? []),
+        [googleQuery.data, shopQuery.data]
+    );
+
+    return {
+        data,
+        isLoading: shopQuery.isLoading,
+        isFetching: shopQuery.isFetching || googleQuery.isFetching,
+    };
 }
 
 export type ProductReviewsPage = {

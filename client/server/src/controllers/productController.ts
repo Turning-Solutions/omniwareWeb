@@ -181,6 +181,7 @@ export const getProducts = async (req: Request, res: Response) => {
         const categoryMatchStage = await buildProductMatchStage(req, ['category'], lookupCache);
         const brandMatchStage = await buildProductMatchStage(req, ['brand'], lookupCache);
         const priceMatchStage = await buildProductMatchStage(req, ['price'], lookupCache);
+        const specsMatchStage = await buildProductMatchStage(req, ['specs'], lookupCache);
 
         // --- Aggregation Pipeline ---
         // Note: We cannot start with a common $match because facets need DIFFERENT matches.
@@ -241,14 +242,10 @@ export const getProducts = async (req: Request, res: Response) => {
                         { $group: { _id: "$availability", count: { $sum: 1 } } },
                         { $project: { value: "$_id", count: 1, _id: 0 } }
                     ],
-                    // Specs (Dynamic)
-                    // Specs are tricky. If I select "16GB", I probably want to see "32GB" option for the same set of products.
-                    // But if I select "Asus", I want specs for "Asus".
-                    // So Specs should probably follow matchStage (strict) or maybe exclude 'specs'?
-                    // For now, let's keep it strict (matchStage) to avoid massive aggregation complexity 
-                    // unless specifically requested.
+                    // Specs (Dynamic): keep all values visible for multi-select
+                    // by excluding current spec selections from the facet match.
                     specs: [
-                        { $match: matchStage },
+                        { $match: specsMatchStage },
                         SPECS_OBJECT_TO_ARRAY_PROJECT,
                         { $unwind: "$specs" },
                         // Group by Key+Value to get counts
@@ -351,6 +348,7 @@ export const getProductFacets = async (req: Request, res: Response) => {
         const categoryMatchStage = await buildProductMatchStage(req, ['category'], lookupCache);
         const brandMatchStage = await buildProductMatchStage(req, ['brand'], lookupCache);
         const priceMatchStage = await buildProductMatchStage(req, ['price'], lookupCache);
+        const specsMatchStage = await buildProductMatchStage(req, ['specs'], lookupCache);
 
         const pipeline = [
             {
@@ -381,7 +379,7 @@ export const getProductFacets = async (req: Request, res: Response) => {
                         { $project: { value: "$_id", count: 1, _id: 0 } }
                     ],
                     specs: [
-                        { $match: matchStage },
+                        { $match: specsMatchStage },
                         SPECS_OBJECT_TO_ARRAY_PROJECT,
                         { $unwind: "$specs" },
                         {

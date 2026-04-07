@@ -41,6 +41,8 @@ export const getProducts = async (req: Request, res: Response) => {
         const brandMatchStage = await buildProductMatchStage(req, ['brand']);
         // For Price: Exclude 'price' filter so we see full range
         const priceMatchStage = await buildProductMatchStage(req, ['price']);
+        // For Specs: Exclude current spec selection so all options stay visible for multi-select
+        const specsMatchStage = await buildProductMatchStage(req, ['specs']);
 
         const sortStage = buildProductSortStage(sort);
 
@@ -105,14 +107,9 @@ export const getProducts = async (req: Request, res: Response) => {
                         { $group: { _id: "$availability", count: { $sum: 1 } } },
                         { $project: { value: "$_id", count: 1, _id: 0 } }
                     ],
-                    // Specs (Dynamic)
-                    // Specs are tricky. If I select "16GB", I probably want to see "32GB" option for the same set of products.
-                    // But if I select "Asus", I want specs for "Asus".
-                    // So Specs should probably follow matchStage (strict) or maybe exclude 'specs'?
-                    // For now, let's keep it strict (matchStage) to avoid massive aggregation complexity 
-                    // unless specifically requested.
+                    // Specs (Dynamic): exclude current spec filters so other options remain visible.
                     specs: [
-                        { $match: matchStage },
+                        { $match: specsMatchStage },
                         SPECS_OBJECT_TO_ARRAY_PROJECT,
                         { $unwind: "$specs" },
                         // Group by Key+Value to get counts
@@ -203,6 +200,8 @@ export const getProductFacets = async (req: Request, res: Response) => {
 
         // For Categories: Exclude 'category' filter
         const categoryMatchStage = await buildProductMatchStage(req, ['category']);
+        // For Specs: Exclude current spec selection so all options stay visible for multi-select
+        const specsMatchStage = await buildProductMatchStage(req, ['specs']);
 
         const pipeline = [
             { $match: matchStage },
@@ -231,6 +230,7 @@ export const getProductFacets = async (req: Request, res: Response) => {
                         { $project: { value: "$_id", count: 1, _id: 0 } }
                     ],
                     specs: [
+                        { $match: specsMatchStage },
                         SPECS_OBJECT_TO_ARRAY_PROJECT,
                         { $unwind: "$specs" },
                         {

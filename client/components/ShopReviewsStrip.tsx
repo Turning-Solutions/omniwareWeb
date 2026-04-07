@@ -1,7 +1,7 @@
 "use client";
 
 import { Star } from "lucide-react";
-import { useShopReviews } from "@/hooks/useReviews";
+import { useShopReviewsForMarquee } from "@/hooks/useReviews";
 import type { Review } from "@/hooks/useReviews";
 
 function formatReviewDate(iso: string) {
@@ -42,7 +42,7 @@ function ReviewMarqueeCard({ r }: { r: Review }) {
                 <div className="min-w-0 flex-1">
                     <p className="truncate text-base font-semibold text-[#F1F1F1]">{r.authorName}</p>
                     <p className="mt-1 font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-[#D12B28]/75">
-                        Shop review
+                        {r.source === "google" ? "Google review" : "Shop review"}
                     </p>
                 </div>
                 <div className="shrink-0 text-right">
@@ -82,7 +82,7 @@ function marqueeSlotsForSegment(reviews: Review[], minCards = 20): Array<{ revie
  * Infinite horizontal shop reviews. Default: full viewport width strip (matches partners marquee).
  */
 export default function ShopReviewsStrip({ fullWidthStrip = true }: ShopReviewsStripProps) {
-    const { data: reviews, isLoading } = useShopReviews(24);
+    const { data: reviews, isLoading } = useShopReviewsForMarquee(24);
     const hasReviews = Boolean(reviews && reviews.length > 0);
     const segmentSlots = reviews && reviews.length > 0 ? marqueeSlotsForSegment(reviews) : [];
     const marqueeDurationSec =
