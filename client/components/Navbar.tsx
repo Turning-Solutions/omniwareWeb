@@ -65,7 +65,7 @@ export default function Navbar() {
                 </div>
 
                 <div className="hidden shrink-0 items-center gap-2 md:flex">
-                    <div className="flex items-center rounded-full border border-white/[0.1] bg-white/[0.04] p-0.5 pl-1">
+                    <div className="flex items-center rounded-full border border-white/[0.1] bg-white/[0.04] p-0.5">
                         <Link
                             href="/cart"
                             className="relative flex h-9 w-9 items-center justify-center rounded-full text-zinc-400 transition-colors hover:bg-white/[0.08] hover:text-white"
