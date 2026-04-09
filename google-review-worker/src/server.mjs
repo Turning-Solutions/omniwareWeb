@@ -7,6 +7,7 @@ import {
 
 const app = express();
 const port = Number(process.env.PORT || 4001);
+const host = "0.0.0.0";
 const refreshSecret = String(process.env.GOOGLE_REVIEWS_REFRESH_WEBHOOK_SECRET || "").trim();
 const defaultMaxReviews = Number.isFinite(Number(process.env.GOOGLE_REVIEWS_MAX_REVIEWS))
   ? Math.max(1, Math.min(500, Number(process.env.GOOGLE_REVIEWS_MAX_REVIEWS)))
@@ -22,6 +23,13 @@ let lastJob = {
 };
 
 app.use(express.json({ limit: "1mb" }));
+
+app.get("/", (_req, res) => {
+  res.status(200).json({
+    ok: true,
+    service: "google-review-worker",
+  });
+});
 
 app.get("/healthz", (_req, res) => {
   res.json({
@@ -106,6 +114,18 @@ app.post("/google-reviews-refresh", async (req, res) => {
   });
 });
 
-app.listen(port, () => {
-  console.log(`[google-review-worker] listening on port ${port}`);
+const server = app.listen(port, host, () => {
+  console.log(`[google-review-worker] listening on ${host}:${port}`);
+});
+
+server.on("error", (error) => {
+  console.error("[google-review-worker] server error", error);
+});
+
+process.on("unhandledRejection", (error) => {
+  console.error("[google-review-worker] unhandled rejection", error);
+});
+
+process.on("uncaughtException", (error) => {
+  console.error("[google-review-worker] uncaught exception", error);
 });
