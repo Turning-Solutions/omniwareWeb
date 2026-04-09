@@ -8,7 +8,7 @@ import DynamicFilterSidebar, { countActiveFilters } from "@/components/DynamicFi
 import LoadingAnimation from "@/components/LoadingAnimation";
 import { SlidersHorizontal, ArrowUpDown, X, ChevronLeft, ChevronRight, Search } from "lucide-react";
 
-const PRODUCTS_PER_PAGE = 15;
+const PRODUCTS_PER_PAGE = 16;
 const SEARCH_DEBOUNCE_MS = 380;
 const SHOP_RETURN_STATE_PREFIX = "shop:return-state:";
 
@@ -185,7 +185,12 @@ export function ShopContent({
         commitSearch("");
     };
 
-    const goToPage = (page: number) => setFilters((prev: Filters) => ({ ...prev, page }));
+    const goToPage = (page: number) => {
+        setFilters((prev: Filters) => ({ ...prev, page }));
+        if (typeof window !== "undefined") {
+            window.scrollTo({ top: 0, behavior: "smooth" });
+        }
+    };
 
     const pagination = (data as { pagination?: { page: number; pages: number; total: number } })?.pagination;
     const currentPage = pagination?.page ?? (data as { page?: number })?.page ?? 1;

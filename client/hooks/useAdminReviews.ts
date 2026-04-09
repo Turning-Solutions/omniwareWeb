@@ -7,6 +7,16 @@ export type AdminReviewRow = Omit<Review, "productId"> & {
     productId?: { _id: string; title: string; slug?: string } | string | null;
 };
 
+export type GoogleReviewSyncStatus = {
+    sourceUrl: string;
+    reviewCount: number;
+    lastRequestedAt: string | null;
+    lastSyncedAt: string | null;
+    lastImportStatus: "idle" | "pending" | "success" | "error";
+    lastError: string;
+    lastRequestedBy: string;
+};
+
 export function useAdminReviews(statusFilter: string, kindFilter: string) {
     return useQuery({
         queryKey: ["admin", "reviews", statusFilter, kindFilter],
@@ -19,9 +29,35 @@ export function useAdminReviews(statusFilter: string, kindFilter: string) {
     });
 }
 
+export function useGoogleReviewSyncStatus() {
+    return useQuery({
+        queryKey: ["admin", "google-reviews", "status"],
+        queryFn: async () => {
+            const { data } = await api.get<{ status: GoogleReviewSyncStatus }>("/admin/google-reviews/status");
+            return data.status;
+        },
+    });
+}
+
 function reviewIdForUrl(id: string): string {
     const s = String(id ?? "").trim();
     return encodeURIComponent(s);
+}
+
+export function useRefreshGoogleReviews() {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: async () => {
+            const { data } = await api.post<{ ok: boolean; queued: boolean; status: GoogleReviewSyncStatus }>(
+                "/admin/google-reviews/refresh"
+            );
+            return data;
+        },
+        onSuccess: () => {
+            qc.invalidateQueries({ queryKey: ["admin", "google-reviews"] });
+            qc.invalidateQueries({ queryKey: ["reviews"] });
+        },
+    });
 }
 
 export function useUpdateReviewStatus() {

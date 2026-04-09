@@ -1,25 +1,5 @@
 import crypto from 'crypto';
-
-type GoogleFindPlaceResponse = {
-    status: string;
-    error_message?: string;
-    candidates?: Array<{ place_id?: string }>;
-};
-
-type GooglePlaceReview = {
-    author_name?: string;
-    rating?: number;
-    text?: string;
-    time?: number;
-};
-
-type GooglePlaceDetailsResponse = {
-    status: string;
-    error_message?: string;
-    result?: {
-        reviews?: GooglePlaceReview[];
-    };
-};
+import GoogleReviewFeed from '../models/GoogleReviewFeed';
 
 export type GoogleReviewForClient = {
     _id: string;
@@ -32,104 +12,197 @@ export type GoogleReviewForClient = {
     source: 'google';
 };
 
-const DEFAULT_LAT = 6.8499365;
-const DEFAULT_LNG = 79.8866177;
+export type GoogleReviewImportItem = {
+    id?: string;
+    externalId?: string;
+    authorName?: string;
+    rating?: number;
+    comment?: string;
+    dateText?: string;
+    createdAt?: string;
+};
 
-let cachedPlaceId: string | null = null;
-let cachedPlaceIdUntil = 0;
+export type GoogleReviewImportPayload = {
+    sourceUrl?: string;
+    reviews?: GoogleReviewImportItem[];
+};
 
-let cachedReviews: GoogleReviewForClient[] | null = null;
-let cachedReviewsUntil = 0;
+export type GoogleReviewSyncStatus = {
+    sourceUrl: string;
+    reviewCount: number;
+    lastRequestedAt: string | null;
+    lastSyncedAt: string | null;
+    lastImportStatus: 'idle' | 'pending' | 'success' | 'error';
+    lastError: string;
+    lastRequestedBy: string;
+};
 
-const PLACE_ID_TTL_MS = 7 * 24 * 60 * 60 * 1000;
-const REVIEWS_TTL_MS = 60 * 60 * 1000;
+const FEED_KEY = 'omniware-google-maps';
+export const DEFAULT_GOOGLE_MAPS_URL =
+    'https://www.google.com/maps/place/Omniware+Technologies/@6.8499418,79.8840428,17z/data=!4m8!3m7!1s0x3ae25bc001c21cfb:0x706552a0c455e4a3!8m2!3d6.8499365!4d79.8866177!9m1!1b1!16s%2Fg%2F11srgk22h7?entry=ttu&g_ep=EgoyMDI2MDQwNy4wIKXMDSoASAFQAw%3D%3D';
 
-function businessLatLng(): { lat: number; lng: number } {
-    const lat = Number(process.env.GOOGLE_BUSINESS_LAT);
-    const lng = Number(process.env.GOOGLE_BUSINESS_LNG);
-    const ok = Number.isFinite(lat) && Number.isFinite(lng);
-    return ok ? { lat, lng } : { lat: DEFAULT_LAT, lng: DEFAULT_LNG };
+function configuredSourceUrl(): string {
+    return process.env.GOOGLE_REVIEWS_SOURCE_URL?.trim() || DEFAULT_GOOGLE_MAPS_URL;
 }
 
-async function resolvePlaceId(apiKey: string): Promise<string | null> {
-    const fromEnv = process.env.GOOGLE_BUSINESS_PLACE_ID?.trim();
-    if (fromEnv) return fromEnv;
-
-    const now = Date.now();
-    if (cachedPlaceId && cachedPlaceIdUntil > now) return cachedPlaceId;
-
-    const { lat, lng } = businessLatLng();
-    const query = process.env.GOOGLE_BUSINESS_FIND_QUERY?.trim() || 'Omniware Technologies';
-
-    const url = new URL('https://maps.googleapis.com/maps/api/place/findplacefromtext/json');
-    url.searchParams.set('input', query);
-    url.searchParams.set('inputtype', 'textquery');
-    url.searchParams.set('fields', 'place_id');
-    url.searchParams.set('locationbias', `circle:3000@${lat},${lng}`);
-    url.searchParams.set('key', apiKey);
-
-    const res = await fetch(url.toString());
-    const data = (await res.json()) as GoogleFindPlaceResponse;
-    if (data.status !== 'OK' || !data.candidates?.[0]?.place_id) {
-        console.warn('[google reviews] find place:', data.status, data.error_message ?? '');
-        return null;
-    }
-
-    const pid = data.candidates[0].place_id;
-    cachedPlaceId = pid;
-    cachedPlaceIdUntil = now + PLACE_ID_TTL_MS;
-    return pid;
+function reviewHash(...parts: string[]): string {
+    return crypto.createHash('sha256').update(parts.join('|')).digest('hex').slice(0, 24);
 }
 
-function mapGoogleReview(r: GooglePlaceReview): GoogleReviewForClient {
-    const author = String(r.author_name || 'Google user').slice(0, 100);
-    const timeSec = typeof r.time === 'number' ? r.time : 0;
-    const text = String(r.text || '').trim();
-    const rawRating = Number(r.rating);
-    const rating = Number.isFinite(rawRating) ? Math.min(5, Math.max(1, Math.round(rawRating))) : 5;
-    const idBase = `${timeSec}:${author}:${text.slice(0, 48)}`;
-    const _id = `google-${crypto.createHash('sha256').update(idBase).digest('hex').slice(0, 24)}`;
+function clampRating(input: unknown): number {
+    const raw = Number(input);
+    if (!Number.isFinite(raw)) return 5;
+    return Math.max(1, Math.min(5, Math.round(raw)));
+}
+
+function safeDate(input: unknown): Date {
+    const d = input ? new Date(String(input)) : new Date(0);
+    return Number.isNaN(d.getTime()) ? new Date(0) : d;
+}
+
+function trimText(input: unknown, fallback: string, max: number): string {
+    const s = String(input ?? '').trim();
+    return (s || fallback).slice(0, max);
+}
+
+function mapStoredReview(r: {
+    externalId?: string;
+    authorName?: string;
+    rating?: number;
+    comment?: string;
+    createdAt?: Date | string;
+}): GoogleReviewForClient {
+    const createdAt = safeDate(r.createdAt).toISOString();
+    const authorName = trimText(r.authorName, 'Google user', 100);
+    const comment = trimText(r.comment, 'Rated on Google.', 4000);
+    const rating = clampRating(r.rating);
     return {
-        _id,
+        _id: `google-${reviewHash(String(r.externalId ?? ''), authorName, comment, createdAt)}`,
         kind: 'shop',
         productId: null,
         rating,
-        authorName: author,
-        comment: text || 'Rated on Google.',
-        createdAt: new Date(timeSec * 1000).toISOString(),
+        authorName,
+        comment,
+        createdAt,
         source: 'google',
     };
 }
 
-/**
- * Fetches up to five recent Google Business reviews (Places API Place Details limit).
- * Cached in memory for one hour. Requires GOOGLE_PLACES_API_KEY.
- */
 export async function loadGoogleBusinessReviewsForApi(): Promise<GoogleReviewForClient[]> {
-    const apiKey = process.env.GOOGLE_PLACES_API_KEY?.trim();
-    if (!apiKey) return [];
+    const feed = await GoogleReviewFeed.findOne({ sourceKey: FEED_KEY }).lean();
+    const reviews: Array<{
+        externalId?: string;
+        authorName?: string;
+        rating?: number;
+        comment?: string;
+        createdAt?: Date | string;
+    }> = Array.isArray(feed?.reviews) ? feed.reviews : [];
+    return reviews
+        .slice()
+        .sort((a, b) => safeDate(b.createdAt).getTime() - safeDate(a.createdAt).getTime())
+        .map(mapStoredReview);
+}
 
-    const now = Date.now();
-    if (cachedReviews && cachedReviewsUntil > now) return cachedReviews;
+export async function loadGoogleReviewSyncStatus(): Promise<GoogleReviewSyncStatus> {
+    const feed = await GoogleReviewFeed.findOne({ sourceKey: FEED_KEY }).lean();
+    return {
+        sourceUrl: feed?.sourceUrl || configuredSourceUrl(),
+        reviewCount: Number(feed?.reviewCount || 0),
+        lastRequestedAt: feed?.lastRequestedAt ? new Date(feed.lastRequestedAt).toISOString() : null,
+        lastSyncedAt: feed?.lastSyncedAt ? new Date(feed.lastSyncedAt).toISOString() : null,
+        lastImportStatus: feed?.lastImportStatus || 'idle',
+        lastError: String(feed?.lastError || ''),
+        lastRequestedBy: String(feed?.lastRequestedBy || ''),
+    };
+}
 
-    const placeId = await resolvePlaceId(apiKey);
-    if (!placeId) return [];
+function normalizeImportedReview(input: GoogleReviewImportItem, index: number) {
+    const authorName = trimText(input.authorName, 'Google user', 100);
+    const comment = trimText(input.comment, 'Rated on Google.', 4000);
+    const createdAt = safeDate(input.createdAt || input.dateText);
+    const dateText = trimText(input.dateText, '', 120);
+    const externalId =
+        trimText(input.externalId || input.id, '', 200) ||
+        reviewHash(authorName, comment, createdAt.toISOString(), String(index));
 
-    const url = new URL('https://maps.googleapis.com/maps/api/place/details/json');
-    url.searchParams.set('place_id', placeId);
-    url.searchParams.set('fields', 'reviews');
-    url.searchParams.set('reviews_sort', 'newest');
-    url.searchParams.set('key', apiKey);
+    return {
+        externalId,
+        authorName,
+        rating: clampRating(input.rating),
+        comment,
+        dateText,
+        createdAt,
+    };
+}
 
-    const res = await fetch(url.toString());
-    const data = (await res.json()) as GooglePlaceDetailsResponse;
-    if (data.status !== 'OK' || !data.result?.reviews?.length) {
-        console.warn('[google reviews] place details:', data.status, data.error_message ?? '');
-        return [];
-    }
+export async function importGoogleBusinessReviews(payload: GoogleReviewImportPayload): Promise<GoogleReviewSyncStatus> {
+    const reviews = Array.isArray(payload.reviews) ? payload.reviews : [];
+    const normalized = reviews
+        .map((item, index) => normalizeImportedReview(item, index))
+        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
-    const list = data.result.reviews.map(mapGoogleReview);
-    cachedReviews = list;
-    cachedReviewsUntil = now + REVIEWS_TTL_MS;
-    return list;
+    await GoogleReviewFeed.findOneAndUpdate(
+        { sourceKey: FEED_KEY },
+        {
+            $set: {
+                sourceUrl: trimText(payload.sourceUrl, configuredSourceUrl(), 2000),
+                reviews: normalized,
+                reviewCount: normalized.length,
+                lastSyncedAt: new Date(),
+                lastImportStatus: 'success',
+                lastError: '',
+            },
+            $setOnInsert: {
+                sourceKey: FEED_KEY,
+                lastRequestedBy: '',
+            },
+        },
+        { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+
+    return loadGoogleReviewSyncStatus();
+}
+
+export async function markGoogleReviewRefreshRequested(requestedBy: string): Promise<GoogleReviewSyncStatus> {
+    await GoogleReviewFeed.findOneAndUpdate(
+        { sourceKey: FEED_KEY },
+        {
+            $set: {
+                sourceUrl: configuredSourceUrl(),
+                lastRequestedAt: new Date(),
+                lastImportStatus: 'pending',
+                lastError: '',
+                lastRequestedBy: trimText(requestedBy, '', 160),
+            },
+            $setOnInsert: {
+                sourceKey: FEED_KEY,
+                reviews: [],
+                reviewCount: 0,
+            },
+        },
+        { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+
+    return loadGoogleReviewSyncStatus();
+}
+
+export async function markGoogleReviewRefreshFailed(message: string): Promise<GoogleReviewSyncStatus> {
+    await GoogleReviewFeed.findOneAndUpdate(
+        { sourceKey: FEED_KEY },
+        {
+            $set: {
+                sourceUrl: configuredSourceUrl(),
+                lastImportStatus: 'error',
+                lastError: trimText(message, 'Refresh failed.', 1000),
+            },
+            $setOnInsert: {
+                sourceKey: FEED_KEY,
+                reviews: [],
+                reviewCount: 0,
+            },
+        },
+        { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+
+    return loadGoogleReviewSyncStatus();
 }

@@ -6,8 +6,11 @@ import { Star, Trash2, Check, X, Loader2, Eye, RotateCcw } from "lucide-react";
 import toast from "react-hot-toast";
 import {
     useAdminReviews,
+    useGoogleReviewSyncStatus,
+    useRefreshGoogleReviews,
     useUpdateReviewStatus,
     useDeleteAdminReview,
+    type GoogleReviewSyncStatus,
     type AdminReviewRow,
 } from "@/hooks/useAdminReviews";
 
@@ -22,6 +25,20 @@ function statusBadge(status: "pending" | "approved" | "rejected") {
     if (status === "approved") return "bg-emerald-500/15 text-emerald-400 border-emerald-500/30";
     if (status === "pending") return "bg-amber-500/15 text-amber-400 border-amber-500/30";
     return "bg-red-500/15 text-red-400 border-red-500/30";
+}
+
+function syncStatusBadge(status: GoogleReviewSyncStatus["lastImportStatus"]) {
+    if (status === "success") return "bg-emerald-500/15 text-emerald-400 border-emerald-500/30";
+    if (status === "pending") return "bg-amber-500/15 text-amber-400 border-amber-500/30";
+    if (status === "error") return "bg-red-500/15 text-red-400 border-red-500/30";
+    return "bg-white/5 text-sub border-border-soft";
+}
+
+function formatTimestamp(value: string | null) {
+    if (!value) return "Never";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "Never";
+    return date.toLocaleString();
 }
 
 function productLink(row: AdminReviewRow) {
@@ -44,8 +61,24 @@ export default function AdminReviewsPage() {
     const [viewing, setViewing] = useState<AdminReviewRow | null>(null);
 
     const { data: reviews, isLoading, error } = useAdminReviews(statusFilter, kindFilter);
+    const { data: googleSync, isLoading: isGoogleSyncLoading } = useGoogleReviewSyncStatus();
+    const refreshGoogle = useRefreshGoogleReviews();
     const updateStatus = useUpdateReviewStatus();
     const deleteReview = useDeleteAdminReview();
+
+    const handleRefreshGoogleReviews = () => {
+        refreshGoogle.mutate(undefined, {
+            onSuccess: () => {
+                toast.success("Google review refresh queued.");
+            },
+            onError: (err: unknown) => {
+                const msg =
+                    (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+                    "Could not queue Google review refresh.";
+                toast.error(msg);
+            },
+        });
+    };
 
     const handleStatus = (id: string, status: "approved" | "rejected" | "pending") => {
         updateStatus.mutate(
@@ -92,6 +125,56 @@ export default function AdminReviewsPage() {
             </div>
 
             <div className="admin-card mb-8 flex flex-wrap items-center gap-3 rounded-xl p-4">
+                <div className="min-w-[14rem] flex-1 space-y-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-xs uppercase tracking-wide text-sub">Google review sync</span>
+                        <span
+                            className={`inline-block rounded-full border px-2 py-0.5 text-xs font-medium capitalize ${
+                                syncStatusBadge(googleSync?.lastImportStatus || "idle")
+                            }`}
+                        >
+                            {googleSync?.lastImportStatus || "idle"}
+                        </span>
+                    </div>
+                    <p className="text-sm text-sub">
+                        {isGoogleSyncLoading
+                            ? "Loading Google sync status…"
+                            : `${googleSync?.reviewCount ?? 0} stored review(s). Last synced ${formatTimestamp(googleSync?.lastSyncedAt ?? null)}.`}
+                    </p>
+                    {googleSync?.lastError ? (
+                        <p className="text-xs text-red-400">{googleSync.lastError}</p>
+                    ) : (
+                        <p className="text-xs text-sub">
+                            Requested by {googleSync?.lastRequestedBy || "—"} on{" "}
+                            {formatTimestamp(googleSync?.lastRequestedAt ?? null)}
+                        </p>
+                    )}
+                    <div className="flex flex-wrap items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={handleRefreshGoogleReviews}
+                            disabled={refreshGoogle.isPending}
+                            className="inline-flex items-center gap-2 rounded-lg border border-accent/40 bg-accent/10 px-3 py-2 text-sm font-medium text-accent hover:bg-accent/15 disabled:opacity-50"
+                        >
+                            {refreshGoogle.isPending ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                                <RotateCcw className="h-4 w-4" />
+                            )}
+                            Refresh Google reviews
+                        </button>
+                        {googleSync?.sourceUrl ? (
+                            <a
+                                href={googleSync.sourceUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-xs text-accent hover:underline"
+                            >
+                                Open source page
+                            </a>
+                        ) : null}
+                    </div>
+                </div>
                 <div className="flex flex-col gap-1">
                     <label className="text-xs uppercase tracking-wide text-sub">Status</label>
                     <select

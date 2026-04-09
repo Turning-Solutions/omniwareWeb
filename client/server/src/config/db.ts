@@ -41,11 +41,16 @@ async function connectDB(): Promise<typeof mongoose> {
 export async function ensureDb(): Promise<void> {
     await connectDB();
     if (!reviewIndexesPromise) {
-        reviewIndexesPromise = import('../models/Review')
-            .then(({ ensureReviewIndexes }) => ensureReviewIndexes())
+        reviewIndexesPromise = Promise.all([
+            import('../models/Review').then(({ ensureReviewIndexes }) => ensureReviewIndexes()),
+            import('../models/GoogleReviewFeed').then(({ ensureGoogleReviewFeedIndexes }) =>
+                ensureGoogleReviewFeedIndexes()
+            ),
+        ])
+            .then(() => undefined)
             .catch((err) => {
                 reviewIndexesPromise = null;
-                console.error('[Review] ensureReviewIndexes', err);
+                console.error('[DB] ensure indexes', err);
                 throw err;
             });
     }
