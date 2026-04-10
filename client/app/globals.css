@@ -147,6 +147,10 @@ body {
     backface-visibility: hidden;
 }
 
+.reviews-marquee-track:hover {
+    animation-play-state: paused;
+}
+
 @media (prefers-reduced-motion: reduce) {
     .brand-marquee-track {
         animation: none;

@@ -48,7 +48,7 @@ export function useRefreshGoogleReviews() {
     const qc = useQueryClient();
     return useMutation({
         mutationFn: async () => {
-            const { data } = await api.post<{ ok: boolean; queued: boolean; status: GoogleReviewSyncStatus }>(
+            const { data } = await api.post<{ ok: boolean; refreshed: boolean; status: GoogleReviewSyncStatus }>(
                 "/admin/google-reviews/refresh"
             );
             return data;

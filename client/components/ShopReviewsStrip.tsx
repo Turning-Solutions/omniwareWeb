@@ -1,8 +1,37 @@
 "use client";
 
 import { Star } from "lucide-react";
-import { useShopReviewsForMarquee } from "@/hooks/useReviews";
 import type { Review } from "@/hooks/useReviews";
+import googleReviewsJson from "@/data/shop-google-reviews.json";
+
+type JsonReview = {
+    id: string;
+    authorName: string;
+    rating: number;
+    dateText?: string;
+    comment: string;
+};
+
+type JsonReviewFile = {
+    fetchedAt?: string;
+    reviews?: JsonReview[];
+};
+
+type MarqueeReview = Review & { dateText?: string };
+
+const parsedReviewFile = googleReviewsJson as JsonReviewFile;
+const baseTimestamp = Date.parse(parsedReviewFile.fetchedAt ?? "");
+const fallbackBaseMs = Number.isNaN(baseTimestamp) ? Date.now() : baseTimestamp;
+const JSON_SHOP_REVIEWS: MarqueeReview[] = (parsedReviewFile.reviews ?? []).map((r, index) => ({
+    _id: `json-${r.id}`,
+    kind: "shop",
+    rating: r.rating,
+    authorName: r.authorName,
+    comment: r.comment,
+    createdAt: new Date(fallbackBaseMs - index * 24 * 60 * 60 * 1000).toISOString(),
+    source: "google",
+    dateText: r.dateText,
+}));
 
 function formatReviewDate(iso: string) {
     try {
@@ -35,7 +64,8 @@ function Stars({ rating }: { rating: number }) {
     );
 }
 
-function ReviewMarqueeCard({ r }: { r: Review }) {
+function ReviewMarqueeCard({ r }: { r: MarqueeReview }) {
+    const dateLabel = r.dateText ?? formatReviewDate(r.createdAt);
     return (
         <article className="group flex min-h-[10.5rem] w-[min(88vw,400px)] shrink-0 flex-col rounded-xl border border-white/[0.08] bg-[#161616] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition-colors duration-300 hover:border-[#D12B28]/40 hover:bg-[#1A1A1A] sm:w-[380px] sm:p-5">
             <div className="flex items-start justify-between gap-3 border-b border-white/[0.06] pb-3">
@@ -54,7 +84,7 @@ function ReviewMarqueeCard({ r }: { r: Review }) {
                 {r.comment}
             </p>
             <time className="mt-3 block text-[11px] text-[#5c5c5c]" dateTime={r.createdAt}>
-                {formatReviewDate(r.createdAt)}
+                {dateLabel}
             </time>
         </article>
     );
@@ -66,10 +96,13 @@ type ShopReviewsStripProps = {
 };
 
 /** Same reviews repeated inside one segment so the row feels endless before the CSS loop. */
-function marqueeSlotsForSegment(reviews: Review[], minCards = 20): Array<{ review: Review; slotKey: string }> {
+function marqueeSlotsForSegment(
+    reviews: MarqueeReview[],
+    minCards = 20
+): Array<{ review: MarqueeReview; slotKey: string }> {
     if (reviews.length === 0) return [];
     const repeats = Math.max(3, Math.ceil(minCards / reviews.length));
-    const slots: Array<{ review: Review; slotKey: string }> = [];
+    const slots: Array<{ review: MarqueeReview; slotKey: string }> = [];
     for (let pass = 0; pass < repeats; pass++) {
         reviews.forEach((rev, i) => {
             slots.push({ review: rev, slotKey: `${pass}-${i}-${rev._id}` });
@@ -82,9 +115,9 @@ function marqueeSlotsForSegment(reviews: Review[], minCards = 20): Array<{ revie
  * Infinite horizontal shop reviews. Default: full viewport width strip (matches partners marquee).
  */
 export default function ShopReviewsStrip({ fullWidthStrip = true }: ShopReviewsStripProps) {
-    const { data: reviews, isLoading } = useShopReviewsForMarquee(24);
-    const hasReviews = Boolean(reviews && reviews.length > 0);
-    const segmentSlots = reviews && reviews.length > 0 ? marqueeSlotsForSegment(reviews) : [];
+    const displayReviews = JSON_SHOP_REVIEWS;
+    const hasReviews = displayReviews.length > 0;
+    const segmentSlots = hasReviews ? marqueeSlotsForSegment(displayReviews) : [];
     const marqueeDurationSec =
         segmentSlots.length > 0
             ? Math.min(420, Math.max(160, Math.round(segmentSlots.length * 12)))
@@ -100,16 +133,7 @@ export default function ShopReviewsStrip({ fullWidthStrip = true }: ShopReviewsS
                 className="pointer-events-none absolute inset-y-0 right-0 z-10 w-12 bg-gradient-to-l from-[#0d0d0d] via-[#0d0d0d]/95 to-transparent sm:w-20 md:w-28"
                 aria-hidden
             />
-            {isLoading ? (
-                <div className="flex w-max gap-5 px-4 sm:px-6">
-                    {[1, 2, 3, 4].map((i) => (
-                        <div
-                            key={i}
-                            className="h-48 w-[min(88vw,380px)] shrink-0 animate-pulse rounded-xl border border-white/[0.06] bg-[#161616] sm:w-[380px]"
-                        />
-                    ))}
-                </div>
-            ) : hasReviews ? (
+            {hasReviews ? (
                 <div
                     className="reviews-marquee-track flex w-max py-1"
                     style={{ animationDuration: `${marqueeDurationSec}s` }}

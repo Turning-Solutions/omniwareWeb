@@ -31,18 +31,18 @@ export async function getGoogleReviewSyncStatus(_req: Request, res: Response) {
 }
 
 export async function refreshGoogleReviews(req: Request, res: Response) {
-    const webhookUrl = process.env.GOOGLE_REVIEWS_REFRESH_WEBHOOK_URL?.trim();
+    const internalSecret = process.env.GOOGLE_REVIEWS_INTERNAL_REFRESH_SECRET?.trim();
     const importSecret = process.env.GOOGLE_REVIEWS_IMPORT_SECRET?.trim();
 
-    if (!webhookUrl) {
+    if (!internalSecret) {
         res.status(503).json({
-            message: "GOOGLE_REVIEWS_REFRESH_WEBHOOK_URL is not configured. Point it to the hosted google-review-worker service.",
+            message: "GOOGLE_REVIEWS_INTERNAL_REFRESH_SECRET is not configured.",
         });
         return;
     }
     if (!importSecret) {
         res.status(503).json({
-            message: "GOOGLE_REVIEWS_IMPORT_SECRET is not configured. Set the shared import secret in the Vercel app.",
+            message: "GOOGLE_REVIEWS_IMPORT_SECRET is not configured.",
         });
         return;
     }
@@ -59,11 +59,10 @@ export async function refreshGoogleReviews(req: Request, res: Response) {
 
         const headers: Record<string, string> = {
             "Content-Type": "application/json",
+            "x-google-reviews-internal-secret": internalSecret,
         };
-        const refreshSecret = process.env.GOOGLE_REVIEWS_REFRESH_WEBHOOK_SECRET?.trim();
-        if (refreshSecret) headers["x-google-review-refresh-secret"] = refreshSecret;
 
-        const upstream = await fetch(webhookUrl, {
+        const upstream = await fetch(`${baseUrlFromRequest(req)}/api/internal/google-reviews-refresh`, {
             method: "POST",
             headers,
             body: JSON.stringify(body),
@@ -71,16 +70,18 @@ export async function refreshGoogleReviews(req: Request, res: Response) {
 
         if (!upstream.ok) {
             const upstreamText = await upstream.text().catch(() => "");
-            const message = upstreamText || `Refresh webhook failed with ${upstream.status}.`;
+            const message = upstreamText || `Internal Google review refresh failed with ${upstream.status}.`;
             await markGoogleReviewRefreshFailed(message);
             res.status(502).json({ message });
             return;
         }
 
+        const latestStatus = await loadGoogleReviewSyncStatus();
+
         res.json({
             ok: true,
-            queued: true,
-            status,
+            refreshed: true,
+            status: latestStatus,
         });
     } catch (e) {
         console.error(e);

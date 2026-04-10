@@ -1,7 +1,8 @@
-import { chromium } from "playwright";
-
 export const DEFAULT_SOURCE_URL =
   "https://www.google.com/maps/place/Omniware+Technologies/@6.8499418,79.8840428,17z/data=!4m8!3m7!1s0x3ae25bc001c21cfb:0x706552a0c455e4a3!8m2!3d6.8499365!4d79.8866177!9m1!1b1!16s%2Fg%2F11srgk22h7?entry=ttu&g_ep=EgoyMDI2MDQwNy4wIKXMDSoASAFQAw%3D%3D";
+
+const DEFAULT_USER_AGENT =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123 Safari/537.36";
 
 function parseRating(value) {
   if (!value) return null;
@@ -84,16 +85,93 @@ async function findReviewScrollerHandle(page) {
   });
 }
 
+async function collectReviews(page, maxReviews) {
+  const reviews = [];
+  const seen = new Set();
+  let sameCountRounds = 0;
+  let previousCount = 0;
+
+  await waitForReviewSurface(page);
+  const scrollerHandle = await findReviewScrollerHandle(page);
+  const noScroller = await scrollerHandle.evaluate((el) => el == null);
+  if (noScroller) {
+    throw new Error("Could not find the reviews scroll container.");
+  }
+
+  while (reviews.length < maxReviews && sameCountRounds < 10) {
+    const cards = page.locator('div[data-review-id], div.jftiEf');
+    const count = await cards.count();
+
+    for (let i = 0; i < count && reviews.length < maxReviews; i++) {
+      const card = cards.nth(i);
+      const reviewId =
+        (await card.getAttribute("data-review-id").catch(() => null)) ||
+        `review-${i}-${reviews.length}`;
+      if (seen.has(reviewId)) continue;
+
+      const moreBtn = card.getByRole("button", { name: /more|full review/i });
+      if ((await moreBtn.count().catch(() => 0)) > 0) {
+        try {
+          await moreBtn.first().click({ timeout: 800 });
+        } catch {
+          // Optional expansion only.
+        }
+      }
+
+      const author =
+        (await card.locator(".d4r55").first().textContent().catch(() => null))?.trim() ||
+        (await card.locator('a[href*="/contrib/"]').first().textContent().catch(() => null))?.trim() ||
+        "Google user";
+
+      const ratingLabel =
+        (await card
+          .locator('span[role="img"][aria-label*="star" i], span.kvMYJc[aria-label*="star" i]')
+          .first()
+          .getAttribute("aria-label")
+          .catch(() => null)) ||
+        (await card.locator('span[aria-label*="star" i]').first().getAttribute("aria-label").catch(() => null));
+
+      const dateText = (await card.locator(".rsqaWe").first().textContent().catch(() => null))?.trim() || "";
+
+      const text =
+        (await card.locator(".wiI7pd").first().textContent().catch(() => null))?.trim() ||
+        (await card.locator(".MyEned").first().textContent().catch(() => null))?.trim() ||
+        "";
+
+      reviews.push({
+        id: reviewId,
+        authorName: author,
+        rating: parseRating(ratingLabel),
+        dateText,
+        comment: text,
+      });
+      seen.add(reviewId);
+    }
+
+    if (count === previousCount) sameCountRounds++;
+    else sameCountRounds = 0;
+    previousCount = count;
+
+    await scrollerHandle.evaluate((el) => {
+      if (!(el instanceof HTMLElement)) return;
+      el.scrollBy({ top: Math.max(900, el.clientHeight * 0.95), behavior: "auto" });
+    });
+    await page.waitForTimeout(1200);
+  }
+
+  await scrollerHandle.dispose();
+  return reviews;
+}
+
 export async function scrapeGoogleMapsReviews({
+  launchBrowser,
   sourceUrl = DEFAULT_SOURCE_URL,
   maxReviews = 120,
-  headless = true,
-} = {}) {
-  const browser = await chromium.launch({ headless });
+}) {
+  const browser = await launchBrowser();
   const context = await browser.newContext({
     locale: "en-US",
-    userAgent:
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123 Safari/537.36",
+    userAgent: DEFAULT_USER_AGENT,
   });
   const page = await context.newPage();
 
@@ -105,81 +183,7 @@ export async function scrapeGoogleMapsReviews({
     await openReviewsPanel(page);
     await page.waitForTimeout(1500);
 
-    const reviews = [];
-    const seen = new Set();
-    let sameCountRounds = 0;
-    let previousCount = 0;
-
-    await waitForReviewSurface(page);
-    const scrollerHandle = await findReviewScrollerHandle(page);
-    const noScroller = await scrollerHandle.evaluate((el) => el == null);
-    if (noScroller) {
-      throw new Error("Could not find the reviews scroll container.");
-    }
-
-    while (reviews.length < maxReviews && sameCountRounds < 10) {
-      const cards = page.locator('div[data-review-id], div.jftiEf');
-      const count = await cards.count();
-
-      for (let i = 0; i < count && reviews.length < maxReviews; i++) {
-        const card = cards.nth(i);
-        const reviewId =
-          (await card.getAttribute("data-review-id").catch(() => null)) ||
-          `review-${i}-${reviews.length}`;
-        if (seen.has(reviewId)) continue;
-
-        const moreBtn = card.getByRole("button", { name: /more|full review/i });
-        if ((await moreBtn.count().catch(() => 0)) > 0) {
-          try {
-            await moreBtn.first().click({ timeout: 800 });
-          } catch {
-            // Optional expansion only.
-          }
-        }
-
-        const author =
-          (await card.locator(".d4r55").first().textContent().catch(() => null))?.trim() ||
-          (await card.locator('a[href*="/contrib/"]').first().textContent().catch(() => null))?.trim() ||
-          "Google user";
-
-        const ratingLabel =
-          (await card
-            .locator('span[role="img"][aria-label*="star" i], span.kvMYJc[aria-label*="star" i]')
-            .first()
-            .getAttribute("aria-label")
-            .catch(() => null)) ||
-          (await card.locator('span[aria-label*="star" i]').first().getAttribute("aria-label").catch(() => null));
-
-        const dateText = (await card.locator(".rsqaWe").first().textContent().catch(() => null))?.trim() || "";
-
-        const text =
-          (await card.locator(".wiI7pd").first().textContent().catch(() => null))?.trim() ||
-          (await card.locator(".MyEned").first().textContent().catch(() => null))?.trim() ||
-          "";
-
-        reviews.push({
-          id: reviewId,
-          authorName: author,
-          rating: parseRating(ratingLabel),
-          dateText,
-          comment: text,
-        });
-        seen.add(reviewId);
-      }
-
-      if (count === previousCount) sameCountRounds++;
-      else sameCountRounds = 0;
-      previousCount = count;
-
-      await scrollerHandle.evaluate((el) => {
-        if (!(el instanceof HTMLElement)) return;
-        el.scrollBy({ top: Math.max(900, el.clientHeight * 0.95), behavior: "auto" });
-      });
-      await page.waitForTimeout(1200);
-    }
-
-    await scrollerHandle.dispose();
-
+    const reviews = await collectReviews(page, maxReviews);
     return {
       sourceUrl,
       fetchedAt: new Date().toISOString(),
@@ -193,6 +197,8 @@ export async function scrapeGoogleMapsReviews({
 }
 
 export async function importGoogleReviewPayload(importUrl, importSecret, payload) {
+  if (!importUrl) return null;
+
   const res = await fetch(importUrl, {
     method: "POST",
     headers: {

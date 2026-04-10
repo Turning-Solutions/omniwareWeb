@@ -69,7 +69,7 @@ export default function AdminReviewsPage() {
     const handleRefreshGoogleReviews = () => {
         refreshGoogle.mutate(undefined, {
             onSuccess: () => {
-                toast.success("Google review refresh queued.");
+                toast.success("Google reviews refreshed.");
             },
             onError: (err: unknown) => {
                 const msg =
