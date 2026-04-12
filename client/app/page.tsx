@@ -480,7 +480,7 @@ export default function Home() {
                 <div className="mx-auto max-w-[92rem] px-3 sm:px-6 lg:px-8">
                     <div className="mb-6 flex flex-col gap-4 sm:mb-10 sm:flex-row sm:items-end sm:justify-between sm:gap-6 lg:mb-12">
                         <FlowSectionHeader
-                            className="mb-0 sm:mb-0 lg:mb-0"
+                            className="mb-0 min-w-0 sm:mb-0 sm:flex-1 lg:mb-0"
                             titleId="featured-heading"
                             watermark="FEATURED"
                             watermarkAlign="right"
@@ -571,6 +571,7 @@ export default function Home() {
                     <FlowSectionHeader
                         titleId="services-heading"
                         watermark="TRUST"
+                        watermarkAlign="right"
                         eyebrow="Why shop here"
                         title="More than a parts list"
                         description="From inventory to delivery, the experience is built for people who actually assemble systems, not just scroll specs."
@@ -672,12 +673,6 @@ export default function Home() {
                 />
                 <div className="relative mx-auto max-w-7xl px-3 sm:px-6 lg:px-8">
                     <div className="relative overflow-hidden rounded-2xl border border-[#D12B28]/40 bg-[#101010] p-5 sm:rounded-[1.75rem] sm:p-11 lg:p-12">
-                        <p
-                            className="pointer-events-none absolute -bottom-6 -right-4 select-none font-bold uppercase leading-none tracking-tight text-[#D12B28]/[0.085] text-[clamp(3rem,14vw,7rem)] sm:-right-2"
-                            aria-hidden
-                        >
-                            BUILD
-                        </p>
                         <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_80%_60%_at_50%_0%,rgba(209,43,40,0.22),transparent_65%)]" aria-hidden />
                         <div className="relative flex flex-col gap-6 sm:gap-8 lg:flex-row lg:items-center lg:justify-between">
                             <div className="max-w-2xl">
