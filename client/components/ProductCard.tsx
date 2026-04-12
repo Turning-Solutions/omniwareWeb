@@ -143,7 +143,7 @@ export default function ProductCard({
                     </div>
                 </div>
 
-                <div className="flex min-w-0 flex-col gap-2 border-t border-white/[0.06] pt-3">
+                <div className="flex min-w-0 flex-col gap-4 border-t border-white/[0.06] pt-3">
                     {effectiveDiscountPercent != null && effectiveDiscountPercent > 0 ? (
                         <div className="min-w-0 flex flex-col items-start gap-0.5 leading-tight">
                             <span className="text-xs text-[#6a6a6a] line-through tabular-nums">
