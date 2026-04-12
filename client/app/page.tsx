@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
     ArrowRight,
+    ChevronLeft,
+    ChevronRight,
     Cpu,
     HardDrive,
     Headphones,
@@ -26,6 +28,44 @@ import ShopReviewsStrip from "@/components/ShopReviewsStrip";
 import ReviewForm from "@/components/reviews/ReviewForm";
 
 const SEARCH_PREVIEW_DEBOUNCE_MS = 320;
+/** Featured strip: fetch more than the old 4-up grid; slider scrolls through them. */
+const FEATURED_PRODUCTS_LIMIT = 16;
+/** Time between automatic scroll steps (ms). */
+const FEATURED_AUTO_SCROLL_MS = 5000;
+
+function scrollFeaturedSlider(track: HTMLElement, direction: 1 | -1): void {
+    const items = [...track.querySelectorAll<HTMLElement>("[data-featured-slider-item]")];
+    if (items.length <= 1 || track.scrollWidth <= track.clientWidth + 2) return;
+
+    const maxLeft = track.scrollWidth - track.clientWidth;
+    const slack = 2;
+
+    // Leftmost slide whose start is at or before the current scroll position (handles partial mis-scrolls).
+    let idx = 0;
+    for (let i = 0; i < items.length; i++) {
+        if (items[i].offsetLeft <= track.scrollLeft + slack) idx = i;
+        else break;
+    }
+
+    let targetIdx = direction > 0 ? idx + 1 : idx - 1;
+    if (direction > 0 && targetIdx >= items.length) {
+        track.scrollTo({ left: 0, behavior: "smooth" });
+        return;
+    }
+    if (direction < 0 && targetIdx < 0) {
+        track.scrollTo({ left: maxLeft, behavior: "smooth" });
+        return;
+    }
+
+    const targetLeft = Math.min(Math.max(0, items[targetIdx].offsetLeft), maxLeft);
+    // At the last slide, offsetLeft can be > maxLeft so we clamp — but scrollLeft is already maxLeft, so no
+    // movement and the carousel never loops. Jump back to the first slide when we cannot advance further.
+    if (direction > 0 && targetLeft <= track.scrollLeft + slack) {
+        track.scrollTo({ left: 0, behavior: "smooth" });
+        return;
+    }
+    track.scrollTo({ left: targetLeft, behavior: "smooth" });
+}
 
 /**
  * Appends an optional cache-busting query string to partner logo URLs.
@@ -42,12 +82,49 @@ export default function Home() {
     const [topBrands, setTopBrands] = useState<Array<{ _id?: string; name: string; logoUrl?: string }>>([]);
 
     const { data: featuredData, isLoading: loadingFeatured, isFetching: fetchingFeatured } = useProducts({
-        limit: 4,
+        limit: FEATURED_PRODUCTS_LIMIT,
         sort: "newest",
         isFeatured: true,
         includeFacets: false,
     });
     const featuredProducts = featuredData?.products || [];
+    const featuredScrollRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (featuredProducts.length <= 1) return;
+        if (typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+            return;
+        }
+
+        let intervalId: number | null = null;
+        let rafId = 0;
+
+        const startInterval = () => {
+            if (!featuredScrollRef.current) {
+                rafId = requestAnimationFrame(startInterval);
+                return;
+            }
+            intervalId = window.setInterval(() => {
+                const track = featuredScrollRef.current;
+                if (!track) return;
+                scrollFeaturedSlider(track, 1);
+            }, FEATURED_AUTO_SCROLL_MS);
+        };
+
+        startInterval();
+
+        return () => {
+            cancelAnimationFrame(rafId);
+            if (intervalId != null) window.clearInterval(intervalId);
+        };
+    }, [featuredProducts.length, loadingFeatured]);
+
+    const handleFeaturedArrow = useCallback((direction: 1 | -1) => {
+        const track = featuredScrollRef.current;
+        if (!track) return;
+        scrollFeaturedSlider(track, direction);
+    }, []);
+
     const normalizedPreviewQuery = previewQuery.trim();
     const shouldShowPreview = normalizedPreviewQuery.length > 0;
     const { data: previewData, isFetching: loadingPreview } = useProducts({
@@ -400,7 +477,7 @@ export default function Home() {
 
             {/* Featured — same visual chapter as discover */}
             <section className="relative py-10 sm:py-16 lg:py-20" aria-labelledby="featured-heading">
-                <div className="mx-auto max-w-7xl px-3 sm:px-6 lg:px-8">
+                <div className="mx-auto max-w-[92rem] px-3 sm:px-6 lg:px-8">
                     <div className="mb-6 flex flex-col gap-4 sm:mb-10 sm:flex-row sm:items-end sm:justify-between sm:gap-6 lg:mb-12">
                         <FlowSectionHeader
                             className="mb-0 sm:mb-0 lg:mb-0"
@@ -419,12 +496,15 @@ export default function Home() {
                         </Link>
                     </div>
 
-                    <div className="relative overflow-hidden rounded-2xl border border-white/[0.07] bg-[#0c0c0c]/85 p-4 shadow-[0_24px_70px_rgba(0,0,0,0.45)] sm:rounded-[1.75rem] sm:p-7 lg:p-8">
+                    <div className="relative overflow-hidden rounded-2xl border border-white/[0.07] bg-[#0c0c0c]/85 p-4 shadow-[0_24px_70px_rgba(0,0,0,0.45)] sm:rounded-[1.75rem] sm:p-7 lg:p-10">
                         <div className="pointer-events-none absolute -right-20 top-1/2 h-48 w-48 -translate-y-1/2 rounded-full bg-[#D12B28]/[0.06] blur-3xl" aria-hidden />
                         {loadingFeatured ? (
-                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 lg:grid-cols-4">
-                                {[...Array(4)].map((_, i) => (
-                                    <div key={i} className="aspect-[3/4] animate-pulse rounded-xl border border-white/[0.06] bg-[#161616]" />
+                            <div className="flex gap-4 overflow-hidden pb-2">
+                                {[...Array(6)].map((_, i) => (
+                                    <div
+                                        key={i}
+                                        className="aspect-[3/4] w-[min(100%,17rem)] shrink-0 animate-pulse rounded-xl border border-white/[0.06] bg-[#161616] lg:w-[calc((100%-4.5rem)/4)]"
+                                    />
                                 ))}
                             </div>
                         ) : featuredProducts.length === 0 ? (
@@ -433,14 +513,45 @@ export default function Home() {
                             </div>
                         ) : (
                             <div className="relative">
-                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 lg:grid-cols-4">
+                                <div className="pointer-events-none absolute inset-y-0 left-0 z-20 flex w-12 items-center justify-start pl-1 sm:w-14 sm:pl-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => handleFeaturedArrow(-1)}
+                                        className="pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full border border-white/[0.12] bg-[#141414]/95 text-[#F1F1F1] transition hover:border-[#D12B28]/40 hover:bg-[#1a1a1a] hover:text-[#D12B28] sm:h-11 sm:w-11"
+                                        aria-label="Previous featured products"
+                                    >
+                                        <ChevronLeft className="h-5 w-5 sm:h-6 sm:w-6" aria-hidden />
+                                    </button>
+                                </div>
+                                <div className="pointer-events-none absolute inset-y-0 right-0 z-20 flex w-12 items-center justify-end pr-1 sm:w-14 sm:pr-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => handleFeaturedArrow(1)}
+                                        className="pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full border border-white/[0.12] bg-[#141414]/95 text-[#F1F1F1] transition hover:border-[#D12B28]/40 hover:bg-[#1a1a1a] hover:text-[#D12B28] sm:h-11 sm:w-11"
+                                        aria-label="Next featured products"
+                                    >
+                                        <ChevronRight className="h-5 w-5 sm:h-6 sm:w-6" aria-hidden />
+                                    </button>
+                                </div>
+                                <div
+                                    ref={featuredScrollRef}
+                                    className="flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-smooth pb-2 pr-1 pt-3 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:pr-2 lg:gap-6"
+                                    role="region"
+                                    aria-roledescription="carousel"
+                                    aria-label="Featured products"
+                                >
                                     {featuredProducts.map((product) => (
-                                        <ProductCard
+                                        <div
                                             key={product._id}
-                                            product={product}
-                                            showWhatsAppButton={false}
-                                            showOrderNowButton
-                                        />
+                                            data-featured-slider-item
+                                            className="w-[min(100%,17rem)] shrink-0 snap-start snap-always last:mr-1 sm:last:mr-2 lg:last:mr-0 lg:w-[calc((100%-4.5rem)/4)]"
+                                        >
+                                            <ProductCard
+                                                product={product}
+                                                showWhatsAppButton={false}
+                                                showOrderNowButton
+                                            />
+                                        </div>
                                     ))}
                                 </div>
                                 {fetchingFeatured && (

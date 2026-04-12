@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, use } from "react";
+import { isAxiosError } from "axios";
 import { useRouter } from "next/navigation";
 import { Save, ArrowLeft, Trash2, Edit2, Plus, ChevronUp, ChevronDown, ImagePlus, Upload, Loader2, ArrowRightLeft, ExternalLink } from "lucide-react";
 import Link from "next/link";
@@ -78,6 +79,21 @@ const COLOR_NAME_TO_HEX: Record<string, string> = {
     olive: "#808000",
     beige: "#F5F5DC",
 };
+
+function getApiErrorMessage(error: unknown) {
+    if (!isAxiosError(error)) return "Failed to save product";
+    const message = error.response?.data?.message;
+    if (typeof message === "string" && message.trim()) return message;
+    if (Array.isArray(message)) {
+        const firstIssue = message[0];
+        if (typeof firstIssue === "string" && firstIssue.trim()) return firstIssue;
+        if (firstIssue && typeof firstIssue === "object" && "message" in firstIssue) {
+            const issueMessage = firstIssue.message;
+            if (typeof issueMessage === "string" && issueMessage.trim()) return issueMessage;
+        }
+    }
+    return error.message || "Failed to save product";
+}
 
 function suggestHexFromColorName(name: string): string {
     const key = name.trim().toLowerCase();
@@ -263,6 +279,32 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
         e.preventDefault();
         setLoading(true);
         try {
+            const parsedPrice = parseFloat(formData.price);
+            const parsedStockQty = parseInt(formData.stock, 10);
+            const normalizedBrandId = formData.brandId.trim();
+            const normalizedCategoryIds = formData.categoryIds.map((categoryId) => categoryId.trim()).filter(Boolean);
+            const hasIncompleteAttributeValue = formData.attributeGroups.some((group) =>
+                group.attributes.some((attribute) => {
+                    const hasAnyValue = attribute.name.trim() || attribute.value.trim();
+                    return Boolean(hasAnyValue) && !attribute.value.trim();
+                })
+            );
+
+            if (!Number.isFinite(parsedPrice) || parsedPrice < 0) {
+                toast.error("Enter a valid product price.");
+                return;
+            }
+
+            if (!Number.isInteger(parsedStockQty) || parsedStockQty < 0) {
+                toast.error("Enter a valid stock quantity.");
+                return;
+            }
+
+            if (hasIncompleteAttributeValue) {
+                toast.error("Each product detail row needs a value, or remove the incomplete row.");
+                return;
+            }
+
             const specsRecord: Record<string, string> = {};
             formData.filterSpecs.forEach(({ key, value }) => {
                 const k = key.trim();
@@ -295,9 +337,11 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
 
             const payload = {
                 ...rest,
+                brandId: normalizedBrandId || undefined,
+                categoryIds: normalizedCategoryIds.length ? normalizedCategoryIds : undefined,
                 discountPercent: parsedProductDiscountPercent,
-                price: parseFloat(formData.price),
-                stock: { qty: parseInt(formData.stock) },
+                price: parsedPrice,
+                stock: { qty: parsedStockQty },
                 availability: formData.availability,
                 warranty: formData.warranty?.trim() || undefined,
                 specs: Object.keys(specsRecord).length ? specsRecord : undefined,
@@ -309,12 +353,14 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                         image: variant.image?.trim() || undefined,
                         price: variant.price.trim() ? parseFloat(variant.price) : undefined,
                     })),
-                attributeGroups: formData.attributeGroups.filter(
-                    g => g.category.trim() && g.attributes.some(a => a.name.trim() || a.value.trim())
-                ).map(g => ({
-                    category: g.category.trim(),
-                    attributes: g.attributes.filter(a => a.name.trim() || a.value.trim()).map(a => ({ name: a.name.trim(), value: a.value.trim() }))
-                })),
+                attributeGroups: formData.attributeGroups
+                    .filter((group) => group.category.trim() && group.attributes.some((attribute) => attribute.value.trim()))
+                    .map((group) => ({
+                        category: group.category.trim(),
+                        attributes: group.attributes
+                            .filter((attribute) => attribute.value.trim())
+                            .map((attribute) => ({ name: attribute.name.trim(), value: attribute.value.trim() }))
+                    })),
             };
 
             if (isNew) {
@@ -342,7 +388,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
             }
         } catch (error) {
             console.error("Error saving product", error);
-            toast.error("Failed to save product");
+            toast.error(getApiErrorMessage(error));
         } finally {
             setLoading(false);
         }

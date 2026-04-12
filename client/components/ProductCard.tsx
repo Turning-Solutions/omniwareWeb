@@ -74,7 +74,7 @@ export default function ProductCard({
     };
 
     return (
-        <div className="group relative min-w-0 overflow-hidden rounded-2xl border border-[#5E5E5E]/30 bg-[#1a1a1a] shadow-sm transition-[transform,box-shadow,border-color,ring-width,ring-color] duration-500 ease-in-out hover:-translate-y-1.5 hover:border-[#D12B28]/55 hover:shadow-[0_22px_48px_-14px_rgba(209,43,40,0.42)] hover:ring-1 hover:ring-[#D12B28]/35">
+        <div className="group relative min-w-0 overflow-hidden rounded-2xl border border-[#5E5E5E]/30 bg-[#1a1a1a] transition-[transform,border-color,ring-width,ring-color] duration-500 ease-in-out hover:-translate-y-1.5 hover:border-[#D12B28]/55 hover:ring-1 hover:ring-[#D12B28]/35">
             <div className="relative z-10 aspect-square overflow-hidden bg-[#121212]/80">
                 {effectiveDiscountPercent != null && effectiveDiscountPercent > 0 && (
                     <div className="absolute top-3 right-3 z-10 rounded-full border border-[#D12B28]/35 bg-[#D12B28]/20 px-3 py-1 text-[10px] font-semibold text-[#F1F1F1] shadow-sm">
@@ -113,7 +113,7 @@ export default function ProductCard({
                     type="button"
                     disabled={!canAddToCart}
                     onClick={handleQuickAddToCart}
-                    className="pointer-events-auto absolute bottom-4 right-4 z-20 rounded-full bg-[#D12B28] p-3 text-[#F1F1F1] shadow-lg shadow-[#D12B28]/25 opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100 translate-y-4 hover:bg-[#E53A36] disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-[#5c5c5c] disabled:opacity-60 disabled:shadow-none hover:disabled:bg-[#5c5c5c]"
+                    className="pointer-events-auto absolute bottom-4 right-4 z-20 rounded-full bg-[#D12B28] p-3 text-[#F1F1F1] opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100 translate-y-4 hover:bg-[#E53A36] disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-[#5c5c5c] disabled:opacity-60 hover:disabled:bg-[#5c5c5c]"
                     title={canAddToCart ? "Add to cart" : "Not available for cart"}
                     aria-label={canAddToCart ? `Add ${product.title} to cart` : "Not available for cart"}
                 >
