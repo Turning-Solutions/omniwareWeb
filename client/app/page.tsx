@@ -32,40 +32,10 @@ const SEARCH_PREVIEW_DEBOUNCE_MS = 320;
 const FEATURED_PRODUCTS_LIMIT = 16;
 /** Time between automatic scroll steps (ms). */
 const FEATURED_AUTO_SCROLL_MS = 5000;
-
-function scrollFeaturedSlider(track: HTMLElement, direction: 1 | -1): void {
-    const items = [...track.querySelectorAll<HTMLElement>("[data-featured-slider-item]")];
-    if (items.length <= 1 || track.scrollWidth <= track.clientWidth + 2) return;
-
-    const maxLeft = track.scrollWidth - track.clientWidth;
-    const slack = 2;
-
-    // Leftmost slide whose start is at or before the current scroll position (handles partial mis-scrolls).
-    let idx = 0;
-    for (let i = 0; i < items.length; i++) {
-        if (items[i].offsetLeft <= track.scrollLeft + slack) idx = i;
-        else break;
-    }
-
-    let targetIdx = direction > 0 ? idx + 1 : idx - 1;
-    if (direction > 0 && targetIdx >= items.length) {
-        track.scrollTo({ left: 0, behavior: "smooth" });
-        return;
-    }
-    if (direction < 0 && targetIdx < 0) {
-        track.scrollTo({ left: maxLeft, behavior: "smooth" });
-        return;
-    }
-
-    const targetLeft = Math.min(Math.max(0, items[targetIdx].offsetLeft), maxLeft);
-    // At the last slide, offsetLeft can be > maxLeft so we clamp — but scrollLeft is already maxLeft, so no
-    // movement and the carousel never loops. Jump back to the first slide when we cannot advance further.
-    if (direction > 0 && targetLeft <= track.scrollLeft + slack) {
-        track.scrollTo({ left: 0, behavior: "smooth" });
-        return;
-    }
-    track.scrollTo({ left: targetLeft, behavior: "smooth" });
-}
+/** Transform animation duration for each featured slide step. */
+const FEATURED_SLIDE_TRANSITION_MS = 520;
+/** Triplicate featured slides to enable seamless infinite looping. */
+const FEATURED_LOOP_COPIES = 3;
 
 /**
  * Appends an optional cache-busting query string to partner logo URLs.
@@ -88,7 +58,53 @@ export default function Home() {
         includeFacets: false,
     });
     const featuredProducts = featuredData?.products || [];
-    const featuredScrollRef = useRef<HTMLDivElement>(null);
+    const featuredLoopedProducts = featuredProducts.length > 1
+        ? Array.from({ length: FEATURED_LOOP_COPIES }, (_, copyIdx) =>
+            featuredProducts.map((product) => ({ product, copyIdx }))
+        ).flat()
+        : featuredProducts.map((product) => ({ product, copyIdx: 0 }));
+    const featuredTrackRef = useRef<HTMLDivElement>(null);
+    const [featuredSlideIndex, setFeaturedSlideIndex] = useState(0);
+    const [featuredTrackOffset, setFeaturedTrackOffset] = useState(0);
+    const [featuredSkipTransition, setFeaturedSkipTransition] = useState(false);
+
+    const syncFeaturedOffset = useCallback((index: number) => {
+        const track = featuredTrackRef.current;
+        if (!track) return;
+        const items = [...track.querySelectorAll<HTMLElement>("[data-featured-slider-item]")];
+        const target = items[index] ?? items[0];
+        if (!target) return;
+        setFeaturedTrackOffset(target.offsetLeft);
+    }, []);
+
+    useEffect(() => {
+        if (featuredProducts.length <= 1) {
+            setFeaturedSlideIndex(0);
+            setFeaturedTrackOffset(0);
+            setFeaturedSkipTransition(false);
+            return;
+        }
+
+        const middleStart = featuredProducts.length;
+        setFeaturedSkipTransition(true);
+        setFeaturedSlideIndex(middleStart);
+        syncFeaturedOffset(middleStart);
+        const rafId = requestAnimationFrame(() => {
+            setFeaturedSkipTransition(false);
+        });
+        return () => cancelAnimationFrame(rafId);
+    }, [featuredProducts.length, syncFeaturedOffset]);
+
+    useEffect(() => {
+        syncFeaturedOffset(featuredSlideIndex);
+    }, [featuredSlideIndex, syncFeaturedOffset, featuredLoopedProducts.length]);
+
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        const handleResize = () => syncFeaturedOffset(featuredSlideIndex);
+        window.addEventListener("resize", handleResize);
+        return () => window.removeEventListener("resize", handleResize);
+    }, [featuredSlideIndex, syncFeaturedOffset]);
 
     useEffect(() => {
         if (featuredProducts.length <= 1) return;
@@ -100,14 +116,12 @@ export default function Home() {
         let rafId = 0;
 
         const startInterval = () => {
-            if (!featuredScrollRef.current) {
+            if (!featuredTrackRef.current) {
                 rafId = requestAnimationFrame(startInterval);
                 return;
             }
             intervalId = window.setInterval(() => {
-                const track = featuredScrollRef.current;
-                if (!track) return;
-                scrollFeaturedSlider(track, 1);
+                setFeaturedSlideIndex((current) => current + 1);
             }, FEATURED_AUTO_SCROLL_MS);
         };
 
@@ -119,11 +133,31 @@ export default function Home() {
         };
     }, [featuredProducts.length, loadingFeatured]);
 
+    useEffect(() => {
+        if (featuredProducts.length <= 1) return;
+        const middleStart = featuredProducts.length;
+        const middleEnd = (featuredProducts.length * 2) - 1;
+        if (featuredSlideIndex >= middleStart && featuredSlideIndex <= middleEnd) return;
+
+        const normalized = ((featuredSlideIndex % featuredProducts.length) + featuredProducts.length) % featuredProducts.length;
+        const recenteredIndex = middleStart + normalized;
+
+        const timeoutId = window.setTimeout(() => {
+            setFeaturedSkipTransition(true);
+            setFeaturedSlideIndex(recenteredIndex);
+            syncFeaturedOffset(recenteredIndex);
+            requestAnimationFrame(() => {
+                setFeaturedSkipTransition(false);
+            });
+        }, FEATURED_SLIDE_TRANSITION_MS + 40);
+
+        return () => window.clearTimeout(timeoutId);
+    }, [featuredProducts.length, featuredSlideIndex, syncFeaturedOffset]);
+
     const handleFeaturedArrow = useCallback((direction: 1 | -1) => {
-        const track = featuredScrollRef.current;
-        if (!track) return;
-        scrollFeaturedSlider(track, direction);
-    }, []);
+        if (featuredProducts.length <= 1) return;
+        setFeaturedSlideIndex((current) => current + direction);
+    }, [featuredProducts.length]);
 
     const normalizedPreviewQuery = previewQuery.trim();
     const shouldShowPreview = normalizedPreviewQuery.length > 0;
@@ -534,25 +568,36 @@ export default function Home() {
                                     </button>
                                 </div>
                                 <div
-                                    ref={featuredScrollRef}
-                                    className="flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-smooth pb-2 pr-1 pt-3 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:pr-2 lg:gap-6"
+                                    className="overflow-hidden pb-2 pr-1 pt-3 sm:pr-2"
                                     role="region"
                                     aria-roledescription="carousel"
                                     aria-label="Featured products"
                                 >
-                                    {featuredProducts.map((product) => (
-                                        <div
-                                            key={product._id}
-                                            data-featured-slider-item
-                                            className="w-[min(100%,17rem)] shrink-0 snap-start snap-always last:mr-1 sm:last:mr-2 lg:last:mr-0 lg:w-[calc((100%-4.5rem)/4)]"
-                                        >
-                                            <ProductCard
-                                                product={product}
-                                                showWhatsAppButton={false}
-                                                showOrderNowButton
-                                            />
-                                        </div>
-                                    ))}
+                                    <div
+                                        ref={featuredTrackRef}
+                                        className="flex gap-4 lg:gap-6"
+                                        style={{
+                                            transform: `translate3d(${-featuredTrackOffset}px, 0, 0)`,
+                                            transition: featuredSkipTransition
+                                                ? "none"
+                                                : `transform ${FEATURED_SLIDE_TRANSITION_MS}ms cubic-bezier(0.22, 1, 0.36, 1)`,
+                                            willChange: "transform",
+                                        }}
+                                    >
+                                        {featuredLoopedProducts.map(({ product, copyIdx }) => (
+                                            <div
+                                                key={`${product._id}-${copyIdx}`}
+                                                data-featured-slider-item
+                                                className="w-[min(100%,17rem)] shrink-0 last:mr-1 sm:last:mr-2 lg:last:mr-0 lg:w-[calc((100%-4.5rem)/4)]"
+                                            >
+                                                <ProductCard
+                                                    product={product}
+                                                    showWhatsAppButton={false}
+                                                    showOrderNowButton
+                                                />
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
                                 {fetchingFeatured && (
                                     <div className="pointer-events-none absolute inset-0 rounded-xl bg-[#0c0c0c]/55">

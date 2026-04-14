@@ -3,7 +3,11 @@ import Product from '../models/Product';
 import Brand from '../models/Brand';
 import Category from '../models/Category';
 import CategoryFeaturedSpecs from '../models/CategoryFeaturedSpecs';
-import { buildProductMatchStage, SPECS_OBJECT_TO_ARRAY_PROJECT } from '../utils/productAggregation';
+import {
+    buildProductMatchStage,
+    SPECS_OBJECT_TO_ARRAY_PROJECT,
+    type MatchStageCache,
+} from '../utils/productAggregation';
 import { normalizeSpecKey } from '../utils/normalizeSpecKey';
 
 /** Maps shop URL values like price-asc to Mongo sort (also accepts price_asc). */
@@ -26,116 +30,181 @@ function normalizeCategoryKeyForFeaturedSpecs(category: unknown): string | null 
     return first ? first.toLowerCase() : null;
 }
 
+function normalizeDiscountPercent(input: unknown): number | null {
+    if (input == null) return null;
+    const n = typeof input === 'number' ? input : Number(input);
+    if (!Number.isFinite(n)) return null;
+    if (n <= 0) return null;
+    return Math.max(0, Math.min(100, n));
+}
+
+function computeEffectiveDiscountPercent(product: any): number | null {
+    const productOverride = normalizeDiscountPercent(product?.discountPercent);
+    if (productOverride != null) return productOverride;
+
+    if (Array.isArray(product?.categoryIds) && product.categoryIds.length > 0) {
+        const first = product.categoryIds[0] as any;
+        const direct = normalizeDiscountPercent(first?.discountPercent);
+        if (direct != null) return direct;
+    }
+
+    const firstCategoryId =
+        Array.isArray(product?.categoryIds) && product.categoryIds.length > 0 ? product.categoryIds[0] : null;
+
+    const categoriesFromLookup = Array.isArray(product?.categories) ? product.categories : [];
+    if (firstCategoryId != null && categoriesFromLookup.length > 0) {
+        const match = categoriesFromLookup.find((c: any) => String(c?._id ?? '') === String(firstCategoryId));
+        return match ? normalizeDiscountPercent(match?.discountPercent) : null;
+    }
+
+    if (categoriesFromLookup.length > 0) return normalizeDiscountPercent(categoriesFromLookup[0]?.discountPercent);
+
+    return null;
+}
+
+function withDiscountInfo(product: any): any {
+    const originalPrice = typeof product?.price === 'number' ? product.price : Number(product?.price);
+    if (!Number.isFinite(originalPrice)) {
+        return { ...product, originalPrice: null, discountedPrice: null, effectiveDiscountPercent: null };
+    }
+
+    const effectiveDiscountPercent = computeEffectiveDiscountPercent(product);
+    const discountedPrice =
+        effectiveDiscountPercent != null
+            ? Math.round(originalPrice * (1 - effectiveDiscountPercent / 100))
+            : originalPrice;
+
+    return {
+        ...product,
+        originalPrice,
+        discountedPrice,
+        effectiveDiscountPercent,
+    };
+}
+
 export const getProducts = async (req: Request, res: Response) => {
     try {
-        const { search, minPrice, maxPrice, brand, category, sort, page = 1, limit = 20, ...dynamicFilters } = req.query;
+        res.set('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=120');
 
-        // 1. Full Match (For Products & Counts)
-        const matchStage = await buildProductMatchStage(req);
-
-        // 2. Facet Matches (Exclude specific filters to keep options visible)
-        // For Brands: Exclude 'brand' filter so we see other brands
-        // For Categories: Exclude 'category' filter
-        const categoryMatchStage = await buildProductMatchStage(req, ['category']);
-        // For Brands: Exclude 'brand' filter so we see other brands
-        const brandMatchStage = await buildProductMatchStage(req, ['brand']);
-        // For Price: Exclude 'price' filter so we see full range
-        const priceMatchStage = await buildProductMatchStage(req, ['price']);
-        // For Specs: Exclude current spec selection so all options stay visible for multi-select
-        const specsMatchStage = await buildProductMatchStage(req, ['specs']);
-
+        const { search, minPrice, maxPrice, brand, category, sort, page = 1, limit = 20, facets = 'true' } = req.query;
+        const includeFacets = String(facets).toLowerCase() !== 'false';
+        const limitNum = Math.min(Number(limit) || 20, 100);
+        const pageNum = Math.max(Number(page) || 1, 1);
+        const skip = (pageNum - 1) * limitNum;
         const sortStage = buildProductSortStage(sort);
 
-        const skip = (Number(page) - 1) * Number(limit);
+        if (!includeFacets) {
+            const lookupCache: MatchStageCache = {};
+            const matchStage = await buildProductMatchStage(req, [], lookupCache);
+            const [products, total] = await Promise.all([
+                Product.aggregate([
+                    { $match: matchStage },
+                    { $sort: sortStage },
+                    { $skip: skip },
+                    { $limit: limitNum },
+                    { $lookup: { from: 'brands', localField: 'brandId', foreignField: '_id', as: 'brand' } },
+                    { $unwind: { path: '$brand', preserveNullAndEmptyArrays: true } },
+                    { $lookup: { from: 'categories', localField: 'categoryIds', foreignField: '_id', as: 'categories' } },
+                ]),
+                Product.countDocuments(matchStage),
+            ]);
 
-        // --- Aggregation Pipeline ---
-        // Note: We cannot start with a common $match because facets need DIFFERENT matches.
-        // So strict match happens INSIDE the 'products' and 'totalCount' pipelines.
-        // Relaxed matches happen INSIDE 'brands' and 'price' pipelines.
+            return res.json({
+                products: products.map(withDiscountInfo),
+                pagination: {
+                    total,
+                    page: pageNum,
+                    limit: limitNum,
+                    pages: Math.ceil(total / limitNum),
+                },
+                categoryKey: category || null,
+                featuredMode: 'none',
+                featuredSpecKeys: [],
+                facets: { price: { min: 0, max: 0 }, categories: [], brands: [], availability: [], specs: {} },
+            });
+        }
+
+        const lookupCache: MatchStageCache = {};
+        const matchStage = await buildProductMatchStage(req, [], lookupCache);
+        const categoryMatchStage = await buildProductMatchStage(req, ['category'], lookupCache);
+        const brandMatchStage = await buildProductMatchStage(req, ['brand'], lookupCache);
+        const priceMatchStage = await buildProductMatchStage(req, ['price'], lookupCache);
+        const specsMatchStage = await buildProductMatchStage(req, ['specs'], lookupCache);
+
         const pipeline = [
             {
                 $facet: {
-                    // 1. Paginated Products
                     products: [
                         { $match: matchStage },
                         { $sort: sortStage },
                         { $skip: skip },
-                        { $limit: Number(limit) },
+                        { $limit: limitNum },
                         { $lookup: { from: 'brands', localField: 'brandId', foreignField: '_id', as: 'brand' } },
                         { $unwind: { path: '$brand', preserveNullAndEmptyArrays: true } },
-                        { $lookup: { from: 'categories', localField: 'categoryIds', foreignField: '_id', as: 'categories' } }
+                        { $lookup: { from: 'categories', localField: 'categoryIds', foreignField: '_id', as: 'categories' } },
                     ],
-                    // 2. Total Count (for pagination)
-                    totalCount: [
-                        { $match: matchStage },
-                        { $count: 'count' }
-                    ],
-
-                    // 3. Facets 
-
-                    // Price Range (Using priceMatchStage - shows range for all products in this category/search, ignoring current price filter)
+                    totalCount: [{ $match: matchStage }, { $count: 'count' }],
                     price: [
                         { $match: priceMatchStage },
-                        { $group: { _id: null, min: { $min: "$price" }, max: { $max: "$price" } } }
+                        { $group: { _id: null, min: { $min: '$price' }, max: { $max: '$price' } } },
                     ],
-                    // Categories (Using categoryMatchStage)
                     categories: [
                         { $match: categoryMatchStage },
-                        { $unwind: "$categoryIds" },
-                        { $group: { _id: "$categoryIds", count: { $sum: 1 } } },
+                        { $unwind: '$categoryIds' },
+                        { $group: { _id: '$categoryIds', count: { $sum: 1 } } },
                         { $lookup: { from: 'categories', localField: '_id', foreignField: '_id', as: 'category' } },
-                        { $unwind: "$category" },
-                        { $project: { value: "$category.slug", label: "$category.name", count: 1 } },
-                        { $sort: { label: 1 } }
+                        { $unwind: '$category' },
+                        { $project: { value: '$category.slug', label: '$category.name', count: 1 } },
+                        { $sort: { label: 1 } },
                     ],
-                    // Brands (Using brandMatchStage - show all brands in this category/search, even if one is selected)
                     brands: [
                         { $match: brandMatchStage },
-                        { $group: { _id: "$brandId", count: { $sum: 1 } } },
+                        { $group: { _id: '$brandId', count: { $sum: 1 } } },
                         { $lookup: { from: 'brands', localField: '_id', foreignField: '_id', as: 'brand' } },
-                        { $unwind: "$brand" },
-                        { $project: { value: "$brand.slug", label: "$brand.name", count: 1 } },
-                        { $sort: { label: 1 } } // Sort brands alphabetically
+                        { $unwind: '$brand' },
+                        { $project: { value: '$brand.slug', label: '$brand.name', count: 1 } },
+                        { $sort: { label: 1 } },
                     ],
-                    // Availability (Typically we want to see counts for selected filters, OR relaxed? 
-                    // Usually availability is singular. Let's use full match or specific? 
-                    // Let's use brandMatchStage as a "General Relaxed" or just Full Match. 
-                    // If I select "In Stock", "Out of Stock" should probably still be visible with count strict? 
-                    // Let's use Full Match for now for availability to show what's strictly available in current view)
                     availability: [
                         { $match: matchStage },
-                        { $group: { _id: "$availability", count: { $sum: 1 } } },
-                        { $project: { value: "$_id", count: 1, _id: 0 } }
+                        { $group: { _id: '$availability', count: { $sum: 1 } } },
+                        { $project: { value: '$_id', count: 1, _id: 0 } },
                     ],
-                    // Specs (Dynamic): exclude current spec filters so other options remain visible.
                     specs: [
                         { $match: specsMatchStage },
                         SPECS_OBJECT_TO_ARRAY_PROJECT,
-                        { $unwind: "$specs" },
-                        // Group by Key+Value to get counts
+                        { $unwind: '$specs' },
                         {
                             $group: {
-                                _id: { key: "$specs.k", value: "$specs.v" },
-                                count: { $sum: 1 }
-                            }
+                                _id: { key: '$specs.k', value: '$specs.v' },
+                                count: { $sum: 1 },
+                            },
                         },
-                        // Group by Key to form the list
                         {
                             $group: {
-                                _id: "$_id.key",
-                                values: { $push: { value: "$_id.value", count: "$count" } }
-                            }
-                        }
-                    ]
-                }
-            }
+                                _id: '$_id.key',
+                                values: { $push: { value: '$_id.value', count: '$count' } },
+                            },
+                        },
+                    ],
+                },
+            },
         ];
 
         const results = await Product.aggregate(pipeline as any);
         const data = results[0];
-        const total = data.totalCount[0] ? data.totalCount[0].count : 0;
+        if (!data) {
+            return res.json({
+                products: [],
+                pagination: { total: 0, page: pageNum, limit: limitNum, pages: 0 },
+                categoryKey: category || null,
+                featuredMode: 'none',
+                featuredSpecKeys: [],
+                facets: { price: { min: 0, max: 0 }, categories: [], brands: [], availability: [], specs: {} },
+            });
+        }
+        const total = data.totalCount?.[0]?.count ?? 0;
 
-        // Only show spec filters that are in the category's featured list; never show all attributes
         let featuredMode: 'restricted' | 'none' = 'none';
         let featuredSpecKeys: string[] = [];
 
@@ -158,29 +227,27 @@ export const getProducts = async (req: Request, res: Response) => {
             });
         }
 
-        let finalFacets = {
+        const finalFacets = {
             price: data.price?.[0] || { min: 0, max: 0 },
             categories: data.categories || [],
             brands: data.brands || [],
             availability: data.availability || [],
-            specs: specsFacet
+            specs: specsFacet,
         };
 
-
         res.json({
-            products: data.products,
+            products: (data.products || []).map(withDiscountInfo),
             pagination: {
                 total,
-                page: Number(page),
-                limit: Number(limit),
-                pages: Math.ceil(total / Number(limit))
+                page: pageNum,
+                limit: limitNum,
+                pages: Math.ceil(total / limitNum),
             },
             categoryKey: categoryKeyForSpecs ?? (typeof category === 'string' ? category : null),
             featuredMode,
             featuredSpecKeys,
-            facets: finalFacets
+            facets: finalFacets,
         });
-
     } catch (error) {
         res.status(500).json({ message: (error as Error).message });
     }
@@ -188,20 +255,12 @@ export const getProducts = async (req: Request, res: Response) => {
 
 export const getProductFacets = async (req: Request, res: Response) => {
     try {
-        // Almost identical logic to getProducts, but we can omit the 'products' fetch if performance is critical,
-        // or just return the facets.
-        // For simplicity/DRY, one could extract the 'buildMatchStage' logic.
-        // For now, I will duplicate the precise match logic to ensure it behaves exactly as the listing.
-
         const { search, minPrice, maxPrice, brand, category, ...dynamicFilters } = req.query;
 
-        // 1. Full Match
-        const matchStage = await buildProductMatchStage(req);
-
-        // For Categories: Exclude 'category' filter
-        const categoryMatchStage = await buildProductMatchStage(req, ['category']);
-        // For Specs: Exclude current spec selection so all options stay visible for multi-select
-        const specsMatchStage = await buildProductMatchStage(req, ['specs']);
+        const lookupCache: MatchStageCache = {};
+        const matchStage = await buildProductMatchStage(req, [], lookupCache);
+        const categoryMatchStage = await buildProductMatchStage(req, ['category'], lookupCache);
+        const specsMatchStage = await buildProductMatchStage(req, ['specs'], lookupCache);
 
         const pipeline = [
             { $match: matchStage },

@@ -3,6 +3,11 @@ import mongoose from 'mongoose';
 import Brand from '../models/Brand';
 import Category from '../models/Category';
 
+export interface MatchStageCache {
+    brandIds?: mongoose.Types.ObjectId[];
+    categoryIds?: mongoose.Types.ObjectId[];
+}
+
 /** $objectToArray errors on null/missing/non-document specs; coerce to {} first. */
 export const SPECS_OBJECT_TO_ARRAY_PROJECT = {
     $project: {
@@ -18,9 +23,12 @@ export const SPECS_OBJECT_TO_ARRAY_PROJECT = {
     },
 } as const;
 
-export const buildProductMatchStage = async (req: Request, exclude: string[] = []) => {
-    // console.log('DEBUG QUERY:', JSON.stringify(req.query, null, 2));
-    const { search, minPrice, maxPrice, brand, category, availability, inStock, ...dynamicFilters } = req.query;
+export const buildProductMatchStage = async (
+    req: Request,
+    exclude: string[] = [],
+    cache?: MatchStageCache
+) => {
+    const { search, minPrice, maxPrice, brand, category, availability, inStock, isFeatured, ...dynamicFilters } = req.query;
     const matchStage: any = { isActive: true };
 
     if (search && !exclude.includes('search')) {
@@ -42,28 +50,42 @@ export const buildProductMatchStage = async (req: Request, exclude: string[] = [
         matchStage.availability = { $in: availabilities };
     }
 
+    if (typeof isFeatured === 'string' && !exclude.includes('isFeatured')) {
+        if (isFeatured === 'true' || isFeatured === 'false') {
+            matchStage.isFeatured = isFeatured === 'true';
+        }
+    }
+
     if (brand && !exclude.includes('brand')) {
-        const brands = (brand as string).split(',');
-        const brandDocs = await Brand.find({
-            $or: [
-                { slug: { $in: brands } },
-                { _id: { $in: brands.filter(b => mongoose.Types.ObjectId.isValid(b)) } }
-            ]
-        });
-        if (brandDocs.length > 0) {
-            matchStage.brandId = { $in: brandDocs.map(b => b._id) };
+        if (cache && 'brandIds' in cache && cache.brandIds !== undefined) {
+            if (cache.brandIds.length > 0) matchStage.brandId = { $in: cache.brandIds };
+        } else {
+            const brands = (brand as string).split(',');
+            const brandDocs = await Brand.find({
+                $or: [
+                    { slug: { $in: brands } },
+                    { _id: { $in: brands.filter((b: string) => mongoose.Types.ObjectId.isValid(b)) } },
+                ],
+            });
+            const ids = brandDocs.map((b) => b._id);
+            if (cache) cache.brandIds = ids;
+            if (ids.length > 0) matchStage.brandId = { $in: ids };
         }
     }
 
     if (category && !exclude.includes('category')) {
-        const cats = (category as string).split(',').map((c) => c.trim()).filter(Boolean);
-        const objectIds = cats.filter((c) => mongoose.Types.ObjectId.isValid(c));
-        const slugParts = cats.filter((c) => !mongoose.Types.ObjectId.isValid(c)).map((c) => c.toLowerCase());
-        const catDocs = await Category.find({
-            $or: [{ slug: { $in: slugParts } }, { _id: { $in: objectIds } }],
-        });
-        if (catDocs.length > 0) {
-            matchStage.categoryIds = { $in: catDocs.map((c) => c._id) };
+        if (cache && 'categoryIds' in cache && cache.categoryIds !== undefined) {
+            if (cache.categoryIds.length > 0) matchStage.categoryIds = { $in: cache.categoryIds };
+        } else {
+            const cats = (category as string).split(',').map((c) => c.trim()).filter(Boolean);
+            const objectIds = cats.filter((c: string) => mongoose.Types.ObjectId.isValid(c));
+            const slugParts = cats.filter((c: string) => !mongoose.Types.ObjectId.isValid(c)).map((c) => c.toLowerCase());
+            const catDocs = await Category.find({
+                $or: [{ slug: { $in: slugParts } }, { _id: { $in: objectIds } }],
+            });
+            const ids = catDocs.map((c) => c._id);
+            if (cache) cache.categoryIds = ids;
+            if (ids.length > 0) matchStage.categoryIds = { $in: ids };
         }
     }
 
@@ -74,7 +96,7 @@ export const buildProductMatchStage = async (req: Request, exclude: string[] = [
     let specsFilter: Record<string, any> = (req.query as any).spec || {};
 
     // Fallback for flat keys (e.g. spec[vram]) if nested parsing didn't happen
-    Object.keys(req.query).forEach(key => {
+    Object.keys(req.query).forEach((key) => {
         if (key.startsWith('spec[')) {
             const match = key.match(/spec\[(.*?)\]/);
             if (match && match[1]) {
