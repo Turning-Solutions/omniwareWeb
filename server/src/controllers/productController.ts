@@ -30,21 +30,21 @@ function normalizeCategoryKeyForFeaturedSpecs(category: unknown): string | null 
     return first ? first.toLowerCase() : null;
 }
 
-function normalizeDiscountPercent(input: unknown): number | null {
+function normalizeDiscountAmount(input: unknown): number | null {
     if (input == null) return null;
     const n = typeof input === 'number' ? input : Number(input);
     if (!Number.isFinite(n)) return null;
     if (n <= 0) return null;
-    return Math.max(0, Math.min(100, n));
+    return Math.max(0, n);
 }
 
-function computeEffectiveDiscountPercent(product: any): number | null {
-    const productOverride = normalizeDiscountPercent(product?.discountPercent);
+function computeEffectiveDiscountAmount(product: any): number | null {
+    const productOverride = normalizeDiscountAmount(product?.discountPercent);
     if (productOverride != null) return productOverride;
 
     if (Array.isArray(product?.categoryIds) && product.categoryIds.length > 0) {
         const first = product.categoryIds[0] as any;
-        const direct = normalizeDiscountPercent(first?.discountPercent);
+        const direct = normalizeDiscountAmount(first?.discountPercent);
         if (direct != null) return direct;
     }
 
@@ -54,10 +54,10 @@ function computeEffectiveDiscountPercent(product: any): number | null {
     const categoriesFromLookup = Array.isArray(product?.categories) ? product.categories : [];
     if (firstCategoryId != null && categoriesFromLookup.length > 0) {
         const match = categoriesFromLookup.find((c: any) => String(c?._id ?? '') === String(firstCategoryId));
-        return match ? normalizeDiscountPercent(match?.discountPercent) : null;
+        return match ? normalizeDiscountAmount(match?.discountPercent) : null;
     }
 
-    if (categoriesFromLookup.length > 0) return normalizeDiscountPercent(categoriesFromLookup[0]?.discountPercent);
+    if (categoriesFromLookup.length > 0) return normalizeDiscountAmount(categoriesFromLookup[0]?.discountPercent);
 
     return null;
 }
@@ -68,17 +68,17 @@ function withDiscountInfo(product: any): any {
         return { ...product, originalPrice: null, discountedPrice: null, effectiveDiscountPercent: null };
     }
 
-    const effectiveDiscountPercent = computeEffectiveDiscountPercent(product);
+    const effectiveDiscountAmount = computeEffectiveDiscountAmount(product);
     const discountedPrice =
-        effectiveDiscountPercent != null
-            ? Math.round(originalPrice * (1 - effectiveDiscountPercent / 100))
+        effectiveDiscountAmount != null
+            ? Math.max(0, Math.round(originalPrice - effectiveDiscountAmount))
             : originalPrice;
 
     return {
         ...product,
         originalPrice,
         discountedPrice,
-        effectiveDiscountPercent,
+        effectiveDiscountPercent: effectiveDiscountAmount,
     };
 }
 
@@ -358,10 +358,11 @@ export const getProductBySlug = async (req: Request, res: Response) => {
     try {
         const product = await Product.findOne({ slug: req.params.slug, isActive: true })
             .populate('brandId', 'name slug logoUrl')
-            .populate('categoryIds', 'name slug');
+            .populate('categoryIds', 'name slug discountPercent');
 
         if (product) {
-            res.json(normalizeProductAttributeGroups(product));
+            const normalized = normalizeProductAttributeGroups(product);
+            res.json(withDiscountInfo(normalized));
         } else {
             res.status(404).json({ message: 'Product not found' });
         }
@@ -468,10 +469,11 @@ export const getProductById = async (req: Request, res: Response) => {
     try {
         const product = await Product.findById(req.params.id)
             .populate('brandId', 'name slug logoUrl')
-            .populate('categoryIds', 'name slug');
+            .populate('categoryIds', 'name slug discountPercent');
 
         if (product) {
-            res.json(normalizeProductAttributeGroups(product));
+            const normalized = normalizeProductAttributeGroups(product);
+            res.json(withDiscountInfo(normalized));
         } else {
             res.status(404).json({ message: 'Product not found' });
         }

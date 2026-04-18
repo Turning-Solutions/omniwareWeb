@@ -31,7 +31,13 @@ router.get('/', async (req: Request, res: Response) => {
         match.isFeatured = isFeatured === 'true';
     }
     if (q && String(q).trim()) {
-        match.title = { $regex: String(q).trim(), $options: 'i' };
+        const term = String(q).trim();
+        const safe = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        match.$or = [
+            { title: { $regex: safe, $options: 'i' } },
+            { sku: { $regex: safe, $options: 'i' } },
+            { 'variants.sku': { $regex: safe, $options: 'i' } },
+        ];
     }
     if (brand && String(brand).trim()) {
         match.brandId = String(brand).trim();
@@ -184,7 +190,7 @@ router.put('/categories/:id', async (req: Request, res: Response) => {
 });
 
 // PUT /api/v1/admin/products/categories/:id/discount
-// Updates the category-wide discount percent that applies to all products in the category.
+// Updates the category-wide discount amount that applies to all products in the category.
 router.put('/categories/:id/discount', async (req: Request, res: Response) => {
     try {
         const { discountPercent } = req.body as { discountPercent?: number | string | null };
@@ -198,12 +204,12 @@ router.put('/categories/:id/discount', async (req: Request, res: Response) => {
         } else {
             const n = Number(discountPercent);
             if (!Number.isFinite(n)) {
-                return res.status(400).json({ message: 'discountPercent must be a number (0-100) or null' });
+                return res.status(400).json({ message: 'discountPercent must be a non-negative number or null' });
             }
-            if (n < 0 || n > 100) {
-                return res.status(400).json({ message: 'discountPercent must be between 0 and 100' });
+            if (n < 0) {
+                return res.status(400).json({ message: 'discountPercent must be 0 or greater' });
             }
-            normalized = Math.max(0, Math.min(100, Math.round(n)));
+            normalized = Math.max(0, n);
         }
 
         const updated = await Category.findByIdAndUpdate(

@@ -5,10 +5,10 @@ const categorySchema = new mongoose.Schema({
     slug: { type: String, required: true, unique: true },
     parentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Category', default: null },
     /**
-     * Optional category-wide discount (percent 0-100).
+     * Optional category-wide discount amount.
      * If null/0, no category discount.
      */
-    discountPercent: { type: Number, required: false, default: null, min: 0, max: 100 },
+    discountPercent: { type: Number, required: false, default: null, min: 0 },
     isActive: { type: Boolean, default: true }
 }, {
     timestamps: true

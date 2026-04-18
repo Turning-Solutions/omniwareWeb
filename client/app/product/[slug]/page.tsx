@@ -30,6 +30,11 @@ interface ProductColorVariant {
     stock?: { qty?: number };
 }
 
+const formatSpecificationLabel = (label?: string) => {
+    if (!label) return "";
+    return label.replaceAll("_", " ").trim();
+};
+
 function ProductPageInner({ params }: { params: Promise<{ slug: string }> }) {
     const { slug } = use(params);
     const router = useRouter();
@@ -147,9 +152,9 @@ function ProductPageInner({ params }: { params: Promise<{ slug: string }> }) {
     const selectedColorImage = selectedColorVariant?.image?.trim() || "";
     const currentImage = selectedColorImage || product.images?.[selectedImage] || "";
 
-    const effectiveDiscountPercent = product.effectiveDiscountPercent ?? product.discountPercent ?? 0;
+    const effectiveDiscountAmount = product.effectiveDiscountPercent ?? product.discountPercent ?? 0;
     const applyDiscountToPrice = (price: number) =>
-        effectiveDiscountPercent > 0 ? Math.round(price * (1 - effectiveDiscountPercent / 100)) : price;
+        effectiveDiscountAmount > 0 ? Math.max(0, Math.round(price - effectiveDiscountAmount)) : price;
 
     const currentOriginalPrice = selectedVariant?.price ?? product.price;
     const currentPrice = applyDiscountToPrice(currentOriginalPrice);
@@ -314,7 +319,7 @@ function ProductPageInner({ params }: { params: Promise<{ slug: string }> }) {
                                 {Object.entries(product.specs).map(([key, value]) => (
                                     <div key={key}>
                                         <span className="block text-[11px] font-medium uppercase tracking-wide text-[#8E8E8E]">
-                                            {key}
+                                            {formatSpecificationLabel(key)}
                                         </span>
                                         <span className="text-[#D4D4D4]">{value as string}</span>
                                     </div>
@@ -345,14 +350,14 @@ function ProductPageInner({ params }: { params: Promise<{ slug: string }> }) {
                             <span className="text-3xl font-bold tabular-nums text-[#F1F1F1]">
                                 LKR {currentPrice.toLocaleString()}
                             </span>
-                            {effectiveDiscountPercent > 0 && (
+                            {effectiveDiscountAmount > 0 && (
                                 <span className="text-sm text-[#8E8E8E] line-through">
                                     LKR {currentOriginalPrice.toLocaleString()}
                                 </span>
                             )}
-                            {effectiveDiscountPercent > 0 && (
+                            {effectiveDiscountAmount > 0 && (
                                 <span className="rounded-full border border-[#D12B28]/35 bg-[#D12B28]/15 px-2.5 py-1 text-xs font-bold text-[#F4C5C5]">
-                                    −{effectiveDiscountPercent}%
+                                    Save LKR {Math.round(effectiveDiscountAmount).toLocaleString()}
                                 </span>
                             )}
                         </div>
@@ -399,7 +404,7 @@ function ProductPageInner({ params }: { params: Promise<{ slug: string }> }) {
                                         {(variant.attributes ?? []).map((a) => a.value).join(" / ")}
                                         {variant.price != null && (
                                             <span className="ml-2 text-xs opacity-75">
-                                                {effectiveDiscountPercent > 0 ? (
+                                                {effectiveDiscountAmount > 0 ? (
                                                     <>
                                                         LKR {applyDiscountToPrice(variant.price).toLocaleString()}
                                                         <span className="ml-1 opacity-60 line-through">
@@ -441,7 +446,7 @@ function ProductPageInner({ params }: { params: Promise<{ slug: string }> }) {
                                         <span>{color.name}</span>
                                         {color.price != null && (
                                             <span className="ml-1 text-xs opacity-75">
-                                                {effectiveDiscountPercent > 0 ? (
+                                                {effectiveDiscountAmount > 0 ? (
                                                     <>
                                                         LKR {applyDiscountToPrice(color.price).toLocaleString()}
                                                         <span className="ml-1 opacity-60 line-through">
@@ -560,7 +565,7 @@ function ProductPageInner({ params }: { params: Promise<{ slug: string }> }) {
                                     {groups.map((group, idx) => (
                                         <div key={idx} className="px-4 py-4 sm:px-5">
                                             <div className="mb-3 font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-[#D12B28]/85">
-                                                {group.category}
+                                                {formatSpecificationLabel(group.category)}
                                             </div>
                                             <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
                                                 {group.attributes.map((attr, i) => (
@@ -568,7 +573,7 @@ function ProductPageInner({ params }: { params: Promise<{ slug: string }> }) {
                                                         {attr.name ? (
                                                             <>
                                                                 <span className="block text-[11px] uppercase tracking-wide text-[#8E8E8E]">
-                                                                    {attr.name}
+                                                                    {formatSpecificationLabel(attr.name)}
                                                                 </span>
                                                                 <span className="text-[#D4D4D4]">{attr.value}</span>
                                                             </>

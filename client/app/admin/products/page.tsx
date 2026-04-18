@@ -258,7 +258,7 @@ export default function ProductsPage() {
                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-sub h-5 w-5" />
                         <input
                             type="text"
-                            placeholder="Search by product title..."
+                            placeholder="Search by product name or SKU..."
                             className="w-full bg-base border border-border-soft rounded-lg pl-10 pr-4 py-2.5 text-main focus:outline-none focus:border-accent transition-colors"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}

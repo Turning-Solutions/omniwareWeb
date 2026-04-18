@@ -33,18 +33,18 @@ const hasFilters = (req: Request): boolean => {
     return keys.length > 0;
 };
 
-function normalizeDiscountPercent(input: unknown): number | null {
+function normalizeDiscountAmount(input: unknown): number | null {
     if (input == null) return null;
     const n = typeof input === 'number' ? input : Number(input);
     if (!Number.isFinite(n)) return null;
     if (n <= 0) return null;
     // Clamp to keep data safe even if someone bypasses UI/API validation
-    return Math.max(0, Math.min(100, n));
+    return Math.max(0, n);
 }
 
-function computeEffectiveDiscountPercent(product: any): number | null {
+function computeEffectiveDiscountAmount(product: any): number | null {
     // 1) Product-level override wins
-    const productOverride = normalizeDiscountPercent(product?.discountPercent);
+    const productOverride = normalizeDiscountAmount(product?.discountPercent);
     if (productOverride != null) return productOverride;
 
     // 2) Otherwise, apply the discount from the product's *first* category.
@@ -55,7 +55,7 @@ function computeEffectiveDiscountPercent(product: any): number | null {
     // If `categoryIds[0]` is already a populated category object, read its discount directly.
     if (Array.isArray(product?.categoryIds) && product.categoryIds.length > 0) {
         const first = product.categoryIds[0] as any;
-        const direct = normalizeDiscountPercent(first?.discountPercent);
+        const direct = normalizeDiscountAmount(first?.discountPercent);
         if (direct != null) return direct;
     }
 
@@ -69,11 +69,11 @@ function computeEffectiveDiscountPercent(product: any): number | null {
         const match = categoriesFromLookup.find(
             (c: any) => String(c?._id ?? '') === String(firstCategoryId)
         );
-        return match ? normalizeDiscountPercent(match?.discountPercent) : null;
+        return match ? normalizeDiscountAmount(match?.discountPercent) : null;
     }
 
     // Fallback: use the first category document if present (aggregate route only).
-    if (categoriesFromLookup.length > 0) return normalizeDiscountPercent(categoriesFromLookup[0]?.discountPercent);
+    if (categoriesFromLookup.length > 0) return normalizeDiscountAmount(categoriesFromLookup[0]?.discountPercent);
 
     return null;
 }
@@ -84,17 +84,17 @@ function withDiscountInfo(product: any): any {
         return { ...product, originalPrice: null, discountedPrice: null, effectiveDiscountPercent: null };
     }
 
-    const effectiveDiscountPercent = computeEffectiveDiscountPercent(product);
+    const effectiveDiscountAmount = computeEffectiveDiscountAmount(product);
     const discountedPrice =
-        effectiveDiscountPercent != null
-            ? Math.round(originalPrice * (1 - effectiveDiscountPercent / 100))
+        effectiveDiscountAmount != null
+            ? Math.max(0, Math.round(originalPrice - effectiveDiscountAmount))
             : originalPrice;
 
     return {
         ...product,
         originalPrice,
         discountedPrice,
-        effectiveDiscountPercent,
+        effectiveDiscountPercent: effectiveDiscountAmount,
     };
 }
 

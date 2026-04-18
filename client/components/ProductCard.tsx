@@ -36,7 +36,7 @@ export default function ProductCard({
     const shopPreOrderButtonClass =
         "relative z-10 inline-flex w-full min-w-0 justify-center items-center gap-1.5 rounded-full border border-transparent bg-[#D12B28] px-3 py-2 text-xs font-semibold text-[#F1F1F1] transition-colors hover:bg-[#B32522] group-hover:border-yellow-400/45 group-hover:bg-yellow-400 group-hover:text-[#1a1a1a] group-hover:shadow-lg group-hover:shadow-yellow-500/25 group-hover:hover:bg-yellow-300";
     const colorVariants = product.colorVariants ?? [];
-    const effectiveDiscountPercent = product.effectiveDiscountPercent ?? product.discountPercent ?? null;
+    const effectiveDiscountAmount = product.effectiveDiscountPercent ?? product.discountPercent ?? null;
     const originalPrice = product.originalPrice ?? product.price;
     const discountedPrice = product.discountedPrice ?? product.price;
     const colorNamesFromLegacyVariants = (product.variants ?? [])
@@ -47,7 +47,7 @@ export default function ProductCard({
         : colorNamesFromLegacyVariants;
 
     const cartPrice =
-        effectiveDiscountPercent != null && effectiveDiscountPercent > 0 ? discountedPrice : product.price;
+        effectiveDiscountAmount != null && effectiveDiscountAmount > 0 ? discountedPrice : product.price;
     const canAddToCart = availability === "in_stock" || availability === "pre_order";
 
     // Hard clamp the title to 2 lines so cards in a grid keep a consistent height,
@@ -76,9 +76,9 @@ export default function ProductCard({
     return (
         <div className="group relative min-w-0 overflow-hidden rounded-2xl border border-[#5E5E5E]/30 bg-[#1a1a1a] transition-[transform,border-color,ring-width,ring-color] duration-500 ease-in-out hover:-translate-y-1.5 hover:border-[#D12B28]/55 hover:ring-1 hover:ring-[#D12B28]/35">
             <div className="relative z-10 aspect-square overflow-hidden bg-[#121212]/80">
-                {effectiveDiscountPercent != null && effectiveDiscountPercent > 0 && (
+                {effectiveDiscountAmount != null && effectiveDiscountAmount > 0 && (
                     <div className="absolute top-3 right-3 z-10 rounded-full border border-[#D12B28]/35 bg-[#D12B28]/20 px-3 py-1 text-[10px] font-semibold text-[#F1F1F1] shadow-sm">
-                        Discount {effectiveDiscountPercent}%
+                        Save LKR {Math.round(effectiveDiscountAmount).toLocaleString()}
                     </div>
                 )}
                 {product.warranty ? (
@@ -144,7 +144,7 @@ export default function ProductCard({
                 </div>
 
                 <div className="flex min-w-0 flex-col gap-4 border-t border-white/[0.06] pt-3">
-                    {effectiveDiscountPercent != null && effectiveDiscountPercent > 0 ? (
+                    {effectiveDiscountAmount != null && effectiveDiscountAmount > 0 ? (
                         <div className="min-w-0 flex flex-col items-start gap-0.5 leading-tight">
                             <span className="text-xs text-[#6a6a6a] line-through tabular-nums">
                                 LKR {originalPrice.toLocaleString()}

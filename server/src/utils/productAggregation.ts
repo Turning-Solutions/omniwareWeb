@@ -3,6 +3,34 @@ import mongoose from 'mongoose';
 import Brand from '../models/Brand';
 import Category from '../models/Category';
 
+/**
+ * When filtering by a parent category (e.g. slug `storage`), include every
+ * descendant `_id` so products tagged only with leaf categories still match
+ * and facet aggregations expose those leaf slugs.
+ */
+async function expandCategoryTreeIds(
+    rootIds: mongoose.Types.ObjectId[]
+): Promise<mongoose.Types.ObjectId[]> {
+    if (rootIds.length === 0) return [];
+    const out = new Set<string>(rootIds.map((id) => String(id)));
+    let frontier = [...rootIds];
+    for (let depth = 0; depth < 64 && frontier.length > 0; depth++) {
+        const children = await Category.find({ parentId: { $in: frontier } })
+            .select('_id')
+            .lean();
+        const next: mongoose.Types.ObjectId[] = [];
+        for (const row of children) {
+            const sid = String(row._id);
+            if (!out.has(sid)) {
+                out.add(sid);
+                next.push(row._id as mongoose.Types.ObjectId);
+            }
+        }
+        frontier = next;
+    }
+    return [...out].map((s) => new mongoose.Types.ObjectId(s));
+}
+
 export interface MatchStageCache {
     brandIds?: mongoose.Types.ObjectId[];
     categoryIds?: mongoose.Types.ObjectId[];
@@ -83,7 +111,8 @@ export const buildProductMatchStage = async (
             const catDocs = await Category.find({
                 $or: [{ slug: { $in: slugParts } }, { _id: { $in: objectIds } }],
             });
-            const ids = catDocs.map((c) => c._id);
+            const rootIds = catDocs.map((c) => c._id);
+            const ids = await expandCategoryTreeIds(rootIds);
             if (cache) cache.categoryIds = ids;
             if (ids.length > 0) matchStage.categoryIds = { $in: ids };
         }

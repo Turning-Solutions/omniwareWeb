@@ -28,13 +28,13 @@ import ShopReviewsStrip from "@/components/ShopReviewsStrip";
 import ReviewForm from "@/components/reviews/ReviewForm";
 
 const SEARCH_PREVIEW_DEBOUNCE_MS = 320;
-/** Featured strip: fetch more than the old 4-up grid; slider scrolls through them. */
+/** Featured strip: fetch more than the old 4-up grid; slider steps through them product-by-product. */
 const FEATURED_PRODUCTS_LIMIT = 16;
-/** Time between automatic scroll steps (ms). */
-const FEATURED_AUTO_SCROLL_MS = 5000;
-/** Transform animation duration for each featured slide step. */
+/** Time between automatic slide steps (ms). */
+const FEATURED_AUTO_SCROLL_MS = 4500;
+/** Per-step transform duration (ms). */
 const FEATURED_SLIDE_TRANSITION_MS = 520;
-/** Triplicate featured slides to enable seamless infinite looping. */
+/** Triplicate featured slides so we can keep the visible index in the middle copy and recenter invisibly. */
 const FEATURED_LOOP_COPIES = 3;
 
 /**
@@ -58,106 +58,92 @@ export default function Home() {
         includeFacets: false,
     });
     const featuredProducts = featuredData?.products || [];
-    const featuredLoopedProducts = featuredProducts.length > 1
+    const baseFeaturedCount = featuredProducts.length;
+    const featuredLoopedProducts = baseFeaturedCount > 1
         ? Array.from({ length: FEATURED_LOOP_COPIES }, (_, copyIdx) =>
             featuredProducts.map((product) => ({ product, copyIdx }))
         ).flat()
         : featuredProducts.map((product) => ({ product, copyIdx: 0 }));
-    const featuredTrackRef = useRef<HTMLDivElement>(null);
-    const [featuredSlideIndex, setFeaturedSlideIndex] = useState(0);
-    const [featuredTrackOffset, setFeaturedTrackOffset] = useState(0);
-    const [featuredSkipTransition, setFeaturedSkipTransition] = useState(false);
 
-    const syncFeaturedOffset = useCallback((index: number) => {
+    const featuredTrackRef = useRef<HTMLDivElement>(null);
+    const featuredIndexRef = useRef(0);
+    const [featuredOffset, setFeaturedOffset] = useState(0);
+    const [featuredAnimate, setFeaturedAnimate] = useState(false);
+
+    const readOffset = useCallback((index: number): number => {
         const track = featuredTrackRef.current;
-        if (!track) return;
-        const items = [...track.querySelectorAll<HTMLElement>("[data-featured-slider-item]")];
-        const target = items[index] ?? items[0];
-        if (!target) return;
-        setFeaturedTrackOffset(target.offsetLeft);
+        if (!track) return 0;
+        const items = track.querySelectorAll<HTMLElement>("[data-featured-slider-item]");
+        return items[index]?.offsetLeft ?? 0;
     }, []);
 
+    const jumpTo = useCallback((index: number) => {
+        featuredIndexRef.current = index;
+        setFeaturedAnimate(false);
+        requestAnimationFrame(() =>
+            requestAnimationFrame(() => {
+                setFeaturedOffset(readOffset(index));
+                setFeaturedAnimate(true);
+            })
+        );
+    }, [readOffset]);
+
+    const slideTo = useCallback((index: number) => {
+        featuredIndexRef.current = index;
+        requestAnimationFrame(() => {
+            setFeaturedOffset(readOffset(index));
+        });
+    }, [readOffset]);
+
+    // On load: jump silently to the first item of the middle copy.
     useEffect(() => {
-        if (featuredProducts.length <= 1) {
-            setFeaturedSlideIndex(0);
-            setFeaturedTrackOffset(0);
-            setFeaturedSkipTransition(false);
+        if (baseFeaturedCount <= 1) {
+            featuredIndexRef.current = 0;
+            setFeaturedOffset(0);
+            setFeaturedAnimate(false);
             return;
         }
+        jumpTo(baseFeaturedCount);
+    }, [baseFeaturedCount, jumpTo]);
 
-        const middleStart = featuredProducts.length;
-        setFeaturedSkipTransition(true);
-        setFeaturedSlideIndex(middleStart);
-        syncFeaturedOffset(middleStart);
-        const rafId = requestAnimationFrame(() => {
-            setFeaturedSkipTransition(false);
-        });
-        return () => cancelAnimationFrame(rafId);
-    }, [featuredProducts.length, syncFeaturedOffset]);
-
-    useEffect(() => {
-        syncFeaturedOffset(featuredSlideIndex);
-    }, [featuredSlideIndex, syncFeaturedOffset, featuredLoopedProducts.length]);
-
+    // Re-measure on resize so offsets stay accurate.
     useEffect(() => {
         if (typeof window === "undefined") return;
-        const handleResize = () => syncFeaturedOffset(featuredSlideIndex);
+        const handleResize = () => {
+            setFeaturedOffset(readOffset(featuredIndexRef.current));
+        };
         window.addEventListener("resize", handleResize);
         return () => window.removeEventListener("resize", handleResize);
-    }, [featuredSlideIndex, syncFeaturedOffset]);
+    }, [readOffset]);
 
+    // Auto-advance every interval.
     useEffect(() => {
-        if (featuredProducts.length <= 1) return;
-        if (typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-            return;
-        }
+        if (baseFeaturedCount <= 1) return;
+        if (typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+        const intervalId = window.setInterval(() => {
+            slideTo(featuredIndexRef.current + 1);
+        }, FEATURED_AUTO_SCROLL_MS);
+        return () => window.clearInterval(intervalId);
+    }, [baseFeaturedCount, loadingFeatured, slideTo]);
 
-        let intervalId: number | null = null;
-        let rafId = 0;
-
-        const startInterval = () => {
-            if (!featuredTrackRef.current) {
-                rafId = requestAnimationFrame(startInterval);
-                return;
-            }
-            intervalId = window.setInterval(() => {
-                setFeaturedSlideIndex((current) => current + 1);
-            }, FEATURED_AUTO_SCROLL_MS);
-        };
-
-        startInterval();
-
-        return () => {
-            cancelAnimationFrame(rafId);
-            if (intervalId != null) window.clearInterval(intervalId);
-        };
-    }, [featuredProducts.length, loadingFeatured]);
-
-    useEffect(() => {
-        if (featuredProducts.length <= 1) return;
-        const middleStart = featuredProducts.length;
-        const middleEnd = (featuredProducts.length * 2) - 1;
-        if (featuredSlideIndex >= middleStart && featuredSlideIndex <= middleEnd) return;
-
-        const normalized = ((featuredSlideIndex % featuredProducts.length) + featuredProducts.length) % featuredProducts.length;
-        const recenteredIndex = middleStart + normalized;
-
-        const timeoutId = window.setTimeout(() => {
-            setFeaturedSkipTransition(true);
-            setFeaturedSlideIndex(recenteredIndex);
-            syncFeaturedOffset(recenteredIndex);
-            requestAnimationFrame(() => {
-                setFeaturedSkipTransition(false);
-            });
-        }, FEATURED_SLIDE_TRANSITION_MS + 40);
-
-        return () => window.clearTimeout(timeoutId);
-    }, [featuredProducts.length, featuredSlideIndex, syncFeaturedOffset]);
+    // After each animated step: silently recenter into the middle copy.
+    const handleFeaturedTransitionEnd = useCallback((event: React.TransitionEvent<HTMLDivElement>) => {
+        if (event.propertyName !== "transform") return;
+        if (baseFeaturedCount <= 1) return;
+        const current = featuredIndexRef.current;
+        const minIdx = baseFeaturedCount;
+        const maxIdx = baseFeaturedCount * 2 - 1;
+        if (current >= minIdx && current <= maxIdx) return;
+        const recentered = current > maxIdx
+            ? current - baseFeaturedCount
+            : current + baseFeaturedCount;
+        jumpTo(recentered);
+    }, [baseFeaturedCount, jumpTo]);
 
     const handleFeaturedArrow = useCallback((direction: 1 | -1) => {
-        if (featuredProducts.length <= 1) return;
-        setFeaturedSlideIndex((current) => current + direction);
-    }, [featuredProducts.length]);
+        if (baseFeaturedCount <= 1) return;
+        slideTo(featuredIndexRef.current + direction);
+    }, [baseFeaturedCount, slideTo]);
 
     const normalizedPreviewQuery = previewQuery.trim();
     const shouldShowPreview = normalizedPreviewQuery.length > 0;
@@ -378,7 +364,7 @@ export default function Home() {
                                                         const brandLabel = typeof product.brand === "object" && product.brand !== null
                                                             ? product.brand.name
                                                             : product.brand;
-                                                        const effectiveDiscountPercent = product.effectiveDiscountPercent ?? product.discountPercent ?? null;
+                                                        const effectiveDiscountAmount = product.effectiveDiscountPercent ?? product.discountPercent ?? null;
                                                         const originalPrice = product.originalPrice ?? product.price;
                                                         const discountedPrice = product.discountedPrice ?? product.price;
 
@@ -396,13 +382,13 @@ export default function Home() {
                                                                     <div className="min-w-0">
                                                                         <p className="truncate text-[11px] text-[#8E8E8E]">{brandLabel}</p>
                                                                         <p className="line-clamp-1 text-sm font-semibold text-[#F1F1F1]">{product.title}</p>
-                                                                        {effectiveDiscountPercent != null && effectiveDiscountPercent > 0 ? (
+                                                                        {effectiveDiscountAmount != null && effectiveDiscountAmount > 0 ? (
                                                                             <p className="mt-0.5 text-xs font-semibold text-[#D12B28] flex items-baseline gap-2">
                                                                                 <span className="text-[#8E8E8E] line-through font-semibold text-[11px]">
                                                                                     LKR {originalPrice.toLocaleString()}
                                                                                 </span>
                                                                                 <span>LKR {discountedPrice.toLocaleString()}</span>
-                                                                                <span className="text-[10px] text-[#F4C5C5] font-bold">-{effectiveDiscountPercent}%</span>
+                                                                                <span className="text-[10px] text-[#F4C5C5] font-bold">Save LKR {Math.round(effectiveDiscountAmount).toLocaleString()}</span>
                                                                             </p>
                                                                         ) : (
                                                                             <p className="mt-0.5 text-xs font-semibold text-[#D12B28]">
@@ -568,19 +554,20 @@ export default function Home() {
                                     </button>
                                 </div>
                                 <div
-                                    className="overflow-hidden pb-2 pr-1 pt-3 sm:pr-2"
+                                    className="overflow-hidden pb-2 pt-3"
                                     role="region"
                                     aria-roledescription="carousel"
                                     aria-label="Featured products"
                                 >
                                     <div
                                         ref={featuredTrackRef}
+                                        onTransitionEnd={handleFeaturedTransitionEnd}
                                         className="flex gap-4 lg:gap-6"
                                         style={{
-                                            transform: `translate3d(${-featuredTrackOffset}px, 0, 0)`,
-                                            transition: featuredSkipTransition
-                                                ? "none"
-                                                : `transform ${FEATURED_SLIDE_TRANSITION_MS}ms cubic-bezier(0.22, 1, 0.36, 1)`,
+                                            transform: `translate3d(${-featuredOffset}px, 0, 0)`,
+                                            transition: featuredAnimate
+                                                ? `transform ${FEATURED_SLIDE_TRANSITION_MS}ms cubic-bezier(0.22, 1, 0.36, 1)`
+                                                : "none",
                                             willChange: "transform",
                                         }}
                                     >
@@ -588,7 +575,7 @@ export default function Home() {
                                             <div
                                                 key={`${product._id}-${copyIdx}`}
                                                 data-featured-slider-item
-                                                className="w-[min(100%,17rem)] shrink-0 last:mr-1 sm:last:mr-2 lg:last:mr-0 lg:w-[calc((100%-4.5rem)/4)]"
+                                                className="w-[17rem] shrink-0 lg:w-[20rem]"
                                             >
                                                 <ProductCard
                                                     product={product}

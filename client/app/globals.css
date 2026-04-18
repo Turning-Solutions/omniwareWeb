@@ -151,6 +151,7 @@ body {
     animation-play-state: paused;
 }
 
+
 @media (prefers-reduced-motion: reduce) {
     .brand-marquee-track {
         animation: none;

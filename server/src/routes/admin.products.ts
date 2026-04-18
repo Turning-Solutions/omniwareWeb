@@ -167,5 +167,48 @@ router.put('/categories/:id', async (req: Request, res: Response) => {
     }
 });
 
+// PUT /api/v1/admin/products/categories/:id/discount
+// Updates the category-wide discount amount that applies to all products in the category.
+router.put('/categories/:id/discount', async (req: Request, res: Response) => {
+    try {
+        const { discountPercent } = req.body as { discountPercent?: number | string | null };
+
+        const before = await Category.findById(req.params.id).lean();
+        if (!before) return res.status(404).json({ message: 'Category not found' });
+
+        let normalized: number | null = null;
+        if (discountPercent == null || discountPercent === '') {
+            normalized = null;
+        } else {
+            const n = Number(discountPercent);
+            if (!Number.isFinite(n)) {
+                return res.status(400).json({ message: 'discountPercent must be a non-negative number or null' });
+            }
+            if (n < 0) {
+                return res.status(400).json({ message: 'discountPercent must be 0 or greater' });
+            }
+            normalized = Math.max(0, n);
+        }
+
+        const updated = await Category.findByIdAndUpdate(
+            req.params.id,
+            { discountPercent: normalized },
+            { returnDocument: 'after' }
+        ).lean();
+
+        await createAuditLog(req, {
+            action: 'UPDATE_CATEGORY_DISCOUNT',
+            entityType: 'Category',
+            entityId: String(req.params.id),
+            before,
+            after: updated,
+        });
+
+        res.json(updated);
+    } catch (error) {
+        res.status(400).json({ message: (error as Error).message });
+    }
+});
+
 export default router;
 

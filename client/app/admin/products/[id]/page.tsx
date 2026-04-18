@@ -124,7 +124,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
     const [formData, setFormData] = useState({
         title: "",
         price: "",
-        /** Optional product-level discount override (empty => use category discount). */
+        /** Optional product-level discount override amount (empty => use category discount). */
         discountPercent: "",
         sku: "",
         slug: "",
@@ -133,7 +133,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
         warranty: "",
         brandId: "",
         categoryIds: [] as string[],
-        /** Category-wide discount for the currently selected category (empty => no category discount). */
+        /** Category-wide discount amount for the currently selected category (empty => no category discount). */
         categoryDiscountPercent: "",
         attributeGroups: [] as AttributeGroup[],
         filterSpecs: [] as FilterSpec[],
@@ -320,20 +320,26 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
             const parsedProductDiscountPercent =
                 formData.discountPercent.trim() === ""
                     ? null
-                    : Math.max(0, Math.min(100, Math.round(Number(formData.discountPercent))));
+                    : Math.max(0, Number(formData.discountPercent));
 
             const selectedCategoryId = formData.categoryIds[0];
             const parsedCategoryDiscountPercent =
                 formData.categoryDiscountPercent.trim() === ""
                     ? null
-                    : Math.max(0, Math.min(100, Math.round(Number(formData.categoryDiscountPercent))));
+                    : Math.max(0, Number(formData.categoryDiscountPercent));
             const parsedInitialCategoryDiscountPercent =
                 initialCategoryDiscountPercent.trim() === ""
                     ? null
-                    : Math.max(
-                        0,
-                        Math.min(100, Math.round(Number(initialCategoryDiscountPercent)))
-                    );
+                    : Math.max(0, Number(initialCategoryDiscountPercent));
+
+            if (parsedProductDiscountPercent != null && !Number.isFinite(parsedProductDiscountPercent)) {
+                toast.error("Enter a valid product discount amount.");
+                return;
+            }
+            if (parsedCategoryDiscountPercent != null && !Number.isFinite(parsedCategoryDiscountPercent)) {
+                toast.error("Enter a valid category discount amount.");
+                return;
+            }
 
             const payload = {
                 ...rest,
@@ -997,37 +1003,35 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                     <div className="mb-4">
                         <h2 className="text-xl font-bold text-main">Discounts</h2>
                         <p className="text-sub text-sm mt-0.5">
-                            Set a product-level discount override, or set a category discount that applies to all products in the selected category.
+                            Set a product-level discount amount override, or set a category discount amount that applies to all products in the selected category.
                         </p>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-2">
-                            <label className="text-sub text-sm">Product discount % (override)</label>
+                            <label className="text-sub text-sm">Product discount amount (LKR)</label>
                             <input
                                 type="number"
                                 min={0}
-                                max={100}
-                                step={1}
+                                step={0.01}
                                 className="w-full bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent"
                                 value={formData.discountPercent}
                                 onChange={(e) => setFormData({ ...formData, discountPercent: e.target.value })}
-                                placeholder="e.g. 10"
+                                placeholder="e.g. 1000"
                             />
-                            <p className="text-xs text-sub">Leave empty to use the category discount (if any).</p>
+                            <p className="text-xs text-sub">Leave empty to use the category discount amount (if any).</p>
                         </div>
 
                         <div className="space-y-2">
-                            <label className="text-sub text-sm">Category discount % (apply to all)</label>
+                            <label className="text-sub text-sm">Category discount amount (LKR)</label>
                             <input
                                 type="number"
                                 min={0}
-                                max={100}
-                                step={1}
+                                step={0.01}
                                 className="w-full bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent disabled:opacity-60"
                                 value={formData.categoryDiscountPercent}
                                 onChange={(e) => setFormData({ ...formData, categoryDiscountPercent: e.target.value })}
-                                placeholder="e.g. 15"
+                                placeholder="e.g. 1500"
                                 disabled={!formData.categoryIds[0]}
                             />
                             <p className="text-xs text-sub">Leave empty to remove the category discount.</p>

@@ -226,6 +226,364 @@ function FilterRadio({
 
 const LIST_PREVIEW = 6;
 
+type CategoryFacet = NonNullable<Facets["categories"]>[number];
+
+type CategoryLayoutNode = {
+    label: string;
+    /**
+     * Explicit DB-slug aliases to match against facets.
+     * Leave empty / undefined to skip DB matching (group-only header).
+     */
+    valueAliases?: string[];
+    /**
+     * When true, this node is always rendered as a section label —
+     * it will never consume a DB category match even if one exists.
+     * Children are still resolved normally.
+     */
+    groupOnly?: boolean;
+    /**
+     * Like `groupOnly` for matching (never consumes a facet), but does not
+     * render its own header — children are merged at the same depth.
+     * Reserved for layout-only buckets when a DB parent slug should not appear
+     * as its own row but children should still be shown at a chosen depth.
+     */
+    passthrough?: boolean;
+    children?: CategoryLayoutNode[];
+};
+
+type ResolvedCategoryNode =
+    | { type: "group"; id: string; label: string; depth: number }
+    | { type: "category"; id: string; facet: CategoryFacet; depth: number };
+
+const CATEGORY_FILTER_LAYOUT: CategoryLayoutNode[] = [
+    // ── Core components ────────────────────────────────────────────
+    { label: "Processor",     valueAliases: ["processor", "processors", "cpu", "cpus"] },
+    { label: "Motherboard",   valueAliases: ["motherboard", "motherboards", "mobo", "mobos"] },
+    { label: "RAM",           valueAliases: ["ram", "memory", "memories", "ddr4", "ddr5"] },
+    {
+        label: "Graphics Card",
+        valueAliases: [
+            "graphics-card", "graphics-cards", "graphic-card",
+            "gpu", "gpus", "vga",
+            "video-card", "video-cards",
+        ],
+    },
+    { label: "Power Supply",  valueAliases: ["power-supply", "power-supplies", "psu", "psus"] },
+
+    // ── Storage (top-level like Peripherals) ───────────────────────
+    {
+        label: "Storage",
+        valueAliases: ["storage", "storages"],
+        children: [
+            {
+                label: "Internal",
+                groupOnly: true,
+                children: [
+                    {
+                        label: "HDD",
+                        valueAliases: [
+                            "hdd", "hdds", "internal-hdd",
+                            "hard-disk", "hard-disks",
+                            "hard-drive", "hard-drives",
+                        ],
+                    },
+                    {
+                        label: "SATA SSD",
+                        valueAliases: [
+                            "sata-ssd", "sata-ssds", "sata",
+                        ],
+                    },
+                    {
+                        label: "NVMe SSD",
+                        valueAliases: [
+                            // explicit slugs
+                            "nvme-ssd", "nvme-ssds",
+                            "nvme", "nvmes",
+                            "m2-nvme", "m2-ssd", "m2", "m-2", "m-2-nvme",
+                            "m2-nvme-ssd", "m.2", "m.2-nvme", "m.2-ssd",
+                            "nvme-ssd-gen-3-4-5",
+                            "nvme-ssd-gen3", "nvme-ssd-gen4", "nvme-ssd-gen5",
+                            "gen3-nvme", "gen4-nvme", "gen5-nvme",
+                            // legacy / generic slugs products might carry
+                            "ssd", "ssds",
+                            "solid-state-drive", "solid-state-drives",
+                            "internal-ssd", "internal-ssds",
+                        ],
+                    },
+                ],
+            },
+            {
+                label: "External",
+                groupOnly: true,
+                children: [
+                    {
+                        label: "External HDD",
+                        valueAliases: [
+                            "external-hdd", "external-hdds",
+                            "external-hard-disk", "external-hard-drive",
+                            "external-hard-drives",
+                        ],
+                    },
+                    {
+                        label: "External SSD",
+                        valueAliases: [
+                            "external-ssd", "external-ssds",
+                            "portable-ssd",
+                        ],
+                    },
+                ],
+            },
+        ],
+    },
+
+    // ── Cooling ────────────────────────────────────────────────────
+    {
+        label: "Cooling",
+        valueAliases: ["cooling", "coolers"],
+        children: [
+            {
+                label: "Air Coolers",
+                valueAliases: ["air-coolers", "air-cooler", "cpu-air-cooler", "cpu-cooler"],
+            },
+            {
+                label: "AIO Liquid Coolers",
+                valueAliases: [
+                    "aio-liquid-coolers", "aio-coolers", "aio",
+                    "liquid-cooler", "liquid-cooling", "water-cooler",
+                ],
+            },
+            {
+                label: "Case Fans",
+                valueAliases: ["case-fans", "case-fan", "fan", "fans", "rgb-fan"],
+            },
+            {
+                label: "Laptop Cooling Pads",
+                valueAliases: [
+                    "laptop-cooling-pads", "laptop-cooling-pad",
+                    "cooling-pad", "cooling-pads",
+                ],
+            },
+            {
+                label: "Thermal Paste",
+                valueAliases: [
+                    "thermal-paste", "thermal-compound",
+                    "thermal-grease", "thermal-interface",
+                ],
+            },
+        ],
+    },
+
+    // ── Cases ──────────────────────────────────────────────────────
+    {
+        label: "PC Cases",
+        valueAliases: [
+            "pc-cases", "pc-case", "cases",
+            "chassis", "cabinet", "tower",
+        ],
+    },
+
+    // ── Audio ──────────────────────────────────────────────────────
+    {
+        label: "Audio",
+        valueAliases: ["audio"],
+        children: [
+            {
+                label: "Headsets",
+                valueAliases: ["headsets", "headset", "headphones", "headphone", "earphones"],
+            },
+            {
+                label: "Microphones",
+                valueAliases: ["microphones", "microphone", "mic", "mics"],
+            },
+            {
+                label: "Speakers",
+                valueAliases: ["speakers", "speaker"],
+            },
+        ],
+    },
+
+    // ── Peripherals ────────────────────────────────────────────────
+    {
+        label: "Peripherals",
+        valueAliases: ["peripherals", "peripheral"],
+        children: [
+            {
+                label: "Keyboards",
+                valueAliases: ["keyboards", "keyboard", "mechanical-keyboard"],
+            },
+            {
+                label: "Mice",
+                valueAliases: ["mice", "mouse", "gaming-mouse"],
+            },
+            {
+                label: "Mousepads",
+                valueAliases: ["mousepads", "mousepad", "mouse-pad", "mouse-pads"],
+            },
+            {
+                label: "Controllers",
+                valueAliases: ["controllers", "controller", "gamepad", "gamepads"],
+            },
+            {
+                label: "Combos",
+                valueAliases: [
+                    "combos", "combo", "combo-sets",
+                    "peripheral-combo", "keyboard-mouse-combo",
+                ],
+            },
+        ],
+    },
+
+    // ── Power ──────────────────────────────────────────────────────
+    {
+        label: "Power",
+        valueAliases: ["power"],
+        children: [
+            {
+                label: "UPS",
+                valueAliases: [
+                    "ups", "uninterruptible-power-supply",
+                    "battery-backup",
+                ],
+            },
+        ],
+    },
+];
+
+function normalizeCategoryToken(value: string): string {
+    return value.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function slugifyCategoryLabel(value: string): string {
+    return value
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "");
+}
+
+function candidateCategoryKeys(node: CategoryLayoutNode): string[] {
+    const aliases = node.valueAliases?.filter(Boolean) ?? [];
+    const inferred = slugifyCategoryLabel(node.label);
+    return Array.from(new Set([node.label, inferred, ...aliases]));
+}
+
+function buildCategoryTree(categories: CategoryFacet[]): ResolvedCategoryNode[] {
+    const normalizedFacetKeys = categories.map((facet) => {
+        const keys = new Set<string>();
+        keys.add(normalizeCategoryToken(facet.value));
+        keys.add(normalizeCategoryToken(facet.label));
+        keys.add(normalizeCategoryToken(slugifyCategoryLabel(facet.value)));
+        keys.add(normalizeCategoryToken(slugifyCategoryLabel(facet.label)));
+        return keys;
+    });
+    const used = new Set<number>();
+
+    /**
+     * Recursively resolve a layout node.
+     * Returns the flat list of ResolvedCategoryNodes produced by this subtree.
+     * Group headers are emitted only when at least one descendant matched a DB category.
+     */
+    const resolveNode = (node: CategoryLayoutNode, depth: number): ResolvedCategoryNode[] => {
+        // Passthrough: never match or render this node — flatten children at same depth.
+        if (node.passthrough && node.children?.length) {
+            const out: ResolvedCategoryNode[] = [];
+            node.children.forEach((child) => {
+                out.push(...resolveNode(child, depth + 1));
+            });
+            return out;
+        }
+
+        // Structural group (Internal / External / Cooling sections, etc.):
+        // always show the section header, then whatever leaf categories matched.
+        if (node.groupOnly && node.children?.length) {
+            const childResults: ResolvedCategoryNode[] = [];
+            node.children.forEach((child) => {
+                childResults.push(...resolveNode(child, depth + 1));
+            });
+            return [
+                {
+                    type: "group",
+                    id: `group-${slugifyCategoryLabel(node.label)}-${depth}`,
+                    label: node.label,
+                    depth,
+                },
+                ...childResults,
+            ];
+        }
+
+        // ── Try to match a DB category (normal leaf / parent with optional children) ──
+        let matchedIndex = -1;
+        const keys = candidateCategoryKeys(node).map(normalizeCategoryToken).filter(Boolean);
+        if (keys.length > 0) {
+            matchedIndex = categories.findIndex(
+                (facet, idx) => !used.has(idx) && keys.some((k) => normalizedFacetKeys[idx].has(k))
+            );
+        }
+
+        const childResults: ResolvedCategoryNode[] = [];
+        node.children?.forEach((child) => {
+            childResults.push(...resolveNode(child, depth + 1));
+        });
+
+        const results: ResolvedCategoryNode[] = [];
+
+        if (matchedIndex >= 0) {
+            used.add(matchedIndex);
+            results.push({
+                type: "category",
+                id: `cat-${categories[matchedIndex].value}`,
+                facet: categories[matchedIndex],
+                depth,
+            });
+            results.push(...childResults);
+        } else if (node.children?.length) {
+            // Parent with children but no self-match: only show a wrapper group
+            // when at least one descendant matched (avoids orphan parent headers).
+            if (childResults.length > 0) {
+                results.push({
+                    type: "group",
+                    id: `group-${slugifyCategoryLabel(node.label)}-${depth}`,
+                    label: node.label,
+                    depth,
+                });
+                results.push(...childResults);
+            }
+        }
+        // Pure leaf with no match → []
+
+        return results;
+    };
+
+    const resolved: ResolvedCategoryNode[] = [];
+    CATEGORY_FILTER_LAYOUT.forEach((node) => {
+        resolved.push(...resolveNode(node, 0));
+    });
+
+    // Anything the layout didn't claim → append under "More Categories"
+    const unmatched = categories
+        .map((facet, idx) => ({ facet, idx }))
+        .filter(({ idx }) => !used.has(idx))
+        .sort((a, b) => a.facet.label.localeCompare(b.facet.label, undefined, { sensitivity: "base" }));
+
+    if (unmatched.length > 0) {
+        resolved.push({
+            type: "group",
+            id: "group-more-categories",
+            label: "More Categories",
+            depth: 0,
+        });
+        unmatched.forEach(({ facet }) =>
+            resolved.push({
+                type: "category",
+                id: `cat-${facet.value}`,
+                facet,
+                depth: 1,
+            })
+        );
+    }
+
+    return resolved;
+}
+
 export default function DynamicFilterSidebar({
     facets,
     filters,
@@ -384,6 +742,11 @@ export default function DynamicFilterSidebar({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [facets.brands, facets.categories, facets.price, filters]);
 
+    const categoryTree = useMemo(
+        () => buildCategoryTree(facets.categories ?? []),
+        [facets.categories]
+    );
+
     const specActiveCount = (key: string) => {
         const v = filters.spec?.[key];
         return typeof v === "string" ? v.split(",").filter(Boolean).length : 0;
@@ -484,20 +847,40 @@ export default function DynamicFilterSidebar({
                                 onToggle={() => toggleSection("categories")}
                             >
                                 <div className="space-y-0.5">
-                                    {facets.categories.map((cat) => (
-                                        <FilterRadio
-                                            key={cat.value}
-                                            name="categoryFilter"
-                                            checked={filters.category === cat.value}
-                                            onChange={() => handleCategoryChange(cat.value)}
-                                            onClick={() => {
-                                                if (filters.category === cat.value)
-                                                    handleCategoryChange(cat.value);
-                                            }}
-                                            label={cat.label}
-                                            count={cat.count}
-                                        />
-                                    ))}
+                                    {categoryTree.map((node) => {
+                                        if (node.type === "group") {
+                                            return (
+                                                <p
+                                                    key={node.id}
+                                                    className={`py-2 text-[11px] font-semibold uppercase tracking-wider text-zinc-500 ${
+                                                        node.depth > 0 ? "pl-4" : ""
+                                                    }`}
+                                                    style={{ paddingLeft: `${node.depth * 16}px` }}
+                                                >
+                                                    {node.label}
+                                                </p>
+                                            );
+                                        }
+
+                                        return (
+                                            <div
+                                                key={node.id}
+                                                style={{ marginLeft: `${node.depth * 12}px` }}
+                                            >
+                                                <FilterRadio
+                                                    name="categoryFilter"
+                                                    checked={filters.category === node.facet.value}
+                                                    onChange={() => handleCategoryChange(node.facet.value)}
+                                                    onClick={() => {
+                                                        if (filters.category === node.facet.value)
+                                                            handleCategoryChange(node.facet.value);
+                                                    }}
+                                                    label={node.facet.label}
+                                                    count={node.facet.count}
+                                                />
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             </FilterSection>
                         ) : null}
@@ -687,7 +1070,8 @@ function BrandList({
     expanded: boolean;
     onToggleExpand: () => void;
 }) {
-    const ordered = orderOptionsSelectedFirst(brands, brandSelected);
+    const sortedBrands = sortFacetOptions(brands);
+    const ordered = orderOptionsSelectedFirst(sortedBrands, brandSelected);
     const visible = expanded
         ? ordered
         : visibleCollapsedOptions(ordered, brandSelected, LIST_PREVIEW);
@@ -744,11 +1128,10 @@ function SpecList({
         return typeof specVal === "string" && specVal.split(",").filter(Boolean).includes(value);
     };
     const sortedItems = sortFacetOptions(items);
-    const ordered = orderOptionsSelectedFirst(sortedItems, isSelected);
     const visible = expanded
-        ? ordered
-        : visibleCollapsedOptions(ordered, isSelected, LIST_PREVIEW);
-    const hidden = Math.max(ordered.length - visible.length, 0);
+        ? sortedItems
+        : sortedItems.slice(0, LIST_PREVIEW);
+    const hidden = Math.max(sortedItems.length - visible.length, 0);
 
     return (
         <div className="space-y-0.5">

@@ -32,9 +32,9 @@ export interface Product {
     originalPrice?: number;
     /** Effective price after applying product/category discounts. */
     discountedPrice?: number;
-    /** Discount percent actually applied to the customer (0/null if none). */
+    /** Discount amount actually applied to the customer (0/null if none). */
     effectiveDiscountPercent?: number | null;
-    /** Product-level override discount percent (null if not set). */
+    /** Product-level override discount amount (null if not set). */
     discountPercent?: number | null;
     images: string[];
     category: string;
