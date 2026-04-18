@@ -30,6 +30,66 @@ function normalizeCategoryKeyForFeaturedSpecs(category: unknown): string | null 
     return first ? first.toLowerCase() : null;
 }
 
+function buildOrderedSpecsFacet(
+    featuredSpecKeys: string[],
+    rawSpecsGroups: Array<{ _id: string; values: any[] }>
+): Record<string, any[]> {
+    const byKey = new Map<string, any[]>();
+    for (const item of rawSpecsGroups || []) {
+        if (item != null && item._id != null) {
+            byKey.set(normalizeSpecKey(String(item._id)), item.values ?? []);
+        }
+    }
+    const out: Record<string, any[]> = {};
+    for (const key of featuredSpecKeys) {
+        const nk = normalizeSpecKey(key);
+        out[nk] = byKey.get(nk) ?? [];
+    }
+    return out;
+}
+
+function categoryFacetWithAncestors(categoryMatchStage: Record<string, unknown>) {
+    return [
+        { $match: categoryMatchStage },
+        { $unwind: '$categoryIds' },
+        {
+            $lookup: {
+                from: 'categories',
+                localField: 'categoryIds',
+                foreignField: '_id',
+                as: '_leafCat',
+            },
+        },
+        { $unwind: { path: '$_leafCat', preserveNullAndEmptyArrays: true } },
+        {
+            $graphLookup: {
+                from: 'categories',
+                startWith: '$_leafCat.parentId',
+                connectFromField: 'parentId',
+                connectToField: '_id',
+                as: '_ancCats',
+                maxDepth: 40,
+            },
+        },
+        {
+            $addFields: {
+                _rollupIds: {
+                    $setUnion: [
+                        ['$categoryIds'],
+                        { $map: { input: { $ifNull: ['$_ancCats', []] }, as: 'd', in: '$$d._id' } },
+                    ],
+                },
+            },
+        },
+        { $unwind: '$_rollupIds' },
+        { $group: { _id: '$_rollupIds', count: { $sum: 1 } } },
+        { $lookup: { from: 'categories', localField: '_id', foreignField: '_id', as: 'category' } },
+        { $unwind: '$category' },
+        { $project: { value: '$category.slug', label: '$category.name', count: 1 } },
+        { $sort: { label: 1 } },
+    ];
+}
+
 function normalizeDiscountAmount(input: unknown): number | null {
     if (input == null) return null;
     const n = typeof input === 'number' ? input : Number(input);
@@ -148,15 +208,7 @@ export const getProducts = async (req: Request, res: Response) => {
                         { $match: priceMatchStage },
                         { $group: { _id: null, min: { $min: '$price' }, max: { $max: '$price' } } },
                     ],
-                    categories: [
-                        { $match: categoryMatchStage },
-                        { $unwind: '$categoryIds' },
-                        { $group: { _id: '$categoryIds', count: { $sum: 1 } } },
-                        { $lookup: { from: 'categories', localField: '_id', foreignField: '_id', as: 'category' } },
-                        { $unwind: '$category' },
-                        { $project: { value: '$category.slug', label: '$category.name', count: 1 } },
-                        { $sort: { label: 1 } },
-                    ],
+                    categories: categoryFacetWithAncestors(categoryMatchStage),
                     brands: [
                         { $match: brandMatchStage },
                         { $group: { _id: '$brandId', count: { $sum: 1 } } },
@@ -217,15 +269,10 @@ export const getProducts = async (req: Request, res: Response) => {
             }
         }
 
-        const specsFacet: Record<string, any[]> = {};
-        if (featuredMode === 'restricted') {
-            (data.specs || []).forEach((item: any) => {
-                const normalizedKey = normalizeSpecKey(item._id);
-                if (featuredSpecKeys.includes(normalizedKey)) {
-                    specsFacet[normalizedKey] = item.values;
-                }
-            });
-        }
+        const specsFacet: Record<string, any[]> =
+            featuredMode === 'restricted'
+                ? buildOrderedSpecsFacet(featuredSpecKeys, data.specs || [])
+                : {};
 
         const finalFacets = {
             price: data.price?.[0] || { min: 0, max: 0 },
@@ -269,15 +316,7 @@ export const getProductFacets = async (req: Request, res: Response) => {
                     price: [
                         { $group: { _id: null, min: { $min: "$price" }, max: { $max: "$price" } } }
                     ],
-                    categories: [
-                        { $match: categoryMatchStage },
-                        { $unwind: "$categoryIds" },
-                        { $group: { _id: "$categoryIds", count: { $sum: 1 } } },
-                        { $lookup: { from: 'categories', localField: '_id', foreignField: '_id', as: 'category' } },
-                        { $unwind: "$category" },
-                        { $project: { value: "$category.slug", label: "$category.name", count: 1 } },
-                        { $sort: { label: 1 } }
-                    ],
+                    categories: categoryFacetWithAncestors(categoryMatchStage),
                     brands: [
                         { $group: { _id: "$brandId", count: { $sum: 1 } } },
                         { $lookup: { from: 'brands', localField: '_id', foreignField: '_id', as: 'brand' } },
@@ -324,15 +363,10 @@ export const getProductFacets = async (req: Request, res: Response) => {
             }
         }
 
-        const specsFacet: Record<string, any[]> = {};
-        if (featuredMode === 'restricted' && data.specs) {
-            data.specs.forEach((item: any) => {
-                const normalizedKey = normalizeSpecKey(item._id);
-                if (featuredSpecKeys.includes(normalizedKey)) {
-                    specsFacet[normalizedKey] = item.values;
-                }
-            });
-        }
+        const specsFacet: Record<string, any[]> =
+            featuredMode === 'restricted'
+                ? buildOrderedSpecsFacet(featuredSpecKeys, data.specs || [])
+                : {};
 
         let finalFacets = {
             price: data.price?.[0] || { min: 0, max: 0 },

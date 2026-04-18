@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, type ReactNode } from "react";
 import { ChevronDown, Search, X, SlidersHorizontal, Check } from "lucide-react";
 import { Facets } from "@/hooks/useProducts";
+import { normalizeSpecKey } from "@/lib/normalizeSpecKey";
 
 interface DynamicFilterSidebarProps {
     facets: Facets;
@@ -93,27 +94,30 @@ function FilterSection({
     onToggle: () => void;
     children: ReactNode;
 }) {
+    const hasActive = badge != null && badge > 0;
     return (
-        <div className="border-b border-white/[0.06] last:border-0">
+        <div className={`border-b last:border-0 transition-colors ${hasActive ? "border-accent/20" : "border-white/[0.06]"}`}>
             <button
                 type="button"
                 id={`filter-header-${id}`}
                 aria-expanded={expanded}
                 aria-controls={`filter-panel-${id}`}
                 onClick={onToggle}
-                className="flex w-full items-center justify-between gap-2 py-3.5 text-left"
+                className="flex w-full items-center justify-between gap-2 py-3.5 text-left group"
             >
                 <div className="flex min-w-0 items-center gap-2">
-                    <span className="text-sm font-semibold text-zinc-100">{title}</span>
-                    {badge != null && badge > 0 ? (
-                        <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-accent/25 px-1.5 text-[11px] font-semibold tabular-nums text-accent">
+                    <span className={`text-sm font-semibold transition-colors ${hasActive ? "text-white" : "text-zinc-200 group-hover:text-white"}`}>
+                        {title}
+                    </span>
+                    {hasActive ? (
+                        <span className="flex h-4.5 min-w-4 items-center justify-center rounded-full bg-accent px-1.5 text-[10px] font-bold tabular-nums text-white">
                             {badge}
                         </span>
                     ) : null}
                 </div>
                 <ChevronDown
-                    className={`h-4 w-4 shrink-0 text-zinc-500 transition-transform duration-200 ${
-                        expanded ? "rotate-180" : ""
+                    className={`h-4 w-4 shrink-0 transition-all duration-200 ${
+                        expanded ? "rotate-180 text-zinc-400" : "text-zinc-600 group-hover:text-zinc-400"
                     }`}
                     aria-hidden
                 />
@@ -134,7 +138,7 @@ function FilterSection({
     );
 }
 
-// Custom checkbox — avoids browser default styling inconsistencies
+// Custom checkbox
 function FilterCheckbox({
     checked,
     onChange,
@@ -147,22 +151,30 @@ function FilterCheckbox({
     count?: number;
 }) {
     return (
-        <label className="group flex cursor-pointer items-center gap-3 rounded-lg py-2 px-1.5 transition-colors hover:bg-white/[0.04]">
-            <span
-                className={`relative flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition-colors ${
-                    checked
-                        ? "border-accent bg-accent"
-                        : "border-zinc-600 bg-zinc-900 group-hover:border-zinc-500"
-                }`}
-            >
-                {checked ? <Check className="h-3 w-3 text-zinc-950" strokeWidth={3} /> : null}
+        <label className={`group flex cursor-pointer items-center gap-2.5 rounded-lg py-1.5 px-2 transition-all duration-150 ${
+            checked
+                ? "bg-accent/10 ring-1 ring-accent/20"
+                : "hover:bg-white/[0.05] ring-1 ring-transparent"
+        }`}>
+            <span className={`relative flex h-4 w-4 shrink-0 items-center justify-center rounded-[4px] border-2 transition-all duration-150 ${
+                checked
+                    ? "border-accent bg-accent"
+                    : "border-zinc-600 bg-transparent group-hover:border-zinc-400"
+            }`}>
+                {checked ? <Check className="h-2.5 w-2.5 text-white" strokeWidth={3.5} /> : null}
             </span>
             <input type="checkbox" checked={checked} onChange={onChange} className="sr-only" tabIndex={-1} />
-            <span className="min-w-0 flex-1 truncate text-sm text-zinc-300 group-hover:text-zinc-100">
+            <span className={`min-w-0 flex-1 truncate text-sm transition-colors ${
+                checked ? "font-medium text-white" : "text-zinc-300 group-hover:text-zinc-100"
+            }`}>
                 {label}
             </span>
             {count != null ? (
-                <span className="shrink-0 text-xs tabular-nums text-zinc-600">{count}</span>
+                <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] tabular-nums font-medium transition-colors ${
+                    checked ? "bg-accent/20 text-accent" : "text-zinc-500"
+                }`}>
+                    {count}
+                </span>
             ) : null}
         </label>
     );
@@ -185,20 +197,18 @@ function FilterRadio({
     count?: number;
 }) {
     return (
-        <label
-            className={`group flex cursor-pointer items-center gap-3 rounded-lg py-2 px-1.5 transition-colors hover:bg-white/[0.04] ${
-                checked ? "bg-accent/10" : ""
-            }`}
-        >
-            <span
-                className={`relative flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
-                    checked
-                        ? "border-accent"
-                        : "border-zinc-600 group-hover:border-zinc-500"
-                }`}
-            >
+        <label className={`group flex cursor-pointer items-center gap-2.5 rounded-lg py-1.5 px-2 transition-all duration-150 ${
+            checked
+                ? "bg-accent/10 ring-1 ring-accent/25"
+                : "hover:bg-white/[0.05] ring-1 ring-transparent"
+        }`}>
+            <span className={`relative flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 transition-all duration-150 ${
+                checked
+                    ? "border-accent"
+                    : "border-zinc-600 group-hover:border-zinc-400"
+            }`}>
                 {checked ? (
-                    <span className="h-2.5 w-2.5 rounded-full bg-accent" />
+                    <span className="h-1.5 w-1.5 rounded-full bg-accent" />
                 ) : null}
             </span>
             <input
@@ -210,15 +220,17 @@ function FilterRadio({
                 className="sr-only"
                 tabIndex={-1}
             />
-            <span
-                className={`min-w-0 flex-1 truncate text-sm transition-colors group-hover:text-zinc-100 ${
-                    checked ? "font-medium text-white" : "text-zinc-300"
-                }`}
-            >
+            <span className={`min-w-0 flex-1 truncate text-sm transition-colors ${
+                checked ? "font-medium text-white" : "text-zinc-300 group-hover:text-zinc-100"
+            }`}>
                 {label}
             </span>
             {count != null ? (
-                <span className="shrink-0 text-xs tabular-nums text-zinc-600">{count}</span>
+                <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] tabular-nums font-medium transition-colors ${
+                    checked ? "bg-accent/20 text-accent" : "text-zinc-500"
+                }`}>
+                    {count}
+                </span>
             ) : null}
         </label>
     );
@@ -252,8 +264,8 @@ type CategoryLayoutNode = {
 };
 
 type ResolvedCategoryNode =
-    | { type: "group"; id: string; label: string; depth: number }
-    | { type: "category"; id: string; facet: CategoryFacet; depth: number };
+    | { type: "group"; id: string; label: string; depth: number; hasChildren: boolean; collapsibleAncestors: string[] }
+    | { type: "category"; id: string; facet: CategoryFacet; depth: number; hasChildren: boolean; collapsibleAncestors: string[] };
 
 const CATEGORY_FILTER_LAYOUT: CategoryLayoutNode[] = [
     // ── Core components ────────────────────────────────────────────
@@ -294,7 +306,7 @@ const CATEGORY_FILTER_LAYOUT: CategoryLayoutNode[] = [
                         ],
                     },
                     {
-                        label: "NVMe SSD",
+                        label: "NVMe SSD (Gen 3/4/5)",
                         valueAliases: [
                             // explicit slugs
                             "nvme-ssd", "nvme-ssds",
@@ -466,7 +478,82 @@ function candidateCategoryKeys(node: CategoryLayoutNode): string[] {
     return Array.from(new Set([node.label, inferred, ...aliases]));
 }
 
-function buildCategoryTree(categories: CategoryFacet[]): ResolvedCategoryNode[] {
+/** Canonical slug for synthetic facets when DB has no row (matches first alias or label slug). */
+function primaryCategorySlug(node: CategoryLayoutNode): string {
+    const first = node.valueAliases?.find((a) => a.trim());
+    if (first) return first.toLowerCase().trim();
+    return slugifyCategoryLabel(node.label);
+}
+
+/** True when the shop is narrowed beyond the default “all products” view. */
+function hasNarrowingFilters(filters: Record<string, unknown>): boolean {
+    if (filters.category) return true;
+    return hasNonCategoryNarrowingFilters(filters);
+}
+
+/**
+ * Narrowing filters excluding category alone.
+ * Choosing a category should still suppress empty layout / “More” rows (same as unfiltered),
+ * otherwise the API often returns every category with count 0 and the sidebar floods with zeros.
+ */
+function hasNonCategoryNarrowingFilters(filters: Record<string, unknown>): boolean {
+    const brand = filters.brand;
+    if (typeof brand === "string" && brand.trim()) return true;
+    if (filters.minPrice !== undefined || filters.maxPrice !== undefined) return true;
+    const spec = filters.spec;
+    if (spec && typeof spec === "object" && Object.keys(spec as Record<string, unknown>).length > 0) {
+        return true;
+    }
+    const search = filters.search;
+    if (typeof search === "string" && search.trim()) return true;
+    if (filters.availability) return true;
+    if (filters.inStock === "true") return true;
+    if (filters.isFeatured === "true" || filters.isFeatured === "false") return true;
+    return false;
+}
+
+/**
+ * Max catalog-wide count for this layout node, from an unfiltered facet snapshot.
+ * `null` = unknown (no overlapping keys in baseline) — do not hide the bucket.
+ */
+function maxBaselineForNode(baseline: Map<string, number> | null, node: CategoryLayoutNode): number | null {
+    if (!baseline || baseline.size === 0) return null;
+    let max = 0;
+    let hit = false;
+    for (const k of candidateCategoryKeys(node).map(normalizeCategoryToken).filter(Boolean)) {
+        if (baseline.has(k)) {
+            hit = true;
+            max = Math.max(max, baseline.get(k)!);
+        }
+    }
+    return hit ? max : null;
+}
+
+function maxBaselineForFacet(baseline: Map<string, number> | null, facet: CategoryFacet): number | null {
+    if (!baseline || baseline.size === 0) return null;
+    const keys = [
+        normalizeCategoryToken(facet.value),
+        normalizeCategoryToken(facet.label),
+        normalizeCategoryToken(slugifyCategoryLabel(facet.value)),
+        normalizeCategoryToken(slugifyCategoryLabel(facet.label)),
+    ];
+    let max = 0;
+    let hit = false;
+    for (const k of keys) {
+        if (baseline.has(k)) {
+            hit = true;
+            max = Math.max(max, baseline.get(k)!);
+        }
+    }
+    return hit ? max : null;
+}
+
+function buildCategoryTree(
+    categories: CategoryFacet[],
+    filters: Record<string, unknown>,
+    baselineCounts: Map<string, number> | null
+): ResolvedCategoryNode[] {
+    const suppressEmptyLayoutBuckets = !hasNonCategoryNarrowingFilters(filters);
     const normalizedFacetKeys = categories.map((facet) => {
         const keys = new Set<string>();
         keys.add(normalizeCategoryToken(facet.value));
@@ -479,35 +566,46 @@ function buildCategoryTree(categories: CategoryFacet[]): ResolvedCategoryNode[] 
 
     /**
      * Recursively resolve a layout node.
-     * Returns the flat list of ResolvedCategoryNodes produced by this subtree.
-     * Group headers are emitted only when at least one descendant matched a DB category.
+     * `ancestors` is the list of collapsible parent IDs above this node —
+     * used to hide children when a parent is collapsed.
      */
-    const resolveNode = (node: CategoryLayoutNode, depth: number): ResolvedCategoryNode[] => {
-        // Passthrough: never match or render this node — flatten children at same depth.
+    const resolveNode = (
+        node: CategoryLayoutNode,
+        depth: number,
+        ancestors: string[]
+    ): ResolvedCategoryNode[] => {
+        // Passthrough: flatten children at same depth without emitting a header.
         if (node.passthrough && node.children?.length) {
             const out: ResolvedCategoryNode[] = [];
             node.children.forEach((child) => {
-                out.push(...resolveNode(child, depth + 1));
+                out.push(...resolveNode(child, depth + 1, ancestors));
             });
             return out;
         }
 
-        // Structural group (Internal / External / Cooling sections, etc.):
-        // always show the section header, then whatever leaf categories matched.
+        // Structural group (Internal / External, etc.): emit a header then children.
         if (node.groupOnly && node.children?.length) {
+            const groupId = `group-${slugifyCategoryLabel(node.label)}-${depth}`;
             const childResults: ResolvedCategoryNode[] = [];
             node.children.forEach((child) => {
-                childResults.push(...resolveNode(child, depth + 1));
+                childResults.push(...resolveNode(child, depth + 1, [...ancestors, groupId]));
             });
             return [
                 {
                     type: "group",
-                    id: `group-${slugifyCategoryLabel(node.label)}-${depth}`,
+                    id: groupId,
                     label: node.label,
                     depth,
+                    hasChildren: childResults.length > 0,
+                    collapsibleAncestors: ancestors,
                 },
                 ...childResults,
             ];
+        }
+
+        // Hide entire layout bucket when last unfiltered snapshot had zero products for it.
+        if (maxBaselineForNode(baselineCounts, node) === 0) {
+            return [];
         }
 
         // ── Try to match a DB category (normal leaf / parent with optional children) ──
@@ -519,49 +617,103 @@ function buildCategoryTree(categories: CategoryFacet[]): ResolvedCategoryNode[] 
             );
         }
 
-        const childResults: ResolvedCategoryNode[] = [];
-        node.children?.forEach((child) => {
-            childResults.push(...resolveNode(child, depth + 1));
-        });
-
         const results: ResolvedCategoryNode[] = [];
 
         if (matchedIndex >= 0) {
             used.add(matchedIndex);
+            const matchedFacet = categories[matchedIndex];
+            const isEmpty = matchedFacet.count === 0;
+            const catId = `cat-${matchedFacet.value}`;
+            const childAncestorIds =
+                suppressEmptyLayoutBuckets && isEmpty ? ancestors : [...ancestors, catId];
+            const childResults: ResolvedCategoryNode[] = [];
+            node.children?.forEach((child) => {
+                childResults.push(...resolveNode(child, depth + 1, childAncestorIds));
+            });
+
+            if (suppressEmptyLayoutBuckets && isEmpty && !node.children?.length) {
+                return [];
+            }
+            if (suppressEmptyLayoutBuckets && isEmpty && node.children?.length) {
+                return childResults;
+            }
+
             results.push({
                 type: "category",
-                id: `cat-${categories[matchedIndex].value}`,
-                facet: categories[matchedIndex],
+                id: catId,
+                facet: matchedFacet,
                 depth,
+                hasChildren: childResults.length > 0,
+                collapsibleAncestors: ancestors,
             });
             results.push(...childResults);
         } else if (node.children?.length) {
-            // Parent with children but no self-match: only show a wrapper group
-            // when at least one descendant matched (avoids orphan parent headers).
-            if (childResults.length > 0) {
+            const slug = keys.length > 0 ? primaryCategorySlug(node) : "";
+            const groupId = `group-${slugifyCategoryLabel(node.label)}-${depth}`;
+            const mb = maxBaselineForNode(baselineCounts, node);
+            const catalogHasStock = mb === null || mb > 0;
+            const useSyntheticParent =
+                keys.length > 0 && !suppressEmptyLayoutBuckets && catalogHasStock;
+            const parentCollapsibleId = useSyntheticParent ? `cat-${slug}` : groupId;
+            const childResults: ResolvedCategoryNode[] = [];
+            node.children.forEach((child) => {
+                childResults.push(...resolveNode(child, depth + 1, [...ancestors, parentCollapsibleId]));
+            });
+
+            if (useSyntheticParent) {
+                results.push({
+                    type: "category",
+                    id: parentCollapsibleId,
+                    facet: { value: slug, label: node.label, count: 0 },
+                    depth,
+                    hasChildren: childResults.length > 0,
+                    collapsibleAncestors: ancestors,
+                });
+                results.push(...childResults);
+            } else if (childResults.length > 0) {
                 results.push({
                     type: "group",
-                    id: `group-${slugifyCategoryLabel(node.label)}-${depth}`,
+                    id: groupId,
                     label: node.label,
                     depth,
+                    hasChildren: true,
+                    collapsibleAncestors: ancestors,
                 });
                 results.push(...childResults);
             }
+        } else if (keys.length > 0 && !suppressEmptyLayoutBuckets) {
+            const mb = maxBaselineForNode(baselineCounts, node);
+            if (mb === null || mb > 0) {
+                // Layout leaf with no facet row — synthetic only when catalog had stock for this bucket.
+                const slug = primaryCategorySlug(node);
+                results.push({
+                    type: "category",
+                    id: `cat-${slug}`,
+                    facet: { value: slug, label: node.label, count: 0 },
+                    depth,
+                    hasChildren: false,
+                    collapsibleAncestors: ancestors,
+                });
+            }
         }
-        // Pure leaf with no match → []
 
         return results;
     };
 
     const resolved: ResolvedCategoryNode[] = [];
     CATEGORY_FILTER_LAYOUT.forEach((node) => {
-        resolved.push(...resolveNode(node, 0));
+        resolved.push(...resolveNode(node, 0, []));
     });
 
     // Anything the layout didn't claim → append under "More Categories"
     const unmatched = categories
         .map((facet, idx) => ({ facet, idx }))
-        .filter(({ idx }) => !used.has(idx))
+        .filter(({ idx, facet }) => {
+            if (used.has(idx)) return false;
+            if (suppressEmptyLayoutBuckets && facet.count === 0) return false;
+            if (baselineCounts && maxBaselineForFacet(baselineCounts, facet) === 0) return false;
+            return true;
+        })
         .sort((a, b) => a.facet.label.localeCompare(b.facet.label, undefined, { sensitivity: "base" }));
 
     if (unmatched.length > 0) {
@@ -570,6 +722,8 @@ function buildCategoryTree(categories: CategoryFacet[]): ResolvedCategoryNode[] 
             id: "group-more-categories",
             label: "More Categories",
             depth: 0,
+            hasChildren: true,
+            collapsibleAncestors: [],
         });
         unmatched.forEach(({ facet }) =>
             resolved.push({
@@ -577,6 +731,8 @@ function buildCategoryTree(categories: CategoryFacet[]): ResolvedCategoryNode[] 
                 id: `cat-${facet.value}`,
                 facet,
                 depth: 1,
+                hasChildren: false,
+                collapsibleAncestors: ["group-more-categories"],
             })
         );
     }
@@ -595,6 +751,25 @@ export default function DynamicFilterSidebar({
     const [sectionSearch, setSectionSearch] = useState<Record<string, string>>({});
     const [expandedLists, setExpandedLists] = useState<Record<string, boolean>>({});
     const [closedSections, setClosedSections] = useState<Record<string, boolean>>({});
+    const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({});
+    /** Snapshot of category facet counts from the last unfiltered shop view (used to hide always-empty categories even under filters). */
+    const [categoryBaselineCounts, setCategoryBaselineCounts] = useState<Map<string, number> | null>(null);
+
+    useEffect(() => {
+        if (hasNarrowingFilters(filters as Record<string, unknown>)) return;
+        const m = new Map<string, number>();
+        for (const c of facets.categories ?? []) {
+            m.set(normalizeCategoryToken(c.value), c.count);
+            m.set(normalizeCategoryToken(c.label), c.count);
+            m.set(normalizeCategoryToken(slugifyCategoryLabel(c.value)), c.count);
+            m.set(normalizeCategoryToken(slugifyCategoryLabel(c.label)), c.count);
+        }
+        setCategoryBaselineCounts(m);
+    }, [facets.categories, filters]);
+
+    const isCatNodeExpanded = (id: string) => !collapsedCategories[id];
+    const toggleCatNode = (id: string) =>
+        setCollapsedCategories((prev) => ({ ...prev, [id]: !prev[id] }));
 
     const activeCount = countActiveFilters(filters);
 
@@ -743,9 +918,49 @@ export default function DynamicFilterSidebar({
     }, [facets.brands, facets.categories, facets.price, filters]);
 
     const categoryTree = useMemo(
-        () => buildCategoryTree(facets.categories ?? []),
-        [facets.categories]
+        () =>
+            buildCategoryTree(
+                facets.categories ?? [],
+                filters as Record<string, unknown>,
+                categoryBaselineCounts
+            ),
+        [facets.categories, filters, categoryBaselineCounts]
     );
+
+    // Only show nodes whose every collapsible ancestor is currently expanded.
+    const visibleCategoryTree = useMemo(
+        () => categoryTree.filter((node) =>
+            node.collapsibleAncestors.every((aid) => isCatNodeExpanded(aid))
+        ),
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [categoryTree, collapsedCategories]
+    );
+
+    /** Stable spec section order: admin `featuredSpecKeys`, then any extras alphabetically. */
+    const orderedSpecFilterEntries = useMemo((): [string, { value: string; count: number }[]][] => {
+        const specs = facets.specs ?? {};
+        const keys = Object.keys(specs);
+        if (keys.length === 0) return [];
+
+        const order = facets.featuredSpecKeys ?? [];
+        if (!order.length) {
+            return keys.sort((a, b) => a.localeCompare(b)).map((k) => [k, specs[k]!]);
+        }
+
+        const out: [string, { value: string; count: number }[]][] = [];
+        const seen = new Set<string>();
+        for (const fk of order) {
+            const nk = normalizeSpecKey(fk);
+            if (nk in specs) {
+                out.push([nk, specs[nk]!]);
+                seen.add(nk);
+            }
+        }
+        for (const k of keys.sort((a, b) => a.localeCompare(b))) {
+            if (!seen.has(k)) out.push([k, specs[k]!]);
+        }
+        return out;
+    }, [facets.specs, facets.featuredSpecKeys]);
 
     const specActiveCount = (key: string) => {
         const v = filters.spec?.[key];
@@ -780,14 +995,14 @@ export default function DynamicFilterSidebar({
                 `}
             >
                 {/* ── Header ── */}
-                <div className="flex flex-shrink-0 items-center justify-between gap-2 px-5 py-4">
+                <div className="flex flex-shrink-0 items-center justify-between gap-2 border-b border-white/[0.06] px-4 py-3.5">
                     <div className="flex items-center gap-2.5">
-                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-accent/15 text-accent">
+                        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-accent/15 text-accent">
                             <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden />
                         </div>
                         <span className="text-sm font-semibold text-white">Filters</span>
                         {activeCount > 0 ? (
-                            <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-accent/20 px-1.5 text-[11px] font-semibold tabular-nums text-accent">
+                            <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1.5 text-[10px] font-bold tabular-nums text-white shadow-sm">
                                 {activeCount}
                             </span>
                         ) : null}
@@ -797,7 +1012,7 @@ export default function DynamicFilterSidebar({
                             <button
                                 type="button"
                                 onClick={clearAll}
-                                className="rounded-lg px-2.5 py-1.5 text-xs font-semibold text-accent transition-colors hover:bg-accent/10"
+                                className="rounded-lg px-2.5 py-1.5 text-xs font-semibold text-zinc-400 transition-colors hover:bg-white/[0.06] hover:text-zinc-200"
                             >
                                 Clear all
                             </button>
@@ -805,91 +1020,128 @@ export default function DynamicFilterSidebar({
                         <button
                             type="button"
                             onClick={onClose}
-                            className="rounded-lg p-1.5 text-zinc-400 transition-colors hover:bg-white/10 hover:text-white lg:hidden"
+                            className="rounded-lg p-1.5 text-zinc-500 transition-colors hover:bg-white/10 hover:text-white lg:hidden"
                             aria-label="Close filters"
                         >
-                            <X className="h-5 w-5" />
+                            <X className="h-4 w-4" />
                         </button>
                     </div>
                 </div>
 
                 {/* ── Scrollable body (mobile only scrolls inside, desktop expands freely) ── */}
                 <div className="flex-1 overflow-y-auto overscroll-contain lg:flex-none lg:overflow-visible">
-                    <div className="space-y-0 px-5 pb-6">
+                    <div className="space-y-0 px-4 pb-6">
 
                         {/* Active pills */}
                         {activeFilterPills.length > 0 ? (
-                            <div className="mb-4 flex flex-wrap gap-1.5 rounded-xl border border-accent/15 bg-accent/[0.06] p-3">
+                            <div className="mb-3 mt-3 flex flex-wrap gap-1.5">
                                 {activeFilterPills.map((pill) => (
                                     <button
                                         key={pill.id}
                                         type="button"
                                         onClick={pill.onRemove}
-                                        className="inline-flex items-center gap-1 rounded-full border border-white/[0.08] bg-zinc-900/80 px-2.5 py-1 text-[11px] font-medium text-zinc-300 transition-colors hover:border-red-500/30 hover:text-red-300"
+                                        className="inline-flex items-center gap-1.5 rounded-full border border-accent/25 bg-accent/10 px-2.5 py-1 text-[11px] font-medium text-accent transition-all hover:bg-accent/20 hover:border-accent/40"
                                     >
                                         <span className="max-w-[9rem] truncate">{pill.label}</span>
-                                        <X className="h-3 w-3 shrink-0 opacity-60" />
+                                        <X className="h-2.5 w-2.5 shrink-0" />
                                     </button>
                                 ))}
                             </div>
                         ) : null}
 
-                        <p className="mb-4 text-xs leading-relaxed text-zinc-500">
-                            Selected options stay pinned near the top so they are easier to review and remove.
-                        </p>
-
-                        {/* ── Category ── */}
-                        {facets.categories && facets.categories.length > 0 ? (
-                            <FilterSection
-                                id="categories"
-                                title="Category"
-                                expanded={isSectionOpen("categories")}
-                                onToggle={() => toggleSection("categories")}
-                            >
+                        {/* ── Category (always visible; empty state when no facet rows) ── */}
+                        <FilterSection
+                            id="categories"
+                            title="Category"
+                            expanded={isSectionOpen("categories")}
+                            onToggle={() => toggleSection("categories")}
+                        >
+                            {(facets.categories?.length ?? 0) === 0 ? (
+                                <p className="py-2 text-sm text-zinc-500">
+                                    No categories match these filters.
+                                </p>
+                            ) : (
                                 <div className="space-y-0.5">
-                                    {categoryTree.map((node) => {
+                                    {visibleCategoryTree.map((node) => {
+                                        const isExpanded = isCatNodeExpanded(node.id);
+
+                                        /* ── Section-group header (e.g. INTERNAL / EXTERNAL) ── */
                                         if (node.type === "group") {
                                             return (
-                                                <p
+                                                <div
                                                     key={node.id}
-                                                    className={`py-2 text-[11px] font-semibold uppercase tracking-wider text-zinc-500 ${
-                                                        node.depth > 0 ? "pl-4" : ""
-                                                    }`}
-                                                    style={{ paddingLeft: `${node.depth * 16}px` }}
+                                                    style={{ paddingLeft: `${node.depth * 14}px` }}
+                                                    className="flex items-center gap-2 pt-3 pb-1"
                                                 >
-                                                    {node.label}
-                                                </p>
+                                                    <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-zinc-500">
+                                                        {node.label}
+                                                    </span>
+                                                    <div className="flex-1 h-px bg-zinc-800" />
+                                                    {node.hasChildren && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => toggleCatNode(node.id)}
+                                                            className="shrink-0 rounded p-0.5 text-zinc-600 transition-colors hover:text-zinc-400"
+                                                            aria-label={isExpanded ? "Collapse" : "Expand"}
+                                                        >
+                                                            <ChevronDown
+                                                                className={`h-3 w-3 transition-transform duration-200 ${isExpanded ? "" : "-rotate-90"}`}
+                                                            />
+                                                        </button>
+                                                    )}
+                                                </div>
                                             );
                                         }
+
+                                        /* ── Selectable category node ── */
+                                        const isChecked = filters.category === node.facet.value;
+                                        const isTopLevel = node.depth === 0;
 
                                         return (
                                             <div
                                                 key={node.id}
                                                 style={{ marginLeft: `${node.depth * 12}px` }}
+                                                className="flex items-center"
                                             >
-                                                <FilterRadio
-                                                    name="categoryFilter"
-                                                    checked={filters.category === node.facet.value}
-                                                    onChange={() => handleCategoryChange(node.facet.value)}
-                                                    onClick={() => {
-                                                        if (filters.category === node.facet.value)
-                                                            handleCategoryChange(node.facet.value);
-                                                    }}
-                                                    label={node.facet.label}
-                                                    count={node.facet.count}
-                                                />
+                                                <div className="min-w-0 flex-1">
+                                                    <FilterRadio
+                                                        name="categoryFilter"
+                                                        checked={isChecked}
+                                                        onChange={() => handleCategoryChange(node.facet.value)}
+                                                        onClick={() => {
+                                                            if (isChecked) handleCategoryChange(node.facet.value);
+                                                        }}
+                                                        label={isTopLevel
+                                                            ? node.facet.label
+                                                            : node.facet.label
+                                                        }
+                                                        count={node.facet.count}
+                                                    />
+                                                </div>
+                                                {node.hasChildren && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => toggleCatNode(node.id)}
+                                                        className="shrink-0 ml-0.5 rounded p-1 text-zinc-600 transition-colors hover:text-zinc-300"
+                                                        aria-label={isExpanded ? "Collapse" : "Expand"}
+                                                    >
+                                                        <ChevronDown
+                                                            className={`h-3.5 w-3.5 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`}
+                                                        />
+                                                    </button>
+                                                )}
                                             </div>
                                         );
                                     })}
                                 </div>
-                            </FilterSection>
-                        ) : null}
+                            )}
+                        </FilterSection>
 
                         {/* ── Price ── */}
                         {(!facets.allowedFilters || facets.allowedFilters.price) && facets.price ? (
                             <FilterSection
                                 id="price"
-                                title="Price (LKR)"
+                                title="Price"
                                 badge={
                                     filters.minPrice !== undefined || filters.maxPrice !== undefined
                                         ? 1
@@ -901,31 +1153,31 @@ export default function DynamicFilterSidebar({
                                 <div className="space-y-3">
                                     <div className="flex gap-2">
                                         <label className="min-w-0 flex-1">
-                                            <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-[#8E8E8E]">
-                                                Min (LKR)
+                                            <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+                                                Min
                                             </span>
                                             <input
                                                 type="number"
                                                 value={priceRange.min}
                                                 min={facets.price?.min || 0}
-                                                max={priceRange.max}
+                                                max={priceRange.max - 1}
                                                 onChange={(e) =>
                                                     setPriceRange((prev) => ({
                                                         ...prev,
                                                         min: Number(e.target.value),
                                                     }))
                                                 }
-                                                className="w-full rounded-lg border border-[#5E5E5E]/40 bg-[#121212]/90 px-3 py-2.5 text-sm tabular-nums text-[#F1F1F1] focus:border-[#D12B28]/50 focus:outline-none focus:ring-2 focus:ring-[#D12B28]/30"
+                                                className="w-full rounded-lg border border-zinc-700 bg-zinc-800/80 px-3 py-2 text-sm tabular-nums text-zinc-100 focus:border-accent/50 focus:outline-none focus:ring-2 focus:ring-accent/20"
                                             />
                                         </label>
                                         <label className="min-w-0 flex-1">
-                                            <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-[#8E8E8E]">
-                                                Max (LKR)
+                                            <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+                                                Max
                                             </span>
                                             <input
                                                 type="number"
                                                 value={priceRange.max}
-                                                min={priceRange.min}
+                                                min={priceRange.min + 1}
                                                 max={facets.price?.max || 1000000}
                                                 onChange={(e) =>
                                                     setPriceRange((prev) => ({
@@ -933,22 +1185,23 @@ export default function DynamicFilterSidebar({
                                                         max: Number(e.target.value),
                                                     }))
                                                 }
-                                                className="w-full rounded-lg border border-[#5E5E5E]/40 bg-[#121212]/90 px-3 py-2.5 text-sm tabular-nums text-[#F1F1F1] focus:border-[#D12B28]/50 focus:outline-none focus:ring-2 focus:ring-[#D12B28]/30"
+                                                className="w-full rounded-lg border border-zinc-700 bg-zinc-800/80 px-3 py-2 text-sm tabular-nums text-zinc-100 focus:border-accent/50 focus:outline-none focus:ring-2 focus:ring-accent/20"
                                             />
                                         </label>
                                     </div>
+
                                     <div className="flex gap-2">
                                         <button
                                             type="button"
                                             onClick={applyPriceFilter}
-                                            className="flex-1 rounded-xl bg-[#D12B28] py-2.5 text-sm font-semibold text-[#F1F1F1] transition-colors hover:bg-[#E53A36]"
+                                            className="flex-1 rounded-lg bg-accent py-2 text-sm font-semibold text-white transition-colors hover:bg-accent/90 active:scale-[0.98]"
                                         >
                                             Apply
                                         </button>
                                         <button
                                             type="button"
                                             onClick={resetPriceFilter}
-                                            className="rounded-xl border border-[#5E5E5E]/45 bg-[#242424]/80 px-4 py-2.5 text-sm font-medium text-[#B0B0B0] transition-colors hover:border-[#D12B28]/40 hover:text-[#F1F1F1]"
+                                            className="rounded-lg border border-zinc-700 bg-zinc-800/60 px-4 py-2 text-sm font-medium text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-200"
                                         >
                                             Reset
                                         </button>
@@ -970,7 +1223,7 @@ export default function DynamicFilterSidebar({
                             >
                                 {facets.brands.length > LIST_PREVIEW ? (
                                     <div className="relative mb-2">
-                                        <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-500" />
+                                        <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-500" />
                                         <input
                                             type="text"
                                             autoComplete="off"
@@ -981,8 +1234,8 @@ export default function DynamicFilterSidebar({
                                                     brands: e.target.value,
                                                 }))
                                             }
-                                            placeholder="Search brands"
-                                            className="w-full rounded-lg border border-[#5E5E5E]/45 bg-[#121212]/90 py-2.5 pl-8 pr-3 text-sm text-[#F1F1F1] caret-[#D12B28] placeholder:text-[#8E8E8E] focus:border-[#D12B28]/50 focus:outline-none focus:ring-2 focus:ring-[#D12B28]/25"
+                                            placeholder="Search brands…"
+                                            className="w-full rounded-lg border border-zinc-700 bg-zinc-800/80 py-2 pl-8 pr-3 text-sm text-zinc-100 caret-accent placeholder:text-zinc-600 focus:border-accent/50 focus:outline-none focus:ring-2 focus:ring-accent/20"
                                         />
                                     </div>
                                 ) : null}
@@ -1003,7 +1256,7 @@ export default function DynamicFilterSidebar({
 
                         {/* ── Spec filters ── */}
                         {filters.category &&
-                            Object.entries(facets.specs || {}).map(([key, values]) => (
+                            orderedSpecFilterEntries.map(([key, values]) => (
                                 <FilterSection
                                     key={key}
                                     id={key}
@@ -1014,7 +1267,7 @@ export default function DynamicFilterSidebar({
                                 >
                                     {values.length > LIST_PREVIEW ? (
                                         <div className="relative mb-2">
-                                            <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-500" />
+                                            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-500" />
                                             <input
                                                 type="text"
                                                 autoComplete="off"
@@ -1025,8 +1278,8 @@ export default function DynamicFilterSidebar({
                                                         [key]: e.target.value,
                                                     }))
                                                 }
-                                                placeholder={`Filter ${formatFilterLabel(key).toLowerCase()}`}
-                                                className="w-full rounded-lg border border-[#5E5E5E]/45 bg-[#121212]/90 py-2.5 pl-8 pr-3 text-sm text-[#F1F1F1] caret-[#D12B28] placeholder:text-[#8E8E8E] focus:border-[#D12B28]/50 focus:outline-none focus:ring-2 focus:ring-[#D12B28]/25"
+                                                placeholder={`Filter ${formatFilterLabel(key).toLowerCase()}…`}
+                                                className="w-full rounded-lg border border-zinc-700 bg-zinc-800/80 py-2 pl-8 pr-3 text-sm text-zinc-100 caret-accent placeholder:text-zinc-600 focus:border-accent/50 focus:outline-none focus:ring-2 focus:ring-accent/20"
                                             />
                                         </div>
                                     ) : null}
@@ -1095,13 +1348,10 @@ function BrandList({
                 <button
                     type="button"
                     onClick={onToggleExpand}
-                    className="mt-1 flex items-center gap-1 text-xs font-medium text-accent hover:text-accent/80"
+                    className="mt-2 flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-zinc-400 transition-colors hover:bg-white/[0.04] hover:text-zinc-200"
                 >
-                    {expanded ? (
-                        <>Show less</>
-                    ) : (
-                        <>Show {hidden} more</>
-                    )}
+                    <ChevronDown className={`h-3 w-3 transition-transform ${expanded ? "rotate-180" : ""}`} />
+                    {expanded ? "Show less" : `Show ${hidden} more`}
                 </button>
             ) : null}
         </div>
@@ -1154,9 +1404,10 @@ function SpecList({
                 <button
                     type="button"
                     onClick={onToggleExpand}
-                    className="mt-1 flex items-center gap-1 text-xs font-medium text-accent hover:text-accent/80"
+                    className="mt-2 flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-zinc-400 transition-colors hover:bg-white/[0.04] hover:text-zinc-200"
                 >
-                    {expanded ? <>Show less</> : <>Show {hidden} more</>}
+                    <ChevronDown className={`h-3 w-3 transition-transform ${expanded ? "rotate-180" : ""}`} />
+                    {expanded ? "Show less" : `Show ${hidden} more`}
                 </button>
             ) : null}
         </div>

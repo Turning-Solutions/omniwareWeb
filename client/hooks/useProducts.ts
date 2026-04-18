@@ -80,6 +80,8 @@ export interface Facets {
     categories?: { value: string; label: string; count: number }[];
     brands?: { value: string; label: string; count: number }[];
     specs?: Record<string, { value: string; count: number }[]>;
+    /** When set, spec filter sections follow this order (matches Category Featured Specs admin). */
+    featuredSpecKeys?: string[];
     allowedFilters?: {
         price: boolean;
         availability: boolean;

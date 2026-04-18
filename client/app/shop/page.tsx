@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useRef, Suspense, useCallback } from "react";
+import { useState, useEffect, useRef, Suspense, useCallback, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
-import { useProducts, useProductFacets } from "@/hooks/useProducts";
+import { useProducts, useProductFacets, type Facets } from "@/hooks/useProducts";
 import ProductCard from "@/components/ProductCard";
 import DynamicFilterSidebar, { countActiveFilters } from "@/components/DynamicFilterSidebar";
 import LoadingAnimation from "@/components/LoadingAnimation";
@@ -77,7 +77,13 @@ export function ShopContent({
         refetch: refetchFacets,
     } = useProductFacets(filters);
     const products = data?.products || [];
-    const facets = (facetsData as any)?.facets || {};
+    const facets = useMemo(() => {
+        const fd = facetsData as { facets?: Facets; featuredSpecKeys?: string[] } | undefined;
+        return {
+            ...(fd?.facets ?? {}),
+            featuredSpecKeys: Array.isArray(fd?.featuredSpecKeys) ? fd.featuredSpecKeys : [],
+        };
+    }, [facetsData]);
 
     // Track previous category to detect changes
     const prevCategoryRef = useRef(filters.category);
