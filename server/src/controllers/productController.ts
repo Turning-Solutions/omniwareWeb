@@ -142,9 +142,20 @@ function withDiscountInfo(product: any): any {
     };
 }
 
+const hasFilters = (req: Request): boolean => {
+    const { search, minPrice, maxPrice, brand, category, availability, inStock, isFeatured } = req.query;
+    if (search || minPrice || maxPrice || brand || category || availability || inStock || isFeatured) return true;
+    const keys = Object.keys(req.query).filter((k) => k.startsWith('spec['));
+    return keys.length > 0;
+};
+
 export const getProducts = async (req: Request, res: Response) => {
     try {
-        res.set('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=120');
+        if (hasFilters(req)) {
+            res.set('Cache-Control', 'private, no-store, must-revalidate');
+        } else {
+            res.set('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=120');
+        }
 
         const { search, minPrice, maxPrice, brand, category, sort, page = 1, limit = 20, facets = 'true' } = req.query;
         const includeFacets = String(facets).toLowerCase() !== 'false';
@@ -274,6 +285,7 @@ export const getProducts = async (req: Request, res: Response) => {
                 ? buildOrderedSpecsFacet(featuredSpecKeys, data.specs || [])
                 : {};
 
+
         const finalFacets = {
             price: data.price?.[0] || { min: 0, max: 0 },
             categories: data.categories || [],
@@ -302,6 +314,12 @@ export const getProducts = async (req: Request, res: Response) => {
 
 export const getProductFacets = async (req: Request, res: Response) => {
     try {
+        if (hasFilters(req)) {
+            res.set('Cache-Control', 'private, no-store, must-revalidate');
+        } else {
+            res.set('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=120');
+        }
+
         const { search, minPrice, maxPrice, brand, category, ...dynamicFilters } = req.query;
 
         const lookupCache: MatchStageCache = {};
@@ -367,6 +385,7 @@ export const getProductFacets = async (req: Request, res: Response) => {
             featuredMode === 'restricted'
                 ? buildOrderedSpecsFacet(featuredSpecKeys, data.specs || [])
                 : {};
+
 
         let finalFacets = {
             price: data.price?.[0] || { min: 0, max: 0 },

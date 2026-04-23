@@ -1,5 +1,6 @@
 import { Request } from 'express';
 import mongoose from 'mongoose';
+import { expandLayoutSlugForCategoryFilter } from '../lib/categoryFilterLayout';
 import Brand from '../models/Brand';
 import Category from '../models/Category';
 
@@ -108,8 +109,18 @@ export const buildProductMatchStage = async (
             const cats = (category as string).split(',').map((c) => c.trim()).filter(Boolean);
             const objectIds = cats.filter((c: string) => mongoose.Types.ObjectId.isValid(c));
             const slugParts = cats.filter((c: string) => !mongoose.Types.ObjectId.isValid(c)).map((c) => c.toLowerCase());
+            const expandedSlugParts: string[] = [];
+            for (const sp of slugParts) {
+                const layoutExpanded = expandLayoutSlugForCategoryFilter(sp);
+                if (layoutExpanded && layoutExpanded.length > 0) {
+                    expandedSlugParts.push(...layoutExpanded);
+                } else {
+                    expandedSlugParts.push(sp);
+                }
+            }
+            const uniqueSlugParts = [...new Set(expandedSlugParts.map((s) => s.toLowerCase()))];
             const catDocs = await Category.find({
-                $or: [{ slug: { $in: slugParts } }, { _id: { $in: objectIds } }],
+                $or: [{ slug: { $in: uniqueSlugParts } }, { _id: { $in: objectIds } }],
             });
             const rootIds = catDocs.map((c) => c._id);
             const ids = await expandCategoryTreeIds(rootIds);

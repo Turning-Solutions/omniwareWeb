@@ -48,6 +48,7 @@ export function ShopContent({
     });
 
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const productsTopRef = useRef<HTMLDivElement | null>(null);
     const [searchDraft, setSearchDraft] = useState(() => String(filters.search ?? ""));
     const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const filtersRef = useRef(filters);
@@ -87,6 +88,8 @@ export function ShopContent({
 
     // Track previous category to detect changes
     const prevCategoryRef = useRef(filters.category);
+    const hasMountedRef = useRef(false);
+    const prevNonPageFiltersRef = useRef<string>("");
 
     // Reset specs and brands when category changes
     useEffect(() => {
@@ -95,11 +98,29 @@ export function ShopContent({
                 const next = { ...prev };
                 delete next.spec;
                 delete next.brand;
+                delete next.subcategories;
                 return next;
             });
             prevCategoryRef.current = filters.category;
         }
     }, [filters.category]);
+
+    useEffect(() => {
+        const { page: _page, ...nonPageFilters } = filters as Filters;
+        const serialized = JSON.stringify(nonPageFilters);
+
+        if (!hasMountedRef.current) {
+            hasMountedRef.current = true;
+            prevNonPageFiltersRef.current = serialized;
+            return;
+        }
+
+        if (prevNonPageFiltersRef.current !== serialized) {
+            productsTopRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+
+        prevNonPageFiltersRef.current = serialized;
+    }, [filters]);
 
     // If the admin updates products/discounts, refetch immediately so discounts are reflected.
     useEffect(() => {
@@ -314,7 +335,7 @@ export function ShopContent({
                     onClose={() => setIsSidebarOpen(false)}
                 />
 
-                <div className="flex-1 min-w-0 space-y-6">
+                <div ref={productsTopRef} className="flex-1 min-w-0 space-y-6">
                     <div className="sticky top-14 z-20 -mx-1 px-1 py-3 sm:static sm:z-0 sm:mx-0 sm:px-0 sm:py-0 bg-gradient-to-b from-[#121212] via-[#121212] to-transparent sm:bg-none">
                         <div className="flex flex-col gap-3 rounded-2xl border border-[#5E5E5E]/35 bg-[#242424]/55 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5 backdrop-blur-sm">
                             <div className="flex flex-wrap items-center gap-2 sm:gap-3">

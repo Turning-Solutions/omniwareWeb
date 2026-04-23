@@ -25,9 +25,11 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
     });
 }
 
-// Disable body parsing so Express can handle it
+// Disable body parsing so Express can handle it.
+// externalResolver: Next must not wrap/cache the Express response (otherwise dev can log 304 with empty bodies).
 export const config = {
     api: {
         bodyParser: false,
+        externalResolver: true,
     },
 };

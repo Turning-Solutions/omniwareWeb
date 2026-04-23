@@ -17,6 +17,9 @@ build/
 out/
 .next/
 
+# Local MongoDB dumps (see server npm script dump:db)
+server/backups/
+
 # Logs
 logs
 *.log

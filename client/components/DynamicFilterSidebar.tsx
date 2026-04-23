@@ -3,6 +3,12 @@
 import { useState, useEffect, useMemo, type ReactNode } from "react";
 import { ChevronDown, Search, X, SlidersHorizontal, Check } from "lucide-react";
 import { Facets } from "@/hooks/useProducts";
+import {
+    CATEGORY_FILTER_LAYOUT,
+    type CategoryLayoutNode,
+    primaryCategorySlug,
+    slugifyCategoryLabel,
+} from "@/lib/categoryFilterLayout";
 import { normalizeSpecKey } from "@/lib/normalizeSpecKey";
 
 interface DynamicFilterSidebarProps {
@@ -17,6 +23,9 @@ interface DynamicFilterSidebarProps {
 export function countActiveFilters(filters: Record<string, unknown>): number {
     let n = 0;
     if (filters.category) n += 1;
+    if (filters.subcategories && String(filters.subcategories).trim()) {
+        n += String(filters.subcategories).split(",").filter(Boolean).length;
+    }
     if (filters.minPrice !== undefined || filters.maxPrice !== undefined) n += 1;
     if (filters.brand && String(filters.brand).trim()) n += 1;
     if (filters.spec && typeof filters.spec === "object") {
@@ -46,15 +55,6 @@ function orderOptionsSelectedFirst<T extends { value: string }>(
     });
 
     return [...selected, ...unselected];
-}
-
-function visibleCollapsedOptions<T extends { value: string }>(
-    items: T[],
-    isSelected: (value: string) => boolean,
-    limit: number
-): T[] {
-    const ordered = orderOptionsSelectedFirst(items, isSelected);
-    return ordered.slice(0, limit);
 }
 
 function compareFilterValues(a: string, b: string): number {
@@ -240,249 +240,18 @@ const LIST_PREVIEW = 6;
 
 type CategoryFacet = NonNullable<Facets["categories"]>[number];
 
-type CategoryLayoutNode = {
-    label: string;
-    /**
-     * Explicit DB-slug aliases to match against facets.
-     * Leave empty / undefined to skip DB matching (group-only header).
-     */
-    valueAliases?: string[];
-    /**
-     * When true, this node is always rendered as a section label —
-     * it will never consume a DB category match even if one exists.
-     * Children are still resolved normally.
-     */
-    groupOnly?: boolean;
-    /**
-     * Like `groupOnly` for matching (never consumes a facet), but does not
-     * render its own header — children are merged at the same depth.
-     * Reserved for layout-only buckets when a DB parent slug should not appear
-     * as its own row but children should still be shown at a chosen depth.
-     */
-    passthrough?: boolean;
-    children?: CategoryLayoutNode[];
-};
-
 type ResolvedCategoryNode =
     | { type: "group"; id: string; label: string; depth: number; hasChildren: boolean; collapsibleAncestors: string[] }
     | { type: "category"; id: string; facet: CategoryFacet; depth: number; hasChildren: boolean; collapsibleAncestors: string[] };
 
-const CATEGORY_FILTER_LAYOUT: CategoryLayoutNode[] = [
-    // ── Core components ────────────────────────────────────────────
-    { label: "Processor",     valueAliases: ["processor", "processors", "cpu", "cpus"] },
-    { label: "Motherboard",   valueAliases: ["motherboard", "motherboards", "mobo", "mobos"] },
-    { label: "RAM",           valueAliases: ["ram", "memory", "memories", "ddr4", "ddr5"] },
-    {
-        label: "Graphics Card",
-        valueAliases: [
-            "graphics-card", "graphics-cards", "graphic-card",
-            "gpu", "gpus", "vga",
-            "video-card", "video-cards",
-        ],
-    },
-    { label: "Power Supply",  valueAliases: ["power-supply", "power-supplies", "psu", "psus"] },
-
-    // ── Storage (top-level like Peripherals) ───────────────────────
-    {
-        label: "Storage",
-        valueAliases: ["storage", "storages"],
-        children: [
-            {
-                label: "Internal",
-                groupOnly: true,
-                children: [
-                    {
-                        label: "HDD",
-                        valueAliases: [
-                            "hdd", "hdds", "internal-hdd",
-                            "hard-disk", "hard-disks",
-                            "hard-drive", "hard-drives",
-                        ],
-                    },
-                    {
-                        label: "SATA SSD",
-                        valueAliases: [
-                            "sata-ssd", "sata-ssds", "sata",
-                        ],
-                    },
-                    {
-                        label: "NVMe SSD (Gen 3/4/5)",
-                        valueAliases: [
-                            // explicit slugs
-                            "nvme-ssd", "nvme-ssds",
-                            "nvme", "nvmes",
-                            "m2-nvme", "m2-ssd", "m2", "m-2", "m-2-nvme",
-                            "m2-nvme-ssd", "m.2", "m.2-nvme", "m.2-ssd",
-                            "nvme-ssd-gen-3-4-5",
-                            "nvme-ssd-gen3", "nvme-ssd-gen4", "nvme-ssd-gen5",
-                            "gen3-nvme", "gen4-nvme", "gen5-nvme",
-                            // legacy / generic slugs products might carry
-                            "ssd", "ssds",
-                            "solid-state-drive", "solid-state-drives",
-                            "internal-ssd", "internal-ssds",
-                        ],
-                    },
-                ],
-            },
-            {
-                label: "External",
-                groupOnly: true,
-                children: [
-                    {
-                        label: "External HDD",
-                        valueAliases: [
-                            "external-hdd", "external-hdds",
-                            "external-hard-disk", "external-hard-drive",
-                            "external-hard-drives",
-                        ],
-                    },
-                    {
-                        label: "External SSD",
-                        valueAliases: [
-                            "external-ssd", "external-ssds",
-                            "portable-ssd",
-                        ],
-                    },
-                ],
-            },
-        ],
-    },
-
-    // ── Cooling ────────────────────────────────────────────────────
-    {
-        label: "Cooling",
-        valueAliases: ["cooling", "coolers"],
-        children: [
-            {
-                label: "Air Coolers",
-                valueAliases: ["air-coolers", "air-cooler", "cpu-air-cooler", "cpu-cooler"],
-            },
-            {
-                label: "AIO Liquid Coolers",
-                valueAliases: [
-                    "aio-liquid-coolers", "aio-coolers", "aio",
-                    "liquid-cooler", "liquid-cooling", "water-cooler",
-                ],
-            },
-            {
-                label: "Case Fans",
-                valueAliases: ["case-fans", "case-fan", "fan", "fans", "rgb-fan"],
-            },
-            {
-                label: "Laptop Cooling Pads",
-                valueAliases: [
-                    "laptop-cooling-pads", "laptop-cooling-pad",
-                    "cooling-pad", "cooling-pads",
-                ],
-            },
-            {
-                label: "Thermal Paste",
-                valueAliases: [
-                    "thermal-paste", "thermal-compound",
-                    "thermal-grease", "thermal-interface",
-                ],
-            },
-        ],
-    },
-
-    // ── Cases ──────────────────────────────────────────────────────
-    {
-        label: "PC Cases",
-        valueAliases: [
-            "pc-cases", "pc-case", "cases",
-            "chassis", "cabinet", "tower",
-        ],
-    },
-
-    // ── Audio ──────────────────────────────────────────────────────
-    {
-        label: "Audio",
-        valueAliases: ["audio"],
-        children: [
-            {
-                label: "Headsets",
-                valueAliases: ["headsets", "headset", "headphones", "headphone", "earphones"],
-            },
-            {
-                label: "Microphones",
-                valueAliases: ["microphones", "microphone", "mic", "mics"],
-            },
-            {
-                label: "Speakers",
-                valueAliases: ["speakers", "speaker"],
-            },
-        ],
-    },
-
-    // ── Peripherals ────────────────────────────────────────────────
-    {
-        label: "Peripherals",
-        valueAliases: ["peripherals", "peripheral"],
-        children: [
-            {
-                label: "Keyboards",
-                valueAliases: ["keyboards", "keyboard", "mechanical-keyboard"],
-            },
-            {
-                label: "Mice",
-                valueAliases: ["mice", "mouse", "gaming-mouse"],
-            },
-            {
-                label: "Mousepads",
-                valueAliases: ["mousepads", "mousepad", "mouse-pad", "mouse-pads"],
-            },
-            {
-                label: "Controllers",
-                valueAliases: ["controllers", "controller", "gamepad", "gamepads"],
-            },
-            {
-                label: "Combos",
-                valueAliases: [
-                    "combos", "combo", "combo-sets",
-                    "peripheral-combo", "keyboard-mouse-combo",
-                ],
-            },
-        ],
-    },
-
-    // ── Power ──────────────────────────────────────────────────────
-    {
-        label: "Power",
-        valueAliases: ["power"],
-        children: [
-            {
-                label: "UPS",
-                valueAliases: [
-                    "ups", "uninterruptible-power-supply",
-                    "battery-backup",
-                ],
-            },
-        ],
-    },
-];
-
 function normalizeCategoryToken(value: string): string {
     return value.toLowerCase().replace(/[^a-z0-9]/g, "");
-}
-
-function slugifyCategoryLabel(value: string): string {
-    return value
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/^-+|-+$/g, "");
 }
 
 function candidateCategoryKeys(node: CategoryLayoutNode): string[] {
     const aliases = node.valueAliases?.filter(Boolean) ?? [];
     const inferred = slugifyCategoryLabel(node.label);
     return Array.from(new Set([node.label, inferred, ...aliases]));
-}
-
-/** Canonical slug for synthetic facets when DB has no row (matches first alias or label slug). */
-function primaryCategorySlug(node: CategoryLayoutNode): string {
-    const first = node.valueAliases?.find((a) => a.trim());
-    if (first) return first.toLowerCase().trim();
-    return slugifyCategoryLabel(node.label);
 }
 
 /** True when the shop is narrowed beyond the default “all products” view. */
@@ -548,11 +317,96 @@ function maxBaselineForFacet(baseline: Map<string, number> | null, facet: Catego
     return hit ? max : null;
 }
 
-function buildCategoryTree(
+function normalizeSlugForMatch(slug: string): string {
+    return normalizeCategoryToken(slug.trim());
+}
+
+function sumCategoryCountsInNodes(nodes: ResolvedCategoryNode[]): number {
+    let sum = 0;
+    for (const n of nodes) {
+        if (n.type === "category") sum += n.facet.count;
+    }
+    return sum;
+}
+
+function segmentContainsNormalizedSlug(
+    nodes: ResolvedCategoryNode[],
+    slugNorm: string
+): boolean {
+    for (const n of nodes) {
+        if (n.type !== "category") continue;
+        if (
+            normalizeCategoryToken(n.facet.value) === slugNorm ||
+            normalizeCategoryToken(n.facet.label) === slugNorm ||
+            normalizeCategoryToken(slugifyCategoryLabel(n.facet.value)) === slugNorm ||
+            normalizeCategoryToken(slugifyCategoryLabel(n.facet.label)) === slugNorm
+        ) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/** When suppressEmptyLayoutBuckets is true, parent departments may render as a group + children only (no category row with facet.value = audio). segmentContainsNormalizedSlug then misses the parent slug — use layout root aliases to still attach subcategories. */
+function layoutRootMatchesNormalizedSlug(root: CategoryLayoutNode, slugNorm: string): boolean {
+    if (root.valueAliases?.some((a) => normalizeCategoryToken(a) === slugNorm)) return true;
+    if (normalizeCategoryToken(slugifyCategoryLabel(root.label)) === slugNorm) return true;
+    if (normalizeCategoryToken(primaryCategorySlug(root)) === slugNorm) return true;
+    return false;
+}
+
+function splitLayoutRootSegment(
+    nodes: ResolvedCategoryNode[],
+    layoutRoot: CategoryLayoutNode
+): { main: ResolvedCategoryNode | null; sub: ResolvedCategoryNode[] } {
+    if (nodes.length === 0) return { main: null, sub: [] };
+    const first = nodes[0];
+    if (first.type === "category" && first.depth === 0 && first.collapsibleAncestors.length === 0) {
+        const main: ResolvedCategoryNode = {
+            ...first,
+            depth: 0,
+            hasChildren: nodes.length > 1,
+        };
+        const sub = nodes.slice(1).map((n) => ({
+            ...n,
+            depth: Math.max(0, n.depth - 1),
+        }));
+        return { main, sub };
+    }
+    const slug = primaryCategorySlug(layoutRoot);
+    const rolledUp = sumCategoryCountsInNodes(nodes);
+    const main: ResolvedCategoryNode = {
+        type: "category",
+        id: `cat-${slug}`,
+        facet: { value: slug, label: layoutRoot.label, count: rolledUp },
+        depth: 0,
+        hasChildren: nodes.length > 0,
+        collapsibleAncestors: [],
+    };
+    const sub = nodes.map((n) => ({
+        ...n,
+        depth: Math.max(0, n.depth - 1),
+    }));
+    return { main, sub };
+}
+
+type CategoryMainEntry = {
+    layoutIndex: number;
+    node: ResolvedCategoryNode;
+};
+
+type CategorySidebarParts = {
+    mainEntries: CategoryMainEntry[];
+    subForest: ResolvedCategoryNode[];
+    subMode: "layout" | "more" | "none";
+    activeLayoutIndex: number | null;
+};
+
+function buildCategorySidebarParts(
     categories: CategoryFacet[],
     filters: Record<string, unknown>,
     baselineCounts: Map<string, number> | null
-): ResolvedCategoryNode[] {
+): CategorySidebarParts {
     const suppressEmptyLayoutBuckets = !hasNonCategoryNarrowingFilters(filters);
     const normalizedFacetKeys = categories.map((facet) => {
         const keys = new Set<string>();
@@ -603,8 +457,10 @@ function buildCategoryTree(
             ];
         }
 
-        // Hide entire layout bucket when last unfiltered snapshot had zero products for it.
-        if (maxBaselineForNode(baselineCounts, node) === 0) {
+        // Hide a *leaf* layout bucket when the unfiltered snapshot had zero products for it.
+        // Parents with layout children must not be dropped here: products may live only on child
+        // slugs (e.g. headsets) while the parent slug (e.g. audio) is absent or zero in facets.
+        if (!node.children?.length && maxBaselineForNode(baselineCounts, node) === 0) {
             return [];
         }
 
@@ -634,8 +490,18 @@ function buildCategoryTree(
             if (suppressEmptyLayoutBuckets && isEmpty && !node.children?.length) {
                 return [];
             }
+            // Always include the matched parent row (even when empty with children) so main/sub split can show the department on the main row.
             if (suppressEmptyLayoutBuckets && isEmpty && node.children?.length) {
-                return childResults;
+                results.push({
+                    type: "category",
+                    id: catId,
+                    facet: matchedFacet,
+                    depth,
+                    hasChildren: childResults.length > 0,
+                    collapsibleAncestors: ancestors,
+                });
+                results.push(...childResults);
+                return results;
             }
 
             results.push({
@@ -681,15 +547,23 @@ function buildCategoryTree(
                 });
                 results.push(...childResults);
             }
-        } else if (keys.length > 0 && !suppressEmptyLayoutBuckets) {
+        } else if (keys.length > 0 && !node.children?.length) {
             const mb = maxBaselineForNode(baselineCounts, node);
-            if (mb === null || mb > 0) {
-                // Layout leaf with no facet row — synthetic only when catalog had stock for this bucket.
+            // Layout leaf with no facet row: show synthetic when baseline says there is stock.
+            // Unfiltered shop (suppressEmptyLayoutBuckets) used to block this entirely, so child
+            // rows never appeared when the API omitted child slugs from facets but baseline
+            // still had counts from the unfiltered snapshot.
+            const allowSynthetic =
+                !suppressEmptyLayoutBuckets
+                    ? mb === null || mb > 0
+                    : mb !== null && mb > 0;
+            if (allowSynthetic) {
                 const slug = primaryCategorySlug(node);
+                const count = typeof mb === "number" ? mb : 0;
                 results.push({
                     type: "category",
                     id: `cat-${slug}`,
-                    facet: { value: slug, label: node.label, count: 0 },
+                    facet: { value: slug, label: node.label, count },
                     depth,
                     hasChildren: false,
                     collapsibleAncestors: ancestors,
@@ -700,12 +574,30 @@ function buildCategoryTree(
         return results;
     };
 
-    const resolved: ResolvedCategoryNode[] = [];
+    const layoutSegments: { root: CategoryLayoutNode; nodes: ResolvedCategoryNode[] }[] = [];
     CATEGORY_FILTER_LAYOUT.forEach((node) => {
-        resolved.push(...resolveNode(node, 0, []));
+        layoutSegments.push({ root: node, nodes: resolveNode(node, 0, []) });
     });
 
-    // Anything the layout didn't claim → append under "More Categories"
+    const mainEntries: CategoryMainEntry[] = [];
+    const subsByLayoutIndex: ResolvedCategoryNode[][] = [];
+    layoutSegments.forEach(({ root, nodes }, layoutIndex) => {
+        const { main, sub } = splitLayoutRootSegment(nodes, root);
+        if (main) {
+            mainEntries.push({
+                layoutIndex,
+                node: {
+                    ...main,
+                    hasChildren: sub.length > 0,
+                },
+            });
+            subsByLayoutIndex.push(sub);
+        } else {
+            subsByLayoutIndex.push([]);
+        }
+    });
+
+    // Anything the layout didn't claim → facets for "More" sub-mode only (not on main row).
     const unmatched = categories
         .map((facet, idx) => ({ facet, idx }))
         .filter(({ idx, facet }) => {
@@ -716,28 +608,63 @@ function buildCategoryTree(
         })
         .sort((a, b) => a.facet.label.localeCompare(b.facet.label, undefined, { sensitivity: "base" }));
 
-    if (unmatched.length > 0) {
-        resolved.push({
-            type: "group",
-            id: "group-more-categories",
-            label: "More Categories",
-            depth: 0,
-            hasChildren: true,
-            collapsibleAncestors: [],
-        });
-        unmatched.forEach(({ facet }) =>
-            resolved.push({
-                type: "category",
-                id: `cat-${facet.value}`,
-                facet,
-                depth: 1,
-                hasChildren: false,
-                collapsibleAncestors: ["group-more-categories"],
-            })
-        );
-    }
+    const categorySlug =
+        typeof filters.category === "string" && filters.category.trim()
+            ? filters.category.trim()
+            : "";
+    const slugNorm = categorySlug ? normalizeSlugForMatch(categorySlug) : "";
 
-    return resolved;
+    let subForest: ResolvedCategoryNode[] = [];
+    let subMode: "layout" | "more" | "none" = "none";
+    let activeLayoutIndex: number | null = null;
+
+    if (slugNorm) {
+        let layoutHit = -1;
+        for (let i = 0; i < layoutSegments.length; i++) {
+            if (
+                segmentContainsNormalizedSlug(layoutSegments[i].nodes, slugNorm) ||
+                layoutRootMatchesNormalizedSlug(layoutSegments[i].root, slugNorm)
+            ) {
+                layoutHit = i;
+                break;
+            }
+        }
+        if (layoutHit >= 0) {
+            subForest = subsByLayoutIndex[layoutHit] ?? [];
+            subMode = "layout";
+            activeLayoutIndex = layoutHit;
+        } else if (
+            unmatched.some(
+                ({ facet }) =>
+                    normalizeSlugForMatch(facet.value) === slugNorm ||
+                    normalizeSlugForMatch(facet.label) === slugNorm
+            )
+        ) {
+            subForest = [
+                {
+                    type: "group",
+                    id: "group-more-categories",
+                    label: "More Categories",
+                    depth: 0,
+                    hasChildren: true,
+                    collapsibleAncestors: [],
+                },
+                ...unmatched.map(({ facet }) => ({
+                    type: "category" as const,
+                    id: `cat-${facet.value}`,
+                    facet,
+                    depth: 1,
+                    hasChildren: false,
+                    collapsibleAncestors: ["group-more-categories"] as string[],
+                })),
+            ];
+            subMode = "more";
+            activeLayoutIndex = null;
+        }
+    }
+    // No category filter: keep subMode "none" and subForest empty — subcategories only after a main row is selected.
+
+    return { mainEntries, subForest, subMode, activeLayoutIndex };
 }
 
 export default function DynamicFilterSidebar({
@@ -749,11 +676,11 @@ export default function DynamicFilterSidebar({
 }: DynamicFilterSidebarProps) {
     const [priceRange, setPriceRange] = useState<{ min: number; max: number }>({ min: 0, max: 0 });
     const [sectionSearch, setSectionSearch] = useState<Record<string, string>>({});
-    const [expandedLists, setExpandedLists] = useState<Record<string, boolean>>({});
     const [closedSections, setClosedSections] = useState<Record<string, boolean>>({});
     const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({});
     /** Snapshot of category facet counts from the last unfiltered shop view (used to hide always-empty categories even under filters). */
     const [categoryBaselineCounts, setCategoryBaselineCounts] = useState<Map<string, number> | null>(null);
+    const [mainCategoryBaselineByLayout, setMainCategoryBaselineByLayout] = useState<Map<number, number> | null>(null);
 
     useEffect(() => {
         if (hasNarrowingFilters(filters as Record<string, unknown>)) return;
@@ -824,13 +751,32 @@ export default function DynamicFilterSidebar({
         const next = { ...filters, page: 1 };
         if (filters.category === value) {
             delete next.category;
+            delete next.subcategories;
             delete next.brand;
             delete next.spec;
         } else {
             next.category = value;
+            delete next.subcategories;
             delete next.brand;
             delete next.spec;
         }
+        setFilters(next);
+    };
+
+    const selectedSubcategories = () => {
+        const raw = typeof filters.subcategories === "string" ? filters.subcategories : "";
+        return raw.split(",").filter(Boolean);
+    };
+
+    const isSubcategorySelected = (value: string) => selectedSubcategories().includes(value);
+
+    const handleSubcategoryToggle = (value: string) => {
+        const current = selectedSubcategories();
+        const nextList = current.includes(value)
+            ? current.filter((v: string) => v !== value)
+            : [...current, value];
+        const next = { ...filters, page: 1, subcategories: nextList.join(",") };
+        if (nextList.length === 0) delete next.subcategories;
         setFilters(next);
     };
 
@@ -868,11 +814,27 @@ export default function DynamicFilterSidebar({
                 onRemove: () => {
                     const next = { ...filters };
                     delete next.category;
+                    delete next.subcategories;
                     delete next.brand;
                     delete next.spec;
                     setFilters(next);
                 },
             });
+        }
+
+        if (typeof filters.subcategories === "string" && filters.subcategories.trim()) {
+            filters.subcategories
+                .split(",")
+                .filter(Boolean)
+                .forEach((v: string) => {
+                    const lbl =
+                        facets.categories?.find((c) => c.value === v)?.label ?? formatFilterLabel(v);
+                    pills.push({
+                        id: `subcat-${v}`,
+                        label: lbl,
+                        onRemove: () => handleSubcategoryToggle(v),
+                    });
+                });
         }
 
         if (filters.minPrice !== undefined || filters.maxPrice !== undefined) {
@@ -917,9 +879,9 @@ export default function DynamicFilterSidebar({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [facets.brands, facets.categories, facets.price, filters]);
 
-    const categoryTree = useMemo(
+    const categorySidebarParts = useMemo(
         () =>
-            buildCategoryTree(
+            buildCategorySidebarParts(
                 facets.categories ?? [],
                 filters as Record<string, unknown>,
                 categoryBaselineCounts
@@ -927,13 +889,71 @@ export default function DynamicFilterSidebar({
         [facets.categories, filters, categoryBaselineCounts]
     );
 
-    // Only show nodes whose every collapsible ancestor is currently expanded.
-    const visibleCategoryTree = useMemo(
-        () => categoryTree.filter((node) =>
-            node.collapsibleAncestors.every((aid) => isCatNodeExpanded(aid))
-        ),
+    const { mainEntries, subForest, subMode, activeLayoutIndex } = categorySidebarParts;
+
+    useEffect(() => {
+        if (hasNarrowingFilters(filters as Record<string, unknown>)) return;
+        const m = new Map<number, number>();
+        for (const entry of mainEntries) {
+            if (entry.node.type !== "category") continue;
+            m.set(entry.layoutIndex, entry.node.facet.count);
+        }
+        setMainCategoryBaselineByLayout(m);
+    }, [mainEntries, filters]);
+    const stableMainCategoryEntries = useMemo(() => {
+        const mainByLayout = new Map<number, CategoryMainEntry>();
+        for (const entry of mainEntries) mainByLayout.set(entry.layoutIndex, entry);
+
+        const out: CategoryMainEntry[] = [];
+        CATEGORY_FILTER_LAYOUT.forEach((layoutNode, layoutIndex) => {
+            const baselineCount = maxBaselineForNode(categoryBaselineCounts, layoutNode);
+            const fallback = mainByLayout.get(layoutIndex);
+            const baselineMainCount = mainCategoryBaselineByLayout?.get(layoutIndex);
+            const fallbackCount =
+                fallback?.node.type === "category" ? fallback.node.facet.count : 0;
+            const stableCount = baselineCount ?? baselineMainCount ?? fallbackCount;
+            if (stableCount <= 0) return;
+
+            const fallbackSlug =
+                fallback?.node.type === "category"
+                    ? fallback.node.facet.value
+                    : primaryCategorySlug(layoutNode);
+            const fallbackId =
+                fallback?.node.type === "category"
+                    ? fallback.node.id
+                    : `cat-${primaryCategorySlug(layoutNode)}`;
+            const hasChildren =
+                fallback?.node.type === "category"
+                    ? fallback.node.hasChildren
+                    : (layoutNode.children?.length ?? 0) > 0;
+
+            out.push({
+                layoutIndex,
+                node: {
+                    type: "category",
+                    id: fallbackId,
+                    facet: {
+                        value: fallbackSlug,
+                        label: layoutNode.label,
+                        count: stableCount,
+                    },
+                    depth: 0,
+                    hasChildren,
+                    collapsibleAncestors: [],
+                },
+            });
+        });
+        return out;
+    }, [mainEntries, categoryBaselineCounts, mainCategoryBaselineByLayout]);
+
+    // Only show sub-tree nodes whose every collapsible ancestor is currently expanded.
+    const visibleSubForest = useMemo(
+        () =>
+            subForest.filter((node) =>
+                node.collapsibleAncestors.every((aid) => isCatNodeExpanded(aid))
+            ),
         // eslint-disable-next-line react-hooks/exhaustive-deps
-        [categoryTree, collapsedCategories]
+        [subForest, collapsedCategories]
     );
 
     /** Stable spec section order: admin `featuredSpecKeys`, then any extras alphabetically. */
@@ -1061,78 +1081,129 @@ export default function DynamicFilterSidebar({
                                     No categories match these filters.
                                 </p>
                             ) : (
-                                <div className="space-y-0.5">
-                                    {visibleCategoryTree.map((node) => {
-                                        const isExpanded = isCatNodeExpanded(node.id);
-
-                                        /* ── Section-group header (e.g. INTERNAL / EXTERNAL) ── */
-                                        if (node.type === "group") {
+                                <div className="space-y-3">
+                                    <div className="space-y-0.5">
+                                        <p className="pb-1 text-[10px] font-bold uppercase tracking-[0.12em] text-zinc-500">
+                                            Category
+                                        </p>
+                                        {stableMainCategoryEntries.map(({ layoutIndex, node }) => {
+                                            if (node.type !== "category") return null;
+                                            const slugMatchesMain =
+                                                typeof filters.category === "string" &&
+                                                filters.category === node.facet.value;
+                                            const branchActive =
+                                                subMode === "layout" &&
+                                                activeLayoutIndex != null &&
+                                                activeLayoutIndex === layoutIndex;
+                                            const isChecked = Boolean(slugMatchesMain || branchActive);
                                             return (
-                                                <div
-                                                    key={node.id}
-                                                    style={{ paddingLeft: `${node.depth * 14}px` }}
-                                                    className="flex items-center gap-2 pt-3 pb-1"
-                                                >
-                                                    <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-zinc-500">
-                                                        {node.label}
-                                                    </span>
-                                                    <div className="flex-1 h-px bg-zinc-800" />
-                                                    {node.hasChildren && (
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => toggleCatNode(node.id)}
-                                                            className="shrink-0 rounded p-0.5 text-zinc-600 transition-colors hover:text-zinc-400"
-                                                            aria-label={isExpanded ? "Collapse" : "Expand"}
-                                                        >
-                                                            <ChevronDown
-                                                                className={`h-3 w-3 transition-transform duration-200 ${isExpanded ? "" : "-rotate-90"}`}
-                                                            />
-                                                        </button>
-                                                    )}
+                                                <div key={node.id} className="flex items-center">
+                                                    <div className="min-w-0 flex-1">
+                                                        <FilterRadio
+                                                            name="categoryFilterMain"
+                                                            checked={isChecked}
+                                                            onChange={() => handleCategoryChange(node.facet.value)}
+                                                            onClick={() => {
+                                                                if (!slugMatchesMain && branchActive) {
+                                                                    handleCategoryChange(node.facet.value);
+                                                                    return;
+                                                                }
+                                                                if (slugMatchesMain) handleCategoryChange(node.facet.value);
+                                                            }}
+                                                            label={node.facet.label}
+                                                            count={node.facet.count}
+                                                        />
+                                                    </div>
                                                 </div>
                                             );
-                                        }
+                                        })}
+                                    </div>
 
-                                        /* ── Selectable category node ── */
-                                        const isChecked = filters.category === node.facet.value;
-                                        const isTopLevel = node.depth === 0;
+                                    <div className="space-y-0.5 border-t border-white/[0.06] pt-3">
+                                        <p className="pb-1 text-[10px] font-bold uppercase tracking-[0.12em] text-zinc-500">
+                                            Subcategory
+                                        </p>
+                                        {subMode === "none" ? (
+                                            <p className="py-1 text-sm text-zinc-500">
+                                                Select a category above to refine.
+                                            </p>
+                                        ) : subMode === "layout" && visibleSubForest.length === 0 ? (
+                                            <p className="py-1 text-sm text-zinc-500">
+                                                No further subcategories for this selection.
+                                            </p>
+                                        ) : (
+                                            visibleSubForest.map((node) => {
+                                                const isExpanded = isCatNodeExpanded(node.id);
 
-                                        return (
-                                            <div
-                                                key={node.id}
-                                                style={{ marginLeft: `${node.depth * 12}px` }}
-                                                className="flex items-center"
-                                            >
-                                                <div className="min-w-0 flex-1">
-                                                    <FilterRadio
-                                                        name="categoryFilter"
-                                                        checked={isChecked}
-                                                        onChange={() => handleCategoryChange(node.facet.value)}
-                                                        onClick={() => {
-                                                            if (isChecked) handleCategoryChange(node.facet.value);
-                                                        }}
-                                                        label={isTopLevel
-                                                            ? node.facet.label
-                                                            : node.facet.label
-                                                        }
-                                                        count={node.facet.count}
-                                                    />
-                                                </div>
-                                                {node.hasChildren && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => toggleCatNode(node.id)}
-                                                        className="shrink-0 ml-0.5 rounded p-1 text-zinc-600 transition-colors hover:text-zinc-300"
-                                                        aria-label={isExpanded ? "Collapse" : "Expand"}
+                                                if (node.type === "group") {
+                                                    return (
+                                                        <div
+                                                            key={node.id}
+                                                            style={{ paddingLeft: `${node.depth * 14}px` }}
+                                                            className="flex items-center gap-2 pt-3 pb-1"
+                                                        >
+                                                            <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-zinc-500">
+                                                                {node.label}
+                                                            </span>
+                                                            <div className="h-px flex-1 bg-zinc-800" />
+                                                            {node.hasChildren ? (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => toggleCatNode(node.id)}
+                                                                    className="shrink-0 rounded p-0.5 text-zinc-600 transition-colors hover:text-zinc-400"
+                                                                    aria-label={isExpanded ? "Collapse" : "Expand"}
+                                                                >
+                                                                    <ChevronDown
+                                                                        className={`h-3 w-3 transition-transform duration-200 ${isExpanded ? "" : "-rotate-90"}`}
+                                                                    />
+                                                                </button>
+                                                            ) : null}
+                                                        </div>
+                                                    );
+                                                }
+
+                                                const isChecked = isSubcategorySelected(node.facet.value);
+                                                return (
+                                                    <div
+                                                        key={node.id}
+                                                        style={{ marginLeft: `${node.depth * 12}px` }}
+                                                        className="relative flex items-center"
                                                     >
-                                                        <ChevronDown
-                                                            className={`h-3.5 w-3.5 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`}
+                                                        <span
+                                                            className="pointer-events-none absolute left-0 top-0 h-full border-l border-zinc-800/90"
+                                                            style={{ transform: `translateX(${node.depth * 12 - 8}px)` }}
+                                                            aria-hidden
                                                         />
-                                                    </button>
-                                                )}
-                                            </div>
-                                        );
-                                    })}
+                                                        <span
+                                                            className="pointer-events-none absolute left-0 top-1/2 w-3 border-t border-zinc-800/90"
+                                                            style={{ transform: `translate(${node.depth * 12 - 8}px, -50%)` }}
+                                                            aria-hidden
+                                                        />
+                                                        <div className="min-w-0 flex-1">
+                                                            <FilterCheckbox
+                                                                checked={isChecked}
+                                                                onChange={() => handleSubcategoryToggle(node.facet.value)}
+                                                                label={node.facet.label}
+                                                                count={node.facet.count}
+                                                            />
+                                                        </div>
+                                                        {node.hasChildren ? (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => toggleCatNode(node.id)}
+                                                                className="ml-0.5 shrink-0 rounded p-1 text-zinc-600 transition-colors hover:text-zinc-300"
+                                                                aria-label={isExpanded ? "Collapse" : "Expand"}
+                                                            >
+                                                                <ChevronDown
+                                                                    className={`h-3.5 w-3.5 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`}
+                                                                />
+                                                            </button>
+                                                        ) : null}
+                                                    </div>
+                                                );
+                                            })
+                                        )}
+                                    </div>
                                 </div>
                             )}
                         </FilterSection>
@@ -1243,13 +1314,6 @@ export default function DynamicFilterSidebar({
                                     brands={filterFacetOptions(facets.brands, "brands")}
                                     brandSelected={brandSelected}
                                     handleBrandChange={handleBrandChange}
-                                    expanded={expandedLists.brands ?? false}
-                                    onToggleExpand={() =>
-                                        setExpandedLists((p) => ({
-                                            ...p,
-                                            brands: !p.brands,
-                                        }))
-                                    }
                                 />
                             </FilterSection>
                         ) : null}
@@ -1291,13 +1355,6 @@ export default function DynamicFilterSidebar({
                                         filterKey={key}
                                         filters={filters}
                                         handleSpecChange={handleSpecChange}
-                                        expanded={expandedLists[key] ?? false}
-                                        onToggleExpand={() =>
-                                            setExpandedLists((p) => ({
-                                                ...p,
-                                                [key]: !p[key],
-                                            }))
-                                        }
                                     />
                                 </FilterSection>
                             ))}
@@ -1308,27 +1365,19 @@ export default function DynamicFilterSidebar({
     );
 }
 
-/* ── Sub-components for show-more lists ── */
+/* ── Sub-components for option lists ── */
 
 function BrandList({
     brands,
     brandSelected,
     handleBrandChange,
-    expanded,
-    onToggleExpand,
 }: {
     brands: { value: string; label: string; count: number }[];
     brandSelected: (v: string) => boolean;
     handleBrandChange: (v: string) => void;
-    expanded: boolean;
-    onToggleExpand: () => void;
 }) {
     const sortedBrands = sortFacetOptions(brands);
-    const ordered = orderOptionsSelectedFirst(sortedBrands, brandSelected);
-    const visible = expanded
-        ? ordered
-        : visibleCollapsedOptions(ordered, brandSelected, LIST_PREVIEW);
-    const hidden = Math.max(ordered.length - visible.length, 0);
+    const visible = orderOptionsSelectedFirst(sortedBrands, brandSelected);
 
     return (
         <div className="space-y-0.5">
@@ -1344,16 +1393,6 @@ function BrandList({
             {brands.length === 0 ? (
                 <p className="py-2 text-sm text-zinc-500">No brands match.</p>
             ) : null}
-            {hidden > 0 ? (
-                <button
-                    type="button"
-                    onClick={onToggleExpand}
-                    className="mt-2 flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-zinc-400 transition-colors hover:bg-white/[0.04] hover:text-zinc-200"
-                >
-                    <ChevronDown className={`h-3 w-3 transition-transform ${expanded ? "rotate-180" : ""}`} />
-                    {expanded ? "Show less" : `Show ${hidden} more`}
-                </button>
-            ) : null}
         </div>
     );
 }
@@ -1363,25 +1402,18 @@ function SpecList({
     filterKey,
     filters,
     handleSpecChange,
-    expanded,
-    onToggleExpand,
 }: {
     items: { value: string; label: string; count: number }[];
     filterKey: string;
     filters: any; // eslint-disable-line @typescript-eslint/no-explicit-any
     handleSpecChange: (key: string, value: string) => void;
-    expanded: boolean;
-    onToggleExpand: () => void;
 }) {
     const isSelected = (value: string) => {
         const specVal = filters.spec?.[filterKey];
         return typeof specVal === "string" && specVal.split(",").filter(Boolean).includes(value);
     };
     const sortedItems = sortFacetOptions(items);
-    const visible = expanded
-        ? sortedItems
-        : sortedItems.slice(0, LIST_PREVIEW);
-    const hidden = Math.max(sortedItems.length - visible.length, 0);
+    const visible = sortedItems;
 
     return (
         <div className="space-y-0.5">
@@ -1399,16 +1431,6 @@ function SpecList({
             })}
             {items.length === 0 ? (
                 <p className="py-2 text-sm text-zinc-500">No options match.</p>
-            ) : null}
-            {hidden > 0 ? (
-                <button
-                    type="button"
-                    onClick={onToggleExpand}
-                    className="mt-2 flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-zinc-400 transition-colors hover:bg-white/[0.04] hover:text-zinc-200"
-                >
-                    <ChevronDown className={`h-3 w-3 transition-transform ${expanded ? "rotate-180" : ""}`} />
-                    {expanded ? "Show less" : `Show ${hidden} more`}
-                </button>
             ) : null}
         </div>
     );

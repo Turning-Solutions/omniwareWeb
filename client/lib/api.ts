@@ -10,6 +10,19 @@ const api = axios.create({
 // Attach Bearer token from localStorage when present (for admin and authenticated requests)
 api.interceptors.request.use((config) => {
     if (typeof window === 'undefined') return config;
+    // Avoid cached 304 responses on product listing/facets (browser may send If-None-Match; empty JSON breaks the shop grid).
+    const method = config.method?.toLowerCase();
+    const url = typeof config.url === 'string' ? config.url : '';
+    if (method === 'get' && url.includes('products')) {
+        const h = config.headers;
+        if (typeof (h as { set?: (k: string, v: string) => void }).set === 'function') {
+            (h as { set: (k: string, v: string) => void }).set('Cache-Control', 'no-cache');
+            (h as { set: (k: string, v: string) => void }).set('Pragma', 'no-cache');
+        } else {
+            (h as Record<string, string>)['Cache-Control'] = 'no-cache';
+            (h as Record<string, string>)['Pragma'] = 'no-cache';
+        }
+    }
     try {
         const raw = localStorage.getItem('userInfo');
         const data = raw ? JSON.parse(raw) : {};

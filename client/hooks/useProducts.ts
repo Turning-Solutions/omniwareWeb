@@ -6,6 +6,7 @@ export interface UseProductsOptions {
     sort?: string;
     search?: string;
     category?: string;
+    subcategories?: string;
     brand?: string;
     minPrice?: number;
     maxPrice?: number;
@@ -106,7 +107,22 @@ function buildProductsQueryString(options: UseProductsOptions): string {
     params.append('limit', limit.toString());
     if (options.sort) params.append('sort', normalizeSortForApi(options.sort));
     if (options.search) params.append('search', options.search);
-    if (options.category) params.append('category', normalizeCategoryForApi(String(options.category)));
+    const subcategoryParts = options.subcategories
+        ? String(options.subcategories)
+              .split(',')
+              .map((s) => normalizeCategoryForApi(s))
+              .filter(Boolean)
+        : [];
+    const categoryParts: string[] =
+        subcategoryParts.length > 0
+            ? subcategoryParts
+            : options.category
+              ? [normalizeCategoryForApi(String(options.category))]
+              : [];
+    if (categoryParts.length > 0) {
+        const unique = Array.from(new Set(categoryParts));
+        params.append('category', unique.join(','));
+    }
     if (options.brand) params.append('brand', options.brand);
     if (options.minPrice != null) params.append('minPrice', options.minPrice.toString());
     if (options.maxPrice != null) params.append('maxPrice', options.maxPrice.toString());
@@ -144,7 +160,22 @@ export const useProductFacets = (options: UseProductsOptions = {}) => {
         queryFn: async () => {
             const params = new URLSearchParams();
             if (options.search) params.append('search', options.search);
-            if (options.category) params.append('category', normalizeCategoryForApi(String(options.category)));
+            const subcategoryParts = options.subcategories
+                ? String(options.subcategories)
+                      .split(',')
+                      .map((s) => normalizeCategoryForApi(s))
+                      .filter(Boolean)
+                : [];
+            const categoryParts: string[] =
+                subcategoryParts.length > 0
+                    ? subcategoryParts
+                    : options.category
+                      ? [normalizeCategoryForApi(String(options.category))]
+                      : [];
+            if (categoryParts.length > 0) {
+                const unique = Array.from(new Set(categoryParts));
+                params.append('category', unique.join(','));
+            }
             if (options.brand) params.append('brand', options.brand);
             if (options.minPrice != null) params.append('minPrice', options.minPrice.toString());
             if (options.maxPrice != null) params.append('maxPrice', options.maxPrice.toString());

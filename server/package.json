@@ -6,7 +6,11 @@
     "dev": "nodemon src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "migrate:storage": "ts-node src/scripts/migrateStorageCategories.ts"
+    "dump:db": "ts-node src/scripts/dumpDatabase.ts",
+    "migrate:storage": "ts-node src/scripts/migrateStorageCategories.ts",
+    "migrate:storage:safe": "npm run dump:db && npm run migrate:storage",
+    "migrate:filter-layout": "ts-node src/scripts/migrateFilterLayoutCategories.ts",
+    "migrate:filter-layout:safe": "npm run dump:db && npm run migrate:filter-layout"
   },
   "keywords": [],
   "author": "",

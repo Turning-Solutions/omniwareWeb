@@ -26,6 +26,33 @@ function normalizeCategoryKeyForFeaturedSpecs(category: unknown): string | null 
     return first ? first.toLowerCase() : null;
 }
 
+async function resolveFeaturedSpecsForCategoryKey(categoryKey: string | null): Promise<string[]> {
+    if (!categoryKey) return [];
+    const key = categoryKey.toLowerCase();
+    const visited = new Set<string>();
+    let current = await Category.findOne({ slug: key }).select('_id slug parentId').lean();
+
+    if (!current) {
+        const direct = await CategoryFeaturedSpecs.findOne({ categoryKey: key }).lean();
+        return direct?.featuredSpecKeys ?? [];
+    }
+
+    for (let depth = 0; depth < 64 && current; depth++) {
+        const slug = String(current.slug ?? '').toLowerCase();
+        if (slug && !visited.has(slug)) {
+            visited.add(slug);
+            const cfg = await CategoryFeaturedSpecs.findOne({ categoryKey: slug }).lean();
+            if (cfg && Array.isArray(cfg.featuredSpecKeys) && cfg.featuredSpecKeys.length > 0) {
+                return cfg.featuredSpecKeys;
+            }
+        }
+        if (!current.parentId) break;
+        current = await Category.findById(current.parentId).select('_id slug parentId').lean();
+    }
+
+    return [];
+}
+
 /** Build specs facet object in admin `featuredSpecKeys` order (stable UI). */
 function buildOrderedSpecsFacet(
     featuredSpecKeys: string[],
@@ -162,9 +189,14 @@ function withDiscountInfo(product: any): any {
 
 export const getProducts = async (req: Request, res: Response) => {
     try {
-        // Cache product listing responses at the CDN edge in production.
-        // This helps absorb repeated traffic while keeping data reasonably fresh.
-        res.set('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=120');
+        // Filtered listings must not be publicly cached: intermediaries/browsers may answer 304
+        // with no body, which breaks JSON clients (empty product lists).
+        if (hasFilters(req)) {
+            res.set('Cache-Control', 'private, no-store, must-revalidate');
+        } else {
+            // Cache product listing responses at the CDN edge in production.
+            res.set('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=120');
+        }
 
         const { search, minPrice, maxPrice, brand, category, sort, page = 1, limit = 20, facets = 'true', ...dynamicFilters } = req.query;
         const includeFacets = String(facets).toLowerCase() !== 'false';
@@ -341,9 +373,9 @@ export const getProducts = async (req: Request, res: Response) => {
 
         const categoryKeyForSpecs = normalizeCategoryKeyForFeaturedSpecs(category);
         if (categoryKeyForSpecs) {
-            const featuredConfig = await CategoryFeaturedSpecs.findOne({ categoryKey: categoryKeyForSpecs });
-            if (featuredConfig && Array.isArray(featuredConfig.featuredSpecKeys) && featuredConfig.featuredSpecKeys.length > 0) {
-                featuredSpecKeys = featuredConfig.featuredSpecKeys;
+            const resolvedFeaturedSpecKeys = await resolveFeaturedSpecsForCategoryKey(categoryKeyForSpecs);
+            if (resolvedFeaturedSpecKeys.length > 0) {
+                featuredSpecKeys = resolvedFeaturedSpecKeys;
                 featuredMode = 'restricted';
             }
         }
@@ -360,7 +392,6 @@ export const getProducts = async (req: Request, res: Response) => {
             availability: data.availability || [],
             specs: specsFacet
         };
-
 
         res.json({
             products: (data.products || []).map(withDiscountInfo),
@@ -383,6 +414,12 @@ export const getProducts = async (req: Request, res: Response) => {
 
 export const getProductFacets = async (req: Request, res: Response) => {
     try {
+        if (hasFilters(req)) {
+            res.set('Cache-Control', 'private, no-store, must-revalidate');
+        } else {
+            res.set('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=120');
+        }
+
         // Almost identical logic to getProducts, but we can omit the 'products' fetch if performance is critical,
         // or just return the facets.
         // For simplicity/DRY, one could extract the 'buildMatchStage' logic.
@@ -448,9 +485,9 @@ export const getProductFacets = async (req: Request, res: Response) => {
 
         const categoryKeyForSpecsFacets = normalizeCategoryKeyForFeaturedSpecs(category);
         if (categoryKeyForSpecsFacets) {
-            const featuredConfig = await CategoryFeaturedSpecs.findOne({ categoryKey: categoryKeyForSpecsFacets });
-            if (featuredConfig && Array.isArray(featuredConfig.featuredSpecKeys) && featuredConfig.featuredSpecKeys.length > 0) {
-                featuredSpecKeys = featuredConfig.featuredSpecKeys;
+            const resolvedFeaturedSpecKeys = await resolveFeaturedSpecsForCategoryKey(categoryKeyForSpecsFacets);
+            if (resolvedFeaturedSpecKeys.length > 0) {
+                featuredSpecKeys = resolvedFeaturedSpecKeys;
                 featuredMode = 'restricted';
             }
         }
