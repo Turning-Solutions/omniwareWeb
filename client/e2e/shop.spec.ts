@@ -239,9 +239,9 @@ test.describe('Shop / Filters / Cart', () => {
         await expect(page.getByRole('button', { name: 'Add Alpha GPU to cart' })).toBeVisible();
         await expect(page.getByRole('button', { name: 'Add Alpha CPU to cart' })).toHaveCount(0);
 
-        // Switch category to CPU.
-        await expect(page.locator('#filter-panel-categories').getByText('CPU', { exact: true })).toBeVisible();
-        await page.locator('#filter-panel-categories').getByText('CPU', { exact: true }).click();
+        // Switch category to Processor (CPU) via the layout-aware sidebar labels.
+        await expect(page.locator('#filter-panel-categories').getByText('Processor', { exact: true })).toBeVisible();
+        await page.locator('#filter-panel-categories').getByText('Processor', { exact: true }).click();
 
         await expect(page.getByRole('button', { name: 'Add Alpha CPU to cart' })).toBeVisible();
         await expect(page.getByRole('button', { name: 'Add Alpha GPU to cart' })).toHaveCount(0);
