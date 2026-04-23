@@ -1,6 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import api from '../lib/api';
 
+export const DEFAULT_PRODUCTS_LIMIT = 20;
+export const PRODUCTS_QUERY_SCOPE = 'products';
+
 export interface UseProductsOptions {
     limit?: number;
     sort?: string;
@@ -103,7 +106,7 @@ function normalizeCategoryForApi(category: string): string {
 function buildProductsQueryString(options: UseProductsOptions): string {
     const params = new URLSearchParams();
     // Always send limit so server returns full facets when limit >= 20 (shop page)
-    const limit = options.limit ?? 20;
+    const limit = options.limit ?? DEFAULT_PRODUCTS_LIMIT;
     params.append('limit', limit.toString());
     if (options.sort) params.append('sort', normalizeSortForApi(options.sort));
     if (options.search) params.append('search', options.search);
@@ -140,14 +143,20 @@ function buildProductsQueryString(options: UseProductsOptions): string {
     return params.toString();
 }
 
-export const useProducts = (options: UseProductsOptions = {}) => {
-    return useQuery<ProductsResponse>({
-        queryKey: ['products', options],
+export function getProductsQueryOptions(options: UseProductsOptions = {}) {
+    return {
+        queryKey: [PRODUCTS_QUERY_SCOPE, options] as const,
         queryFn: async () => {
             const query = buildProductsQueryString(options);
             const { data } = await api.get(`/products?${query}`);
-            return data;
+            return data as ProductsResponse;
         },
+    };
+}
+
+export const useProducts = (options: UseProductsOptions = {}) => {
+    return useQuery<ProductsResponse>({
+        ...getProductsQueryOptions(options),
         enabled: options.enabled ?? true,
         staleTime: 2 * 60 * 1000, // 2 minutes — avoid refetch on every mount
         placeholderData: (previousData) => previousData, // show previous list while refetching
