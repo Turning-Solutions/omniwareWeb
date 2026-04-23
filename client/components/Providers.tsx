@@ -29,12 +29,15 @@ function ShopProductsPreloader({ queryClient }: { queryClient: QueryClient }) {
         };
 
         const schedulePrefetch = () => {
-            if ('requestIdleCallback' in window) {
-                const idleId = window.requestIdleCallback(() => runPrefetch(), { timeout: 2000 });
-                return () => window.cancelIdleCallback(idleId);
+            if (
+                typeof globalThis.requestIdleCallback === 'function' &&
+                typeof globalThis.cancelIdleCallback === 'function'
+            ) {
+                const idleId = globalThis.requestIdleCallback(() => runPrefetch(), { timeout: 2000 });
+                return () => globalThis.cancelIdleCallback(idleId);
             }
-            const timeoutId = window.setTimeout(runPrefetch, 250);
-            return () => window.clearTimeout(timeoutId);
+            const timeoutId = globalThis.setTimeout(runPrefetch, 250);
+            return () => globalThis.clearTimeout(timeoutId);
         };
 
         if (document.readyState === 'complete') {
