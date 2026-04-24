@@ -117,13 +117,13 @@ export default function Footer() {
                         <h3 className="text-sm font-semibold text-gray-300 tracking-wider uppercase">Legal</h3>
                         <ul className="mt-4 space-y-4">
                             <li>
-                                <Link href="#" className="text-base text-gray-400 hover:text-white">
+                                <Link href="/privacy-policy" className="text-base text-gray-400 hover:text-white">
                                     Privacy Policy
                                 </Link>
                             </li>
                             <li>
-                                <Link href="#" className="text-base text-gray-400 hover:text-white">
-                                    Terms of Service
+                                <Link href="/terms-and-conditions" className="text-base text-gray-400 hover:text-white">
+                                    Terms and Conditions
                                 </Link>
                             </li>
                             {/* Only admin entry point */}
