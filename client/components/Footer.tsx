@@ -3,7 +3,7 @@ import Link from "next/link";
 const socialLinks = [
     {
         name: "Facebook",
-        href: "https://facebook.com",
+        href: "https://www.facebook.com/OmniwareTechnologies/",
         icon: (
             <svg viewBox="0 0 24 24" className="h-5 w-5 fill-current" aria-hidden="true">
                 <path d="M22 12a10 10 0 1 0-11.56 9.88v-6.99H7.9V12h2.54V9.8c0-2.5 1.49-3.89 3.77-3.89 1.09 0 2.23.2 2.23.2v2.46h-1.26c-1.24 0-1.63.78-1.63 1.57V12h2.77l-.44 2.89h-2.33v6.99A10 10 0 0 0 22 12" />
@@ -21,7 +21,7 @@ const socialLinks = [
     },
     {
         name: "TikTok",
-        href: "https://tiktok.com",
+        href: "https://www.tiktok.com/@omniware",
         icon: (
             <svg viewBox="0 0 24 24" className="h-5 w-5 fill-current" aria-hidden="true">
                 <path d="M19.59 6.69A4.83 4.83 0 0 1 16.03 5V15.4A5.4 5.4 0 1 1 10.63 10v2.73a2.67 2.67 0 1 0 2.67 2.67V2h2.73a4.83 4.83 0 0 0 3.56 4.69v0z" />
@@ -30,7 +30,7 @@ const socialLinks = [
     },
     {
         name: "X",
-        href: "https://x.com",
+        href: "https://x.com/OmniwareTech",
         icon: (
             <svg viewBox="0 0 24 24" className="h-5 w-5 fill-current" aria-hidden="true">
                 <path d="M18.9 2H22l-6.77 7.73L23 22h-6.12l-4.8-6.27L6.6 22H3.5l7.24-8.27L1 2h6.27l4.34 5.73L18.9 2zm-1.07 18.15h1.69L6.35 3.76H4.53l13.3 16.39z" />
@@ -39,7 +39,7 @@ const socialLinks = [
     },
     {
         name: "Discord",
-        href: "https://discord.gg/6SJw6Yg6",
+        href: "https://discord.gg/Q6yzJNBk",
         icon: (
             <svg viewBox="0 0 24 24" className="h-5 w-5 fill-current" aria-hidden="true">
                 <path d="M20.32 4.37A19.8 19.8 0 0 0 15.42 3a13.69 13.69 0 0 0-.62 1.27 18.29 18.29 0 0 0-5.6 0A13.69 13.69 0 0 0 8.58 3a19.8 19.8 0 0 0-4.9 1.37C.65 8.97-.17 13.43.25 17.84A19.92 19.92 0 0 0 6.2 20.9c.48-.66.9-1.36 1.25-2.09-.69-.26-1.35-.58-1.97-.95.17-.12.34-.24.5-.37a14.2 14.2 0 0 0 12.04 0c.17.13.34.25.5.37-.62.37-1.28.69-1.97.95.35.73.77 1.43 1.25 2.09a19.92 19.92 0 0 0 5.95-3.06c.5-5.11-.85-9.53-3.43-13.47zM9.68 15.15c-1.17 0-2.13-1.08-2.13-2.4 0-1.33.95-2.4 2.13-2.4 1.18 0 2.14 1.08 2.13 2.4 0 1.33-.95 2.4-2.13 2.4zm4.64 0c-1.17 0-2.13-1.08-2.13-2.4 0-1.33.95-2.4 2.13-2.4 1.18 0 2.14 1.08 2.13 2.4 0 1.33-.95 2.4-2.13 2.4z" />
@@ -48,7 +48,7 @@ const socialLinks = [
     },
     {
         name: "LinkedIn",
-        href: "https://linkedin.com",
+        href: "https://www.linkedin.com/company/omniwarelk/",
         icon: (
             <svg viewBox="0 0 24 24" className="h-5 w-5 fill-current" aria-hidden="true">
                 <path d="M20.45 20.45h-3.56v-5.58c0-1.33-.03-3.04-1.85-3.04-1.85 0-2.14 1.45-2.14 2.95v5.67H9.34V9h3.42v1.56h.05c.48-.9 1.64-1.85 3.37-1.85 3.61 0 4.27 2.38 4.27 5.48v6.26zM5.34 7.43a2.06 2.06 0 1 1 0-4.12 2.06 2.06 0 0 1 0 4.12zM7.12 20.45H3.56V9h3.56v11.45zM22.23 0H1.77A1.76 1.76 0 0 0 0 1.74v20.52A1.76 1.76 0 0 0 1.77 24h20.46A1.77 1.77 0 0 0 24 22.26V1.74A1.77 1.77 0 0 0 22.23 0z" />
