@@ -33,16 +33,18 @@ export default function Navbar() {
             <div className="mx-auto flex h-14 max-w-[1440px] items-center gap-3 px-4 sm:gap-4 sm:px-6 lg:px-10">
                 <Link
                     href="/"
-                    className="relative flex h-6 w-[min(118px,42vw)] shrink-0 items-center sm:w-[132px]"
+                    className="flex shrink-0 items-center gap-2 rounded-md px-1 py-1"
+                    aria-label="Omniware home"
                 >
                     <Image
-                        src="/textLogo.svg"
-                        alt="Omniware"
-                        fill
-                        className="object-contain object-left"
-                        sizes="132px"
+                        src="/Logo White.png"
+                        alt="Omniware logo"
+                        width={28}
+                        height={28}
+                        className="h-7 w-7 object-contain"
                         priority
                     />
+                    <span className="text-base font-semibold uppercase tracking-wide text-white sm:text-lg">Omniware</span>
                 </Link>
 
                 <div className="hidden min-w-0 flex-1 items-center justify-center gap-0.5 md:flex">
