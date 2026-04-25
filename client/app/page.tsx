@@ -9,11 +9,7 @@ import {
     ChevronLeft,
     ChevronRight,
     Cpu,
-    HardDrive,
-    Headphones,
     LifeBuoy,
-    MemoryStick,
-    Mouse,
     Search,
     ShieldCheck,
     Truck,
@@ -181,10 +177,30 @@ export default function Home() {
      * `slug` must match each category’s `slug` in Admin → Categories (lowercase recommended).
      */
     const categories = [
-        { label: "RAM", slug: "ram", icon: MemoryStick },
-        { label: "Mouse", slug: "mouse", icon: Mouse },
-        { label: "Storage", slug: "storage", icon: HardDrive },
-        { label: "Headset", slug: "headset", icon: Headphones },
+        {
+            label: "RAM",
+            slug: "ram",
+            imageSrc: "https://res.cloudinary.com/dwuxumj4x/image/upload/v1775212592/omniware/products/zydk9yfwxpndsnee7pjb.webp",
+            imageClassName: "h-[6.2rem] w-[6.2rem] right-[0.65rem] top-[53%] -translate-y-1/2 rotate-[8deg] group-hover:right-[-0.6rem] group-hover:-translate-y-[62%] group-hover:scale-[1.2]",
+        },
+        {
+            label: "Mouse",
+            slug: "mouse",
+            imageSrc: "https://res.cloudinary.com/dwuxumj4x/image/upload/v1772860506/omniware/products/okciyxxgkgdws5xwffrx.webp",
+            imageClassName: "h-[6rem] w-[6rem] right-[0.7rem] top-[53%] -translate-y-1/2 -rotate-[6deg] group-hover:right-[-0.55rem] group-hover:-translate-y-[62%] group-hover:scale-[1.2]",
+        },
+        {
+            label: "Storage",
+            slug: "storage",
+            imageSrc: "https://res.cloudinary.com/dwuxumj4x/image/upload/v1775709758/omniware/products/hvcmuuucawggzlvjv1qu.webp",
+            imageClassName: "h-[6.1rem] w-[6.1rem] right-[0.65rem] top-[53%] -translate-y-1/2 rotate-[3deg] group-hover:right-[-0.6rem] group-hover:-translate-y-[62%] group-hover:scale-[1.2]",
+        },
+        {
+            label: "Headset",
+            slug: "headset",
+            imageSrc: "https://res.cloudinary.com/dwuxumj4x/image/upload/v1774285372/omniware/products/mgkajml10ain7io3dvjg.webp",
+            imageClassName: "h-[6.15rem] w-[6.15rem] right-[0.65rem] top-[53%] -translate-y-1/2 -rotate-[9deg] group-hover:right-[-0.6rem] group-hover:-translate-y-[62%] group-hover:scale-[1.2]",
+        },
     ];
 
     useEffect(() => {
@@ -280,13 +296,13 @@ export default function Home() {
                                     watermark="SHOP"
                                     eyebrow="Discover"
                                     title="Find the parts your build is missing"
-                                    description="Search the catalog, jump to a category, or scan what is trending, everything below flows from here."
+                                    description="Upgrade smarter. Search by product, category, or jump straight into what’s trending."
                                 />
                                 <div className="mb-3 flex flex-col gap-3 sm:mb-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-3">
                                     <div className="flex items-center gap-2">
                                         <span className="inline-flex h-1.5 w-1.5 rounded-full bg-[#D12B28] shadow-[0_0_6px_#D12B28]" />
                                         <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-[#D12B28]/80 sm:text-[11px] sm:tracking-[0.22em]">
-                                            Find items
+                                            Explore Products
                                         </span>
                                     </div>
                                     <div className="flex w-full gap-2 sm:w-auto sm:flex-wrap sm:items-center">
@@ -300,7 +316,7 @@ export default function Home() {
                                             href="/services"
                                             className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-white/12 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-white/80 transition hover:border-[#D12B28]/40 hover:text-white sm:flex-none sm:px-3.5 sm:py-1.5"
                                         >
-                                            Build Help
+                                            Build Help - Get Build Advice
                                         </Link>
                                     </div>
                                 </div>
@@ -420,7 +436,7 @@ export default function Home() {
                                     Hot:
                                 </span>
                                 <div className="flex min-w-0 flex-1 gap-2 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                                    {["RTX 5090", "Ryzen 9 9950X", "DDR5 32GB", "Gen5 NVMe", "X870E"].map((term) => (
+                                    {["1TB NVMe", "DDR5 Ram", "Wireless Mouse", "Gen5 NVMe", "X870E"].map((term) => (
                                         <button
                                             key={term}
                                             type="button"
@@ -461,30 +477,39 @@ export default function Home() {
                         </div>
 
                         {/* Category cards */}
-                        <div className="border-t border-white/[0.05] px-4 pb-4 pt-3 sm:px-7 sm:pb-7 sm:pt-4 lg:px-10 lg:pb-8">
-                            <p className="mb-2.5 font-mono text-[10px] uppercase tracking-widest text-[#4a4a4a] sm:mb-3">
-                                Which lane are you shopping?
+                        <div className="border-t border-white/[0.05] px-4 pb-5 pt-4 sm:px-7 sm:pb-8 sm:pt-5 lg:px-10 lg:pb-9">
+                            <p className="mb-2.5 font-mono text-[10px] uppercase tracking-[0.18em] text-[#565656] sm:mb-3">
+                                Which lane are you shopping?  - Browse by Category
                             </p>
-                            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4 sm:gap-3">
+                            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4 sm:gap-3.5">
                                 {categories.map((category) => {
-                                    const Icon = category.icon;
                                     return (
                                         <Link
                                             key={category.slug}
                                             href={`/shop/${category.slug}`}
-                                            className="group relative flex min-h-[5.5rem] flex-col items-start gap-2 overflow-hidden rounded-xl border border-white/[0.07] bg-[#161616] p-3 transition hover:border-[#D12B28]/40 hover:bg-[#1A1A1A] sm:min-h-0 sm:gap-3 sm:p-4"
+                                            className="group relative flex min-h-[6.5rem] flex-col items-start gap-2.5 overflow-visible rounded-xl border border-white/[0.1] bg-[linear-gradient(155deg,#1b1b1b_0%,#151515_55%,#101010_100%)] p-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] transition-all duration-300 hover:-translate-y-0.5 hover:border-[#D12B28]/50 hover:shadow-[0_14px_30px_rgba(0,0,0,0.42),0_0_0_1px_rgba(209,43,40,0.12)] sm:min-h-0 sm:gap-3 sm:p-4"
                                         >
-                                            <div className="pointer-events-none absolute right-0 top-0 h-20 w-20 translate-x-6 -translate-y-6 rounded-full bg-[#D12B28]/0 blur-2xl transition-all duration-500 group-hover:bg-[#D12B28]/15" />
+                                            <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(145deg,rgba(255,255,255,0.04)_0%,rgba(255,255,255,0)_45%)]" />
+                                            <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_top,rgba(0,0,0,0.52)_0%,rgba(0,0,0,0.18)_55%,rgba(0,0,0,0)_100%)]" />
+                                            <div className="pointer-events-none absolute -left-8 bottom-0 h-20 w-20 translate-y-6 rounded-full bg-white/[0.03] blur-2xl" />
+                                            <div className="pointer-events-none absolute right-0 top-0 h-24 w-24 translate-x-6 -translate-y-6 rounded-full bg-[#D12B28]/0 blur-2xl transition-all duration-500 group-hover:bg-[#D12B28]/18" />
+                                            <div className={`pointer-events-none absolute z-[2] opacity-90 transition-all duration-500 group-hover:opacity-100 ${category.imageClassName}`} aria-hidden>
+                                                <Image
+                                                    src={withLogoCacheBust(category.imageSrc)}
+                                                    alt=""
+                                                    fill
+                                                    className="object-contain drop-shadow-[0_14px_34px_rgba(209,43,40,0.36)] transition-transform duration-500 group-hover:scale-105"
+                                                    sizes="120px"
+                                                />
+                                            </div>
                                             <div className="relative z-10 flex w-full items-start justify-between gap-2">
-                                                <span className="inline-block max-w-[min(100%,11rem)] rounded-md border border-[#D12B28]/35 bg-gradient-to-br from-[#D12B28]/22 via-[#D12B28]/10 to-white/[0.04] px-2 py-1.5 text-left text-[12px] font-bold leading-snug tracking-tight text-white shadow-[0_0_24px_rgba(209,43,40,0.12),inset_0_1px_0_rgba(255,255,255,0.06)] sm:px-2.5 sm:text-[15px]">
+                                                <span className="inline-block max-w-[min(100%,11rem)] rounded-md border border-[#D12B28]/35 bg-gradient-to-br from-[#D12B28]/26 via-[#D12B28]/12 to-white/[0.04] px-2.5 py-1.5 text-left text-[12px] font-semibold leading-snug tracking-tight text-white shadow-[0_0_24px_rgba(209,43,40,0.12),inset_0_1px_0_rgba(255,255,255,0.08)] sm:px-3 sm:text-[14px]">
                                                     {category.label}
                                                 </span>
-                                                <div className="shrink-0 rounded-lg border border-white/[0.07] bg-white/[0.04] p-2 transition group-hover:border-[#D12B28]/30 group-hover:bg-[#D12B28]/10">
-                                                    <Icon className="h-4 w-4 text-[#D12B28]" />
-                                                </div>
                                             </div>
-                                            <span className="relative z-10 flex items-center gap-1 text-[11px] font-medium text-[#5C5C5C] transition group-hover:text-[#D12B28]">
-                                                Browse <ArrowRight className="h-3 w-3" />
+                                            <span className="relative z-10 mt-auto flex items-center gap-1.5 text-[11px] font-medium text-[#8A8A8A] transition-colors duration-300 group-hover:text-[#D12B28]">
+                                                Browse
+                                                <ArrowRight className="h-3 w-3 transition-transform duration-300 group-hover:translate-x-0.5" />
                                             </span>
                                         </Link>
                                     );
@@ -506,7 +531,7 @@ export default function Home() {
                             watermarkAlign="right"
                             eyebrow="Spotlight"
                             title="Hand-picked hardware"
-                            description="Fresh drops and standout SKUs we would put in our own rigs, same cards, cleaner path to checkout."
+                            description="Clean selection. Proven performance."
                         />
                         <Link
                             href="/shop"
@@ -605,7 +630,7 @@ export default function Home() {
                         watermark="TRUST"
                         watermarkAlign="right"
                         eyebrow="Why shop here"
-                        title="More than a parts list"
+                        title="It's not just another Computer shop"
                         description="From inventory to delivery, the experience is built for people who actually assemble systems, not just scroll specs."
                     />
                     <div className="grid gap-3 sm:grid-cols-2 sm:gap-5">
