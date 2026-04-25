@@ -180,8 +180,8 @@ export default function Home() {
         {
             label: "RAM",
             slug: "ram",
-            imageSrc: "https://res.cloudinary.com/dwuxumj4x/image/upload/v1775212592/omniware/products/zydk9yfwxpndsnee7pjb.webp",
-            imageClassName: "h-[6.2rem] w-[6.2rem] right-[0.65rem] top-[53%] -translate-y-1/2 rotate-[8deg] group-hover:right-[-0.6rem] group-hover:-translate-y-[62%] group-hover:scale-[1.2]",
+            imageSrc: "https://res.cloudinary.com/dwuxumj4x/image/upload/v1771681365/omniware/products/mfwwjba89hx1srcm0rwm.webp",
+            imageClassName: "h-[8.3rem] w-[8.3rem] right-[0.65rem] top-[53%] -translate-y-1/2 rotate-[8deg] group-hover:right-[-0.6rem] group-hover:-translate-y-[62%] group-hover:scale-[1.2]",
         },
         {
             label: "Mouse",
@@ -481,13 +481,13 @@ export default function Home() {
                             <p className="mb-2.5 font-mono text-[10px] uppercase tracking-[0.18em] text-[#565656] sm:mb-3">
                                 Which lane are you shopping?  - Browse by Category
                             </p>
-                            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4 sm:gap-3.5">
+                            <div className="relative isolate grid grid-cols-2 gap-2.5 sm:grid-cols-4 sm:gap-3.5">
                                 {categories.map((category) => {
                                     return (
                                         <Link
                                             key={category.slug}
                                             href={`/shop/${category.slug}`}
-                                            className="group relative flex min-h-[6.5rem] flex-col items-start gap-2.5 overflow-visible rounded-xl border border-white/[0.1] bg-[linear-gradient(155deg,#1b1b1b_0%,#151515_55%,#101010_100%)] p-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] transition-all duration-300 hover:-translate-y-0.5 hover:border-[#D12B28]/50 hover:shadow-[0_14px_30px_rgba(0,0,0,0.42),0_0_0_1px_rgba(209,43,40,0.12)] sm:min-h-0 sm:gap-3 sm:p-4"
+                                            className="group relative z-0 flex min-h-[6.5rem] flex-col items-start gap-2.5 overflow-visible rounded-xl border border-white/[0.1] bg-[linear-gradient(155deg,#1b1b1b_0%,#151515_55%,#101010_100%)] p-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] transition-all duration-300 hover:z-30 hover:-translate-y-0.5 hover:border-[#D12B28]/50 hover:shadow-[0_14px_30px_rgba(0,0,0,0.42),0_0_0_1px_rgba(209,43,40,0.12)] sm:min-h-0 sm:gap-3 sm:p-4"
                                         >
                                             <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(145deg,rgba(255,255,255,0.04)_0%,rgba(255,255,255,0)_45%)]" />
                                             <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_top,rgba(0,0,0,0.52)_0%,rgba(0,0,0,0.18)_55%,rgba(0,0,0,0)_100%)]" />
