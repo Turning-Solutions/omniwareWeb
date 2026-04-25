@@ -228,6 +228,14 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                 const firstCategory = Array.isArray(data.categoryIds) ? data.categoryIds[0] : null;
                 const categoryDiscountPercent = firstCategory?.discountPercent != null ? String(firstCategory.discountPercent) : "";
                 setInitialCategoryDiscountPercent(categoryDiscountPercent);
+                const rawCategoryIds: string[] =
+                    data.categoryIds
+                        ?.map((c: { _id?: string } & string) => (typeof c === "string" ? c : c?._id))
+                        .filter(Boolean)
+                        .map((id) => String(id)) ?? [];
+                // Single category dropdown: keep only the primary id so a save does not re-post stray ids (e.g. legacy / migration).
+                const categoryIdsForForm = rawCategoryIds.length > 0 ? [rawCategoryIds[0]] : [];
+
                 setFormData({
                     title: data.title ?? "",
                     price: data.price != null ? String(data.price) : "",
@@ -238,7 +246,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                     description: data.description ?? "",
                     warranty: data.warranty ?? "",
                     brandId: data.brandId?._id || data.brandId || "",
-                    categoryIds: data.categoryIds?.map((c: any) => c._id || c) || [], // eslint-disable-line @typescript-eslint/no-explicit-any
+                    categoryIds: categoryIdsForForm,
                     categoryDiscountPercent,
                     attributeGroups,
                     filterSpecs,
@@ -282,7 +290,8 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
             const parsedPrice = parseFloat(formData.price);
             const parsedStockQty = parseInt(formData.stock, 10);
             const normalizedBrandId = formData.brandId.trim();
-            const normalizedCategoryIds = formData.categoryIds.map((categoryId) => categoryId.trim()).filter(Boolean);
+            const primaryCategoryId = formData.categoryIds[0]?.trim();
+            const normalizedCategoryIds = primaryCategoryId ? [primaryCategoryId] : [];
             const hasIncompleteAttributeValue = formData.attributeGroups.some((group) =>
                 group.attributes.some((attribute) => {
                     const hasAnyValue = attribute.name.trim() || attribute.value.trim();
