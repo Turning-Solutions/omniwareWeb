@@ -230,9 +230,15 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                 setInitialCategoryDiscountPercent(categoryDiscountPercent);
                 const rawCategoryIds: string[] =
                     data.categoryIds
-                        ?.map((c: { _id?: string } & string) => (typeof c === "string" ? c : c?._id))
-                        .filter(Boolean)
-                        .map((id) => String(id)) ?? [];
+                        ?.map((c: unknown) => {
+                            if (typeof c === "string") return c;
+                            if (c && typeof c === "object" && "_id" in c) {
+                                const maybeId = (c as { _id?: unknown })._id;
+                                return typeof maybeId === "string" ? maybeId : undefined;
+                            }
+                            return undefined;
+                        })
+                        .filter((id): id is string => Boolean(id)) ?? [];
                 // Single category dropdown: keep only the primary id so a save does not re-post stray ids (e.g. legacy / migration).
                 const categoryIdsForForm = rawCategoryIds.length > 0 ? [rawCategoryIds[0]] : [];
 
