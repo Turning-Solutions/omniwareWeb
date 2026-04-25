@@ -18,7 +18,6 @@ import {
 import { useProducts } from "@/hooks/useProducts";
 import ProductCard from "@/components/ProductCard";
 import PromotionStripe from "@/components/PromotionStripe";
-import LoadingAnimation from "@/components/LoadingAnimation";
 import FlowSectionHeader from "@/components/FlowSectionHeader";
 import ShopReviewsStrip from "@/components/ShopReviewsStrip";
 import ReviewForm from "@/components/reviews/ReviewForm";
@@ -47,7 +46,7 @@ export default function Home() {
     const [previewQuery, setPreviewQuery] = useState("");
     const [topBrands, setTopBrands] = useState<Array<{ _id?: string; name: string; logoUrl?: string }>>([]);
 
-    const { data: featuredData, isLoading: loadingFeatured, isFetching: fetchingFeatured } = useProducts({
+    const { data: featuredData, isLoading: loadingFeatured } = useProducts({
         limit: FEATURED_PRODUCTS_LIMIT,
         sort: "newest",
         isFeatured: true,
@@ -612,11 +611,6 @@ export default function Home() {
                                         ))}
                                     </div>
                                 </div>
-                                {fetchingFeatured && (
-                                    <div className="pointer-events-none absolute inset-0 rounded-xl bg-[#0c0c0c]/55">
-                                        <LoadingAnimation size="sm" label="Updating featured..." className="h-full" />
-                                    </div>
-                                )}
                             </div>
                         )}
                     </div>

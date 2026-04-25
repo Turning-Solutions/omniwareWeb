@@ -117,11 +117,8 @@ function ProductPageInner({ params }: { params: Promise<{ slug: string }> }) {
             <div className="relative flex min-h-screen flex-col overflow-x-hidden bg-[#0a0a0a] text-[#F1F1F1]">
                 <div className="relative flex flex-1 flex-col bg-[linear-gradient(180deg,#080808_0%,#0c0c0c_18%,#101010_45%,#0d0d0d_72%,#0a0a0a_100%)] pt-24 pb-16">
                     {shellDecor}
-                    <div className="mx-auto max-w-7xl flex-1 px-4 sm:px-6 lg:px-8">
-                        <div className="relative overflow-hidden rounded-[1.75rem] border border-white/[0.07] bg-[#0c0c0c]/85 p-12 shadow-[0_24px_70px_rgba(0,0,0,0.45)]">
-                            <div className="pointer-events-none absolute -right-20 top-1/2 h-48 w-48 -translate-y-1/2 rounded-full bg-[#D12B28]/[0.06] blur-3xl" aria-hidden />
-                            <LoadingAnimation size="lg" label="Loading product..." className="h-56" />
-                        </div>
+                    <div className="mx-auto flex w-full max-w-7xl flex-1 items-center justify-center px-4 sm:px-6 lg:px-8">
+                        <LoadingAnimation size="lg" label="Loading product..." />
                     </div>
                 </div>
             </div>
