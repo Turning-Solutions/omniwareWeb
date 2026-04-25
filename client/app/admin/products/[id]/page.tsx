@@ -238,7 +238,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                             }
                             return undefined;
                         })
-                        .filter((id): id is string => Boolean(id)) ?? [];
+                        .filter((id: string | undefined): id is string => Boolean(id)) ?? [];
                 // Single category dropdown: keep only the primary id so a save does not re-post stray ids (e.g. legacy / migration).
                 const categoryIdsForForm = rawCategoryIds.length > 0 ? [rawCategoryIds[0]] : [];
 
