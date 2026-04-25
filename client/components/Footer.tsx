@@ -111,6 +111,11 @@ export default function Footer() {
                                     FAQs
                                 </Link>
                             </li>
+                            <li>
+                                <Link href="/pickup-and-delivery" className="text-base text-gray-400 hover:text-white">
+                                    Pickup &amp; Delivery
+                                </Link>
+                            </li>
                         </ul>
                     </div>
                     <div>

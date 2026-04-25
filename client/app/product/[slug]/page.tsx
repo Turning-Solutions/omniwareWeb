@@ -370,10 +370,16 @@ function ProductPageInner({ params }: { params: Promise<{ slug: string }> }) {
                     {availability === "pre_order" && (
                         <div className="mb-6 flex gap-3 rounded-2xl border border-yellow-400/25 bg-yellow-500/[0.07] px-4 py-3 text-sm text-yellow-100/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
                             <Clock className="mt-0.5 h-4 w-4 shrink-0 text-yellow-400" aria-hidden />
-                            <p>
-                                <span className="font-semibold text-yellow-200">Pre-order.</span> Fulfillment is
-                                usually within ~72 hours after your order is confirmed.
-                            </p>
+                            <div className="space-y-2">
+                                <p>
+                                    This product is fulfilled via pre-order and is usually delivered within ~72 hours after
+                                    your order is confirmed.
+                                </p>
+                                <p>
+                                    Please note that prices may change based on supplier rates and availability. We will
+                                    always confirm the final price with you before proceeding.
+                                </p>
+                            </div>
                         </div>
                     )}
 
