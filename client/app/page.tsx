@@ -30,8 +30,8 @@ const FEATURED_PRODUCTS_LIMIT = 16;
 const FEATURED_AUTO_SCROLL_MS = 4500;
 /** Per-step transform duration (ms). */
 const FEATURED_SLIDE_TRANSITION_MS = 520;
-/** Triplicate featured slides so we can keep the visible index in the middle copy and recenter invisibly. */
-const FEATURED_LOOP_COPIES = 3;
+/** Render extra copies so we can recenter off-screen and keep the loop feeling continuous. */
+const FEATURED_LOOP_COPIES = 5;
 
 /**
  * Appends an optional cache-busting query string to partner logo URLs.
@@ -76,12 +76,13 @@ export default function Home() {
     const jumpTo = useCallback((index: number) => {
         featuredIndexRef.current = index;
         setFeaturedAnimate(false);
-        requestAnimationFrame(() =>
+        requestAnimationFrame(() => {
+            setFeaturedOffset(readOffset(index));
+            // Re-enable transitions on the following frame so recentering never animates backward.
             requestAnimationFrame(() => {
-                setFeaturedOffset(readOffset(index));
                 setFeaturedAnimate(true);
-            })
-        );
+            });
+        });
     }, [readOffset]);
 
     const slideTo = useCallback((index: number) => {
@@ -91,7 +92,7 @@ export default function Home() {
         });
     }, [readOffset]);
 
-    // On load: jump silently to the first item of the middle copy.
+    // On load: jump silently to the first item of the center copy.
     useEffect(() => {
         if (baseFeaturedCount <= 1) {
             featuredIndexRef.current = 0;
@@ -99,7 +100,7 @@ export default function Home() {
             setFeaturedAnimate(false);
             return;
         }
-        jumpTo(baseFeaturedCount);
+        jumpTo(baseFeaturedCount * 2);
     }, [baseFeaturedCount, jumpTo]);
 
     // Re-measure on resize so offsets stay accurate.
@@ -122,13 +123,13 @@ export default function Home() {
         return () => window.clearInterval(intervalId);
     }, [baseFeaturedCount, loadingFeatured, slideTo]);
 
-    // After each animated step: silently recenter into the middle copy.
+    // After each animated step: silently recenter into the center copy.
     const handleFeaturedTransitionEnd = useCallback((event: React.TransitionEvent<HTMLDivElement>) => {
         if (event.propertyName !== "transform") return;
         if (baseFeaturedCount <= 1) return;
         const current = featuredIndexRef.current;
-        const minIdx = baseFeaturedCount;
-        const maxIdx = baseFeaturedCount * 2 - 1;
+        const minIdx = baseFeaturedCount * 2;
+        const maxIdx = baseFeaturedCount * 3 - 1;
         if (current >= minIdx && current <= maxIdx) return;
         const recentered = current > maxIdx
             ? current - baseFeaturedCount
@@ -522,7 +523,7 @@ export default function Home() {
 
             {/* Featured — same visual chapter as discover */}
             <section className="relative py-10 sm:py-16 lg:py-20" aria-labelledby="featured-heading">
-                <div className="mx-auto max-w-[92rem] px-3 sm:px-6 lg:px-8">
+                <div className="mx-auto max-w-[96rem] px-3 sm:px-6 lg:px-8">
                     <div className="mb-6 flex flex-col gap-4 sm:mb-10 sm:flex-row sm:items-end sm:justify-between sm:gap-6 lg:mb-12">
                         <FlowSectionHeader
                             className="mb-0 min-w-0 sm:mb-0 sm:flex-1 lg:mb-0"
@@ -579,7 +580,7 @@ export default function Home() {
                                     </button>
                                 </div>
                                 <div
-                                    className="overflow-hidden pb-2 pt-3"
+                                    className="overflow-hidden px-12 pb-2 pt-3 sm:px-14 lg:px-0"
                                     role="region"
                                     aria-roledescription="carousel"
                                     aria-label="Featured products"
