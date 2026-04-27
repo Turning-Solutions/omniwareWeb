@@ -1015,19 +1015,6 @@ export default function DynamicFilterSidebar({
         });
         return out;
     }, [mainEntries, categoryBaselineCounts, mainCategoryBaselineByLayout]);
-    useEffect(() => {
-        const storageMain = stableMainCategoryEntries.find(
-            (entry) =>
-                entry.node.type === "category" &&
-                (entry.node.facet.value === "storage" || entry.node.facet.label.toLowerCase() === "storage")
-        );
-        const storageSubs = subForest
-            .filter((n) => n.type === "category")
-            .map((n) => ({ value: n.facet.value, label: n.facet.label, count: n.facet.count }));
-        // #region agent log
-        fetch('http://127.0.0.1:7405/ingest/fc9bb09e-38e3-439b-a2a2-45095cb5014e',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'9a1013'},body:JSON.stringify({sessionId:'9a1013',runId:'run-count-debug',hypothesisId:'C2',location:'client/components/DynamicFilterSidebar.tsx:categorySidebarParts',message:'Sidebar category counts resolved',data:{selectedCategory:typeof filters.category==='string'?filters.category:null,selectedSubcategories:typeof filters.subcategories==='string'?filters.subcategories:null,storageMain:storageMain&&storageMain.node.type==='category'?{value:storageMain.node.facet.value,label:storageMain.node.facet.label,count:storageMain.node.facet.count}:null,subMode,storageSubs,rawStorageFacet:(facets.categories||[]).filter((c)=>['storage','internal-storage','external-storage','hdd','sata-ssd','nvme-ssd'].includes(String(c.value))).map((c)=>({value:c.value,label:c.label,count:c.count}))},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
-    }, [stableMainCategoryEntries, subForest, subMode, filters.category, filters.subcategories, facets.categories]);
 
     // Only show sub-tree nodes whose every collapsible ancestor is currently expanded.
     const visibleSubForest = useMemo(

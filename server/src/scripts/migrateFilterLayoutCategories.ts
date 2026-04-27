@@ -43,132 +43,18 @@ loadEnv();
 
 type CatRef = { _id: mongoose.Types.ObjectId; slug: string; name: string };
 
-function postDebugLog(
-    location: string,
-    message: string,
-    data: Record<string, unknown>,
-    hypothesisId: string,
-    runId = 'initial'
-): void {
-    fetch('http://127.0.0.1:7405/ingest/fc9bb09e-38e3-439b-a2a2-45095cb5014e',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e5794d'},body:JSON.stringify({sessionId:'e5794d',runId,hypothesisId,location,message,data,timestamp:Date.now()})}).catch(()=>{});
-}
-
 async function connect(): Promise<void> {
-    // #region agent log
-    postDebugLog(
-        'server/src/scripts/migrateFilterLayoutCategories.ts:connect:entry',
-        'migration connect entry',
-        {
-            hasMongoUri: Boolean(process.env.MONGODB_URI?.trim()),
-            hasMongoUriDirect: Boolean(process.env.MONGODB_URI_DIRECT?.trim()),
-            hasDnsServersOverride: Boolean(process.env.MONGODB_DNS_SERVERS?.trim()),
-            uriScheme: process.env.MONGODB_URI?.trim().startsWith('mongodb+srv://')
-                ? 'mongodb+srv'
-                : process.env.MONGODB_URI?.trim().startsWith('mongodb://')
-                ? 'mongodb'
-                : 'unknown',
-        },
-        'H1'
-    );
-    // #endregion
     if (!process.env.MONGODB_URI) {
-        // #region agent log
-        postDebugLog(
-            'server/src/scripts/migrateFilterLayoutCategories.ts:connect:missing-uri',
-            'missing mongo uri',
-            {},
-            'H5'
-        );
-        // #endregion
         throw new Error('MONGODB_URI is not set.');
     }
     let connectUri = process.env.MONGODB_URI;
     if (process.env.MONGODB_URI_DIRECT?.trim()) {
         connectUri = process.env.MONGODB_URI_DIRECT.trim();
-        // #region agent log
-        postDebugLog(
-            'server/src/scripts/migrateFilterLayoutCategories.ts:connect:direct-uri',
-            'using direct mongo uri override',
-            { usingDirectUri: true },
-            'H4',
-            'post-fix'
-        );
-        // #endregion
     } else if (/^mongodb\+srv:\/\//i.test(process.env.MONGODB_URI)) {
-        try {
-            connectUri = await expandMongoSrvUri(process.env.MONGODB_URI);
-            // #region agent log
-            postDebugLog(
-                'server/src/scripts/migrateFilterLayoutCategories.ts:connect:expanded-uri',
-                'expanded srv uri to seed list',
-                {
-                    usedSrvExpansion: true,
-                    expandedScheme: connectUri.startsWith('mongodb://') ? 'mongodb' : 'other',
-                },
-                'H4',
-                'post-fix'
-            );
-            // #endregion
-        } catch (err) {
-            const e = err as NodeJS.ErrnoException;
-            // #region agent log
-            postDebugLog(
-                'server/src/scripts/migrateFilterLayoutCategories.ts:connect:expand-error',
-                'srv expansion failed before mongoose connect',
-                {
-                    code: e.code ?? null,
-                    syscall: e.syscall ?? null,
-                    hostname: (e as unknown as { hostname?: string }).hostname ?? null,
-                    message: e.message,
-                },
-                'H3',
-                'post-fix'
-            );
-            // #endregion
-            throw err;
-        }
+        connectUri = await expandMongoSrvUri(process.env.MONGODB_URI);
     }
 
-    try {
-        // #region agent log
-        postDebugLog(
-            'server/src/scripts/migrateFilterLayoutCategories.ts:connect:before-mongoose',
-            'attempting mongoose connect',
-            {
-                usingRawMongoUri: connectUri === process.env.MONGODB_URI,
-                usingExpandedSrvUri: connectUri !== process.env.MONGODB_URI && connectUri.startsWith('mongodb://'),
-                uriPrefix: connectUri.slice(0, Math.min(18, connectUri.length)),
-            },
-            connectUri === process.env.MONGODB_URI ? 'H2' : 'H4',
-            'post-fix'
-        );
-        // #endregion
-        await mongoose.connect(connectUri);
-    } catch (err) {
-        const e = err as NodeJS.ErrnoException;
-        // #region agent log
-        postDebugLog(
-            'server/src/scripts/migrateFilterLayoutCategories.ts:connect:error',
-            'mongoose connect failed',
-            {
-                code: e.code ?? null,
-                syscall: e.syscall ?? null,
-                hostname: (e as unknown as { hostname?: string }).hostname ?? null,
-                message: e.message,
-            },
-            e.message.includes('querySrv') ? 'H3' : 'H4'
-        );
-        // #endregion
-        throw err;
-    }
-    // #region agent log
-    postDebugLog(
-        'server/src/scripts/migrateFilterLayoutCategories.ts:connect:success',
-        'mongoose connect succeeded',
-        { host: mongoose.connection.host },
-        'H4'
-    );
-    // #endregion
+    await mongoose.connect(connectUri);
     console.log(`[migrate:filter-layout] Connected to ${mongoose.connection.host}`);
 }
 

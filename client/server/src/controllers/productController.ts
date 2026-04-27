@@ -560,10 +560,6 @@ export const getProductFacets = async (req: Request, res: Response) => {
             availability: data.availability || [],
             specs: specsFacet
         };
-        // #region agent log
-        fetch('http://127.0.0.1:7405/ingest/fc9bb09e-38e3-439b-a2a2-45095cb5014e',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'9a1013'},body:JSON.stringify({sessionId:'9a1013',runId:'run-count-debug',hypothesisId:'C1',location:'client/server/src/controllers/productController.ts:getProductFacets',message:'Facet categories generated',data:{queryCategory:req.query.category??null,querySpec:(req.query as any).spec??null,categoryFacetSample:(finalFacets.categories||[]).filter((c:any)=>['storage','internal-storage','external-storage','hdd','sata-ssd','nvme-ssd'].includes(String(c?.value))).map((c:any)=>({value:c.value,label:c.label,count:c.count})),categoryFacetTotal:(finalFacets.categories||[]).length},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
-
 
         res.json({
             categoryKey: categoryKeyForSpecsFacets ?? (typeof category === 'string' ? category : null),
