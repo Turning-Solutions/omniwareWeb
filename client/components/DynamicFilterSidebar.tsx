@@ -17,6 +17,10 @@ interface DynamicFilterSidebarProps {
     setFilters: (filters: any) => void; // eslint-disable-line @typescript-eslint/no-explicit-any
     isOpen: boolean;
     onClose: () => void;
+    /** Prefetch shop list + facets when hovering a main category row (matches click outcome). */
+    onCategoryPrefetchEnter?: (facetValue: string) => void;
+    /** Prefetch when hovering a subcategory row (toggle outcome vs current selection). */
+    onSubcategoryPrefetchEnter?: (facetValue: string) => void;
 }
 
 /** Count active filters (excluding search/sort/page) for badge and toolbar */
@@ -144,14 +148,18 @@ function FilterCheckbox({
     onChange,
     label,
     count,
+    onPrefetchPointerEnter,
 }: {
     checked: boolean;
     onChange: () => void;
     label: string;
     count?: number;
+    onPrefetchPointerEnter?: () => void;
 }) {
     return (
-        <label className={`group flex cursor-pointer items-center gap-2.5 rounded-lg py-1.5 px-2 transition-all duration-150 ${
+        <label
+            onPointerEnter={onPrefetchPointerEnter}
+            className={`group flex cursor-pointer items-center gap-2.5 rounded-lg py-1.5 px-2 transition-all duration-150 ${
             checked
                 ? "bg-accent/10 ring-1 ring-accent/20"
                 : "hover:bg-white/[0.05] ring-1 ring-transparent"
@@ -188,6 +196,7 @@ function FilterRadio({
     name,
     label,
     count,
+    onPrefetchPointerEnter,
 }: {
     checked: boolean;
     onChange: () => void;
@@ -195,9 +204,12 @@ function FilterRadio({
     name: string;
     label: string;
     count?: number;
+    onPrefetchPointerEnter?: () => void;
 }) {
     return (
-        <label className={`group flex cursor-pointer items-center gap-2.5 rounded-lg py-1.5 px-2 transition-all duration-150 ${
+        <label
+            onPointerEnter={onPrefetchPointerEnter}
+            className={`group flex cursor-pointer items-center gap-2.5 rounded-lg py-1.5 px-2 transition-all duration-150 ${
             checked
                 ? "bg-accent/10 ring-1 ring-accent/25"
                 : "hover:bg-white/[0.05] ring-1 ring-transparent"
@@ -722,6 +734,8 @@ export default function DynamicFilterSidebar({
     setFilters,
     isOpen,
     onClose,
+    onCategoryPrefetchEnter,
+    onSubcategoryPrefetchEnter,
 }: DynamicFilterSidebarProps) {
     const [priceRange, setPriceRange] = useState<{ min: number; max: number }>({ min: 0, max: 0 });
     const [sectionSearch, setSectionSearch] = useState<Record<string, string>>({});
@@ -1181,6 +1195,11 @@ export default function DynamicFilterSidebar({
                                                             }}
                                                             label={node.facet.label}
                                                             count={node.facet.count}
+                                                            onPrefetchPointerEnter={
+                                                                onCategoryPrefetchEnter
+                                                                    ? () => onCategoryPrefetchEnter(node.facet.value)
+                                                                    : undefined
+                                                            }
                                                         />
                                                     </div>
                                                 </div>
@@ -1254,6 +1273,11 @@ export default function DynamicFilterSidebar({
                                                                 onChange={() => handleSubcategoryToggle(node.facet.value)}
                                                                 label={node.facet.label}
                                                                 count={node.facet.count}
+                                                                onPrefetchPointerEnter={
+                                                                    onSubcategoryPrefetchEnter
+                                                                        ? () => onSubcategoryPrefetchEnter(node.facet.value)
+                                                                        : undefined
+                                                                }
                                                             />
                                                         </div>
                                                         {node.hasChildren ? (

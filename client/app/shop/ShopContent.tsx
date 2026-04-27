@@ -1,7 +1,14 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { useProducts, useProductFacets, type Facets } from "@/hooks/useProducts";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+    getProductFacetsQueryOptions,
+    getProductsQueryOptions,
+    useProducts,
+    useProductFacets,
+    type Facets,
+} from "@/hooks/useProducts";
 import ProductCard from "@/components/ProductCard";
 import DynamicFilterSidebar, { countActiveFilters } from "@/components/DynamicFilterSidebar";
 import LoadingAnimation from "@/components/LoadingAnimation";
@@ -10,6 +17,7 @@ import { SHOP_PRODUCTS_PER_PAGE } from "@/lib/shopConstants";
 
 const SEARCH_DEBOUNCE_MS = 380;
 const SHOP_RETURN_STATE_PREFIX = "shop:return-state:";
+const SHOP_LIST_STALE_MS = 2 * 60 * 1000;
 
 type Filters = Record<string, any>;
 
@@ -62,6 +70,66 @@ export function ShopContent({
         window.sessionStorage.setItem(returnStateStorageKey, JSON.stringify(filtersRef.current));
         window.sessionStorage.setItem(`${returnStateStorageKey}:pending`, "1");
     }, [returnStateStorageKey]);
+
+    const queryClient = useQueryClient();
+
+    const prefetchShopListState = useCallback(
+        (next: Filters) => {
+            const listOpts = getProductsQueryOptions({
+                ...next,
+                limit: SHOP_PRODUCTS_PER_PAGE,
+                includeFacets: false,
+            });
+            const facetOpts = getProductFacetsQueryOptions(next);
+            void queryClient.prefetchQuery({ ...listOpts, staleTime: SHOP_LIST_STALE_MS });
+            void queryClient.prefetchQuery({ ...facetOpts, staleTime: SHOP_LIST_STALE_MS });
+        },
+        [queryClient]
+    );
+
+    const prefetchCategoryHover = useCallback(
+        (facetValue: string) => {
+            const cur = filtersRef.current;
+            let next: Filters;
+            if (cur.category === facetValue) {
+                next = { ...cur, page: 1 };
+                delete next.category;
+                delete next.subcategories;
+                delete next.brand;
+                delete next.spec;
+            } else {
+                next = { ...cur, category: facetValue, page: 1 };
+                delete next.subcategories;
+                delete next.brand;
+                delete next.spec;
+            }
+            prefetchShopListState(next);
+        },
+        [prefetchShopListState]
+    );
+
+    const prefetchSubcategoryHover = useCallback(
+        (value: string) => {
+            const cur = filtersRef.current;
+            const raw = typeof cur.subcategories === "string" ? cur.subcategories : "";
+            const current = raw.split(",").filter(Boolean);
+            const nextList = current.includes(value)
+                ? current.filter((v: string) => v !== value)
+                : [...current, value];
+            const next: Filters = { ...cur, page: 1, subcategories: nextList.join(",") };
+            if (nextList.length === 0) delete next.subcategories;
+            prefetchShopListState(next);
+        },
+        [prefetchShopListState]
+    );
+
+    const prefetchPageHover = useCallback(
+        (page: number) => {
+            if (page < 1) return;
+            prefetchShopListState({ ...filtersRef.current, page });
+        },
+        [prefetchShopListState]
+    );
 
     // Fetch products first (fast path without expensive facets aggregation)
     const {
@@ -324,6 +392,8 @@ export function ShopContent({
                     setFilters={setFilters}
                     isOpen={isSidebarOpen}
                     onClose={() => setIsSidebarOpen(false)}
+                    onCategoryPrefetchEnter={prefetchCategoryHover}
+                    onSubcategoryPrefetchEnter={prefetchSubcategoryHover}
                 />
 
                 <div ref={productsTopRef} className="flex-1 min-w-0 space-y-6">
@@ -449,6 +519,11 @@ export function ShopContent({
                                         <button
                                             type="button"
                                             onClick={() => goToPage(currentPage - 1)}
+                                            onPointerEnter={
+                                                currentPage > 1
+                                                    ? () => prefetchPageHover(currentPage - 1)
+                                                    : undefined
+                                            }
                                             disabled={currentPage <= 1}
                                             className={`inline-flex items-center gap-1 rounded-full px-3 py-2 text-sm font-medium transition-colors ${
                                                 currentPage <= 1
@@ -470,6 +545,11 @@ export function ShopContent({
                                                         type="button"
                                                         key={p}
                                                         onClick={() => goToPage(p as number)}
+                                                        onPointerEnter={
+                                                            p !== currentPage
+                                                                ? () => prefetchPageHover(p as number)
+                                                                : undefined
+                                                        }
                                                         className={`flex h-9 min-w-9 items-center justify-center rounded-full text-sm font-medium transition-colors ${
                                                             p === currentPage
                                                                 ? "bg-[#D12B28] text-[#F1F1F1] shadow-sm shadow-[#D12B28]/25"
@@ -484,6 +564,11 @@ export function ShopContent({
                                         <button
                                             type="button"
                                             onClick={() => goToPage(currentPage + 1)}
+                                            onPointerEnter={
+                                                currentPage < totalPages
+                                                    ? () => prefetchPageHover(currentPage + 1)
+                                                    : undefined
+                                            }
                                             disabled={currentPage >= totalPages}
                                             className={`inline-flex items-center gap-1 rounded-full px-3 py-2 text-sm font-medium transition-colors ${
                                                 currentPage >= totalPages

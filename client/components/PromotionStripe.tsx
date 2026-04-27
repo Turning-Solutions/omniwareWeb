@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { ArrowRight, ChevronLeft, ChevronRight, Clock, X, Zap } from "lucide-react";
 import api from "@/lib/api";
@@ -43,23 +44,29 @@ const textSlide = {
 
 const transition = { duration: 0.62, ease: [0.22, 1, 0.36, 1] as const };
 
+const PROMOTIONS_STALE_MS = 20 * 60 * 1000;
+
 interface PromotionStripeProps {
     asHero?: boolean;
 }
 
 export default function PromotionStripe({ asHero = false }: PromotionStripeProps) {
-    const [promotions, setPromotions] = useState<Promotion[]>([]);
-    const [loading,    setLoading]    = useState(true);
+    const { data: promotions = [], isPending: loading } = useQuery({
+        queryKey: ["promotions", "active"] as const,
+        queryFn: async () => {
+            try {
+                const res = await api.get<Promotion[]>("/promotions/active");
+                return Array.isArray(res.data) ? res.data : [];
+            } catch {
+                return [];
+            }
+        },
+        staleTime: PROMOTIONS_STALE_MS,
+    });
+
     const [activeIndex, setActiveIndex] = useState(0);
     const [direction,   setDirection]   = useState(1);
     const [isDetailsOpen, setIsDetailsOpen] = useState(false);
-
-    useEffect(() => {
-        api.get("/promotions/active")
-            .then(res => setPromotions(res.data))
-            .catch(() => setPromotions([]))
-            .finally(() => setLoading(false));
-    }, []);
 
     const safeIndex = useMemo(() => {
         if (promotions.length === 0) return 0;

@@ -163,9 +163,9 @@ export const useProducts = (options: UseProductsOptions = {}) => {
     });
 };
 
-export const useProductFacets = (options: UseProductsOptions = {}) => {
-    return useQuery<{ facets: Facets }>({
-        queryKey: ['product-facets', options],
+export function getProductFacetsQueryOptions(options: UseProductsOptions = {}) {
+    return {
+        queryKey: ['product-facets', options] as const,
         queryFn: async () => {
             const params = new URLSearchParams();
             if (options.search) params.append('search', options.search);
@@ -200,6 +200,12 @@ export const useProductFacets = (options: UseProductsOptions = {}) => {
             const { data } = await api.get(`/products/facets${query ? `?${query}` : ''}`);
             return data;
         },
+    };
+}
+
+export const useProductFacets = (options: UseProductsOptions = {}) => {
+    return useQuery<{ facets: Facets }>({
+        ...getProductFacetsQueryOptions(options),
         staleTime: 2 * 60 * 1000,
         placeholderData: (previousData) => previousData,
     });

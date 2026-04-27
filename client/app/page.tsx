@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -44,7 +45,40 @@ export default function Home() {
     const router = useRouter();
     const [searchDraft, setSearchDraft] = useState("");
     const [previewQuery, setPreviewQuery] = useState("");
-    const [topBrands, setTopBrands] = useState<Array<{ _id?: string; name: string; logoUrl?: string }>>([]);
+
+    const FALLBACK_TOP_BRANDS: Array<{ _id?: string; name: string; logoUrl?: string }> = [
+        { name: "AMD" },
+        { name: "INTEL" },
+        { name: "NVIDIA" },
+        { name: "ASUS" },
+        { name: "MSI" },
+        { name: "GIGABYTE" },
+        { name: "ZOTAG" },
+        { name: "CORSAIR" },
+        { name: "NZXT" },
+        { name: "ANTEC" },
+        { name: "PROLINK" },
+        { name: "OMIKUMA" },
+        { name: "WD" },
+        { name: "SAMSUNG" },
+    ];
+
+    type PartnerBrand = { _id?: string; name: string; logoUrl?: string };
+
+    const { data: topBrands = [] } = useQuery({
+        queryKey: ["partners", "active"] as const,
+        queryFn: async (): Promise<PartnerBrand[]> => {
+            try {
+                const res = await fetch("/api/v1/partners/active");
+                if (!res.ok) throw new Error("Failed to load partners");
+                const data: unknown = await res.json();
+                return Array.isArray(data) ? (data as PartnerBrand[]) : [];
+            } catch {
+                return FALLBACK_TOP_BRANDS;
+            }
+        },
+        staleTime: 20 * 60 * 1000,
+    });
 
     const { data: featuredData, isLoading: loadingFeatured } = useProducts({
         limit: FEATURED_PRODUCTS_LIMIT,
@@ -147,6 +181,7 @@ export default function Home() {
         search: shouldShowPreview ? normalizedPreviewQuery : undefined,
         limit: 4,
         sort: "newest",
+        enabled: shouldShowPreview,
     });
     const previewProducts = shouldShowPreview ? (previewData?.products || []).slice(0, 4) : [];
 
@@ -203,42 +238,6 @@ export default function Home() {
         },
     ];
 
-    useEffect(() => {
-        let isMounted = true;
-        const loadPartners = async () => {
-            try {
-                const res = await fetch("/api/v1/partners/active", { cache: "no-store" });
-                if (!res.ok) throw new Error("Failed to load partners");
-                const data = await res.json();
-                if (isMounted) {
-                    setTopBrands(Array.isArray(data) ? data : []);
-                }
-            } catch {
-                if (!isMounted) return;
-                setTopBrands([
-                    { name: "AMD" },
-                    { name: "INTEL" },
-                    { name: "NVIDIA" },
-                    { name: "ASUS" },
-                    { name: "MSI" },
-                    { name: "GIGABYTE" },
-                    { name: "ZOTAG" },
-                    { name: "CORSAIR" },
-                    { name: "NZXT" },
-                    { name: "ANTEC" },
-                    { name: "PROLINK" },
-                    { name: "OMIKUMA" },
-                    { name: "WD" },
-                    { name: "SAMSUNG" },
-                ]);
-            }
-        };
-
-        void loadPartners();
-        return () => {
-            isMounted = false;
-        };
-    }, []);
     const servicePillars = [
         {
             title: "Trusted Inventory",
