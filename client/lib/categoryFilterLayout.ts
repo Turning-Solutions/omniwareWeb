@@ -15,73 +15,47 @@ export const CATEGORY_FILTER_LAYOUT: CategoryLayoutNode[] = [
     { label: "Motherboard", valueAliases: ["motherboard", "motherboards", "mobo", "mobos"] },
     { label: "RAM", valueAliases: ["ram", "memory", "memories", "ddr4", "ddr5"] },
     {
-        label: "Graphics Card",
+        label: "Graphic Card",
         valueAliases: [
             "graphics-card", "graphics-cards", "graphic-card",
             "gpu", "gpus", "vga",
             "video-card", "video-cards",
         ],
     },
-    { label: "Power Supply", valueAliases: ["power-supply", "power-supplies", "psu", "psus"] },
-
     {
         label: "Storage",
         valueAliases: ["storage", "storages"],
         children: [
             {
-                label: "Internal",
-                groupOnly: true,
-                children: [
-                    {
-                        label: "HDD",
-                        valueAliases: [
-                            "hdd", "hdds", "internal-hdd",
-                            "hard-disk", "hard-disks",
-                            "hard-drive", "hard-drives",
-                        ],
-                    },
-                    {
-                        label: "SATA SSD",
-                        valueAliases: [
-                            "sata-ssd", "sata-ssds", "sata",
-                        ],
-                    },
-                    {
-                        label: "NVMe SSD (Gen 3/4/5)",
-                        valueAliases: [
-                            "nvme-ssd", "nvme-ssds",
-                            "nvme", "nvmes",
-                            "m2-nvme", "m2-ssd", "m2", "m-2", "m-2-nvme",
-                            "m2-nvme-ssd", "m.2", "m.2-nvme", "m.2-ssd",
-                            "nvme-ssd-gen-3-4-5",
-                            "nvme-ssd-gen3", "nvme-ssd-gen4", "nvme-ssd-gen5",
-                            "gen3-nvme", "gen4-nvme", "gen5-nvme",
-                            "ssd", "ssds",
-                            "solid-state-drive", "solid-state-drives",
-                            "internal-ssd", "internal-ssds",
-                        ],
-                    },
+                label: "Internal Storage",
+                valueAliases: [
+                    "internal-storage", "internal",
+                    "sata-ssd", "sata-ssds", "sata",
+                    "internal-ssd", "internal-ssds",
+                    "m.2-nvme", "m2-nvme",
+                    "m2-ssd", "m2", "m-2", "m-2-nvme",
+                    "m2-nvme-ssd", "m.2", "m.2-ssd",
+                    "nvme-ssd", "nvme-ssds",
+                    "nvme", "nvmes",
+                    "nvme-ssd-gen-3-4-5",
+                    "nvme-ssd-gen3", "nvme-ssd-gen4", "nvme-ssd-gen5",
+                    "gen3-nvme", "gen4-nvme", "gen5-nvme",
+                    "ssd", "ssds",
+                    "solid-state-drive", "solid-state-drives",
+                    "hdd", "hdds", "internal-hdd",
+                    "hard-disk", "hard-disks",
+                    "hard-drive", "hard-drives",
                 ],
             },
             {
-                label: "External",
-                groupOnly: true,
-                children: [
-                    {
-                        label: "External HDD",
-                        valueAliases: [
-                            "external-hdd", "external-hdds",
-                            "external-hard-disk", "external-hard-drive",
-                            "external-hard-drives",
-                        ],
-                    },
-                    {
-                        label: "External SSD",
-                        valueAliases: [
-                            "external-ssd", "external-ssds",
-                            "portable-ssd",
-                        ],
-                    },
+                label: "External Storage",
+                valueAliases: [
+                    "external-storage", "external",
+                    "external-hdd", "external-hdds",
+                    "external-hard-disk", "external-hard-drive",
+                    "external-hard-drives",
+                    "external-ssd", "external-ssds",
+                    "portable-ssd",
                 ],
             },
         ],
@@ -129,6 +103,10 @@ export const CATEGORY_FILTER_LAYOUT: CategoryLayoutNode[] = [
             "pc-cases", "pc-case", "cases",
             "chassis", "cabinet", "tower",
         ],
+    },
+    {
+        label: "Monitors",
+        valueAliases: ["monitor", "monitors", "display", "displays", "screen", "screens"],
     },
 
     {
@@ -181,16 +159,10 @@ export const CATEGORY_FILTER_LAYOUT: CategoryLayoutNode[] = [
     },
 
     {
-        label: "Power",
-        valueAliases: ["power"],
-        children: [
-            {
-                label: "UPS",
-                valueAliases: [
-                    "ups", "uninterruptible-power-supply",
-                    "battery-backup",
-                ],
-            },
+        label: "UPS",
+        valueAliases: [
+            "ups", "uninterruptible-power-supply",
+            "battery-backup", "power-backup",
         ],
     },
 ];
@@ -233,10 +205,11 @@ function collectSubtreeSlugs(node: CategoryLayoutNode): string[] {
     return Array.from(new Set(out));
 }
 
-function findLayoutParentNodeWithChildrenBySlug(slug: string): CategoryLayoutNode | null {
+/** First layout node whose aliases/label match `slug` (any depth — parent or leaf). */
+function findLayoutNodeBySlug(slug: string): CategoryLayoutNode | null {
     function walk(nodes: CategoryLayoutNode[]): CategoryLayoutNode | null {
         for (const n of nodes) {
-            if (n.children && n.children.length > 0 && matchesSlug(n, slug)) return n;
+            if (matchesSlug(n, slug)) return n;
             const sub = walk(n.children ?? []);
             if (sub) return sub;
         }
@@ -246,14 +219,13 @@ function findLayoutParentNodeWithChildrenBySlug(slug: string): CategoryLayoutNod
 }
 
 /**
- * When the URL filter uses a layout department slug (e.g. `audio`, `peripherals`), products are
- * usually tagged with leaf category IDs. If Category.parentId links are missing, expanding only
- * from the parent row's DB document misses those leaves. We union all layout alias slugs under
- * that department so Category.find + expandCategoryTreeIds match the same products the sidebar
- * rolls up in counts.
+ * When the URL filter uses a layout slug (department or leaf), union all layout alias slugs for
+ * that node and its subtree so Category.find matches DB rows products may be tagged with (e.g.
+ * `keyboard` vs `keyboards` under Peripherals). Previously only parents with children matched,
+ * so leaf filters sent a single slug and missed sibling alias categories.
  */
 export function expandLayoutSlugForCategoryFilter(slug: string): string[] | null {
-    const n = findLayoutParentNodeWithChildrenBySlug(slug);
+    const n = findLayoutNodeBySlug(slug);
     if (!n) return null;
     return collectSubtreeSlugs(n);
 }

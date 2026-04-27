@@ -5,9 +5,10 @@ import { useEffect, useRef, useState } from 'react';
 import { Toaster } from 'react-hot-toast';
 import { CartProvider } from "@/context/CartContext";
 import { getProductsQueryOptions } from '@/hooks/useProducts';
+import { SHOP_PRODUCTS_PER_PAGE } from '@/lib/shopConstants';
 
 const SHOP_PREFETCH_OPTIONS = {
-    limit: 16,
+    limit: SHOP_PRODUCTS_PER_PAGE,
     sort: 'newest',
     page: 1,
     includeFacets: false,

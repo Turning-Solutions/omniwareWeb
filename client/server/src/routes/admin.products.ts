@@ -11,6 +11,15 @@ const router = express.Router();
 
 router.use(requireAuth, requireAdmin, adminRateLimit);
 
+function normalizeCategorySlugInput(value: unknown): string {
+    return String(value ?? '')
+        .trim()
+        .toLowerCase()
+        .replace(/\bm[\s._-]*2\b/g, 'm2')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)/g, '');
+}
+
 // GET /api/v1/admin/products
 router.get('/', async (req: Request, res: Response) => {
     const { q, category, brand, isActive, isFeatured, page = '1', limit = '20' } = req.query;
@@ -87,6 +96,27 @@ function normalizeProductBody(body: Record<string, unknown>): Record<string, unk
     return b;
 }
 
+function buildProductUpdate(body: Record<string, unknown>): Record<string, unknown> {
+    const normalized = normalizeProductBody(body);
+    const unset: Record<string, 1> = {};
+
+    if (body.sku === '' || (typeof body.sku === 'string' && !body.sku.trim())) {
+        unset.sku = 1;
+    }
+    if (body.slug === '' || (typeof body.slug === 'string' && !body.slug.trim())) {
+        unset.slug = 1;
+    }
+
+    if (Object.keys(unset).length === 0) {
+        return normalized;
+    }
+
+    return {
+        ...normalized,
+        $unset: unset,
+    };
+}
+
 // POST /api/v1/admin/products
 router.post('/', async (req: Request, res: Response) => {
     try {
@@ -111,7 +141,7 @@ router.patch('/:id', async (req: Request, res: Response) => {
     if (!before) return res.status(404).json({ message: 'Product not found' });
 
     try {
-        const updated = await Product.findByIdAndUpdate(req.params.id, normalizeProductBody(req.body), {
+        const updated = await Product.findByIdAndUpdate(req.params.id, buildProductUpdate(req.body), {
             returnDocument: 'after',
             runValidators: true,
         }).lean();
@@ -172,7 +202,14 @@ router.put('/brands/:id', async (req: Request, res: Response) => {
 router.post('/categories', async (req: Request, res: Response) => {
     try {
         const { name, slug, parentId } = req.body;
-        const category = await Category.create({ name, slug, parentId, isActive: true });
+        const normalizedName = typeof name === 'string' ? name.trim() : '';
+        const normalizedSlug = normalizeCategorySlugInput(slug || normalizedName);
+        const category = await Category.create({
+            name: normalizedName,
+            slug: normalizedSlug,
+            parentId,
+            isActive: true,
+        });
         res.status(201).json(category);
     } catch (error) {
         res.status(400).json({ message: (error as Error).message });
@@ -181,7 +218,14 @@ router.post('/categories', async (req: Request, res: Response) => {
 
 router.put('/categories/:id', async (req: Request, res: Response) => {
     try {
-        const category = await Category.findByIdAndUpdate(req.params.id, req.body, { returnDocument: 'after' });
+        const update: Record<string, unknown> = { ...req.body };
+        if (typeof update.name === 'string') update.name = update.name.trim();
+        if ('slug' in update || typeof update.name === 'string') {
+            update.slug = normalizeCategorySlugInput(
+                (typeof update.slug === 'string' && update.slug.trim()) ? update.slug : update.name
+            );
+        }
+        const category = await Category.findByIdAndUpdate(req.params.id, update, { returnDocument: 'after' });
         if (!category) return res.status(404).json({ message: 'Category not found' });
         res.json(category);
     } catch (error) {

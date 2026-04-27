@@ -116,6 +116,16 @@ function formatSpecLabel(specKey: string): string {
     return specKey.replace(/_/g, " ");
 }
 
+/** Keep admin-entered category slugs consistent for names like "M.2 NVMe". */
+function normalizeCategorySlugInput(value: string): string {
+    return value
+        .trim()
+        .toLowerCase()
+        .replace(/\bm[\s._-]*2\b/g, "m2")
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/(^-|-$)/g, "");
+}
+
 export default function ProductFormPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
     const router = useRouter();
@@ -124,6 +134,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
     const [formData, setFormData] = useState({
         title: "",
         price: "",
+        dealerPrice: "",
         /** Optional product-level discount override amount (empty => use category discount). */
         discountPercent: "",
         sku: "",
@@ -191,7 +202,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
         if (isNew) return;
         const fetchProduct = async () => {
             try {
-                const { data } = await api.get(`/products/id/${id}`);
+                const { data } = await api.get(`/admin/products/${id}`);
                 const specsObj = data.specs;
                 // Mongoose `Map` fields sometimes arrive as Map-like objects; normalize to plain entries.
                 const specsEntries: Array<[string, unknown]> =
@@ -245,6 +256,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                 setFormData({
                     title: data.title ?? "",
                     price: data.price != null ? String(data.price) : "",
+                    dealerPrice: data.dealerPrice != null ? String(data.dealerPrice) : "",
                     discountPercent: productDiscountPercent,
                     sku: data.sku ?? "",
                     slug: data.slug ?? "",
@@ -294,6 +306,8 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
         setLoading(true);
         try {
             const parsedPrice = parseFloat(formData.price);
+            const parsedDealerPrice =
+                formData.dealerPrice.trim() === "" ? null : parseFloat(formData.dealerPrice);
             const parsedStockQty = parseInt(formData.stock, 10);
             const normalizedBrandId = formData.brandId.trim();
             const primaryCategoryId = formData.categoryIds[0]?.trim();
@@ -312,6 +326,10 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
 
             if (!Number.isInteger(parsedStockQty) || parsedStockQty < 0) {
                 toast.error("Enter a valid stock quantity.");
+                return;
+            }
+            if (parsedDealerPrice != null && (!Number.isFinite(parsedDealerPrice) || parsedDealerPrice < 0)) {
+                toast.error("Enter a valid dealer price.");
                 return;
             }
 
@@ -360,6 +378,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                 ...rest,
                 brandId: normalizedBrandId || undefined,
                 categoryIds: normalizedCategoryIds.length ? normalizedCategoryIds : undefined,
+                dealerPrice: parsedDealerPrice,
                 discountPercent: parsedProductDiscountPercent,
                 price: parsedPrice,
                 stock: { qty: parsedStockQty },
@@ -707,7 +726,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
     const handleAddCategory = async () => {
         const name = window.prompt("Enter new category name:");
         if (!name) return;
-        const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+        const slug = normalizeCategorySlugInput(name);
         try {
             const { data: newCategory } = await api.post("/admin/products/categories", { name, slug });
             setCategories([...categories, newCategory]);
@@ -730,7 +749,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
         if (!category) return;
         const newName = window.prompt("Edit category name:", category.name);
         if (!newName || newName === category.name) return;
-        const slug = newName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+        const slug = normalizeCategorySlugInput(newName);
         try {
             const { data: updated } = await api.put(`/admin/products/categories/${category._id}`, { name: newName, slug });
             setCategories(categories.map(c => c._id === updated._id ? updated : c));
@@ -866,12 +885,15 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                             />
                         </div>
                         <div className="space-y-2">
-                            <label className="text-sub text-sm">Slug (Optional/Auto)</label>
+                            <label className="text-sub text-sm">Dealer Price (LKR)</label>
                             <input
-                                type="text"
+                                type="number"
+                                min={0}
+                                step={0.01}
                                 className="w-full bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent"
-                                value={formData.slug}
-                                onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
+                                value={formData.dealerPrice}
+                                onChange={(e) => setFormData({ ...formData, dealerPrice: e.target.value })}
+                                placeholder="Optional"
                             />
                         </div>
                         <div className="space-y-2">
@@ -882,6 +904,15 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                                 className="w-full bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent"
                                 value={formData.price}
                                 onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-sub text-sm">Slug (Optional/Auto)</label>
+                            <input
+                                type="text"
+                                className="w-full bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent"
+                                value={formData.slug}
+                                onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
                             />
                         </div>
                         <div className="space-y-2">

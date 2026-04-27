@@ -466,18 +466,48 @@ function buildCategorySidebarParts(
 
         // ── Try to match a DB category (normal leaf / parent with optional children) ──
         let matchedIndex = -1;
+        let matchedIndices: number[] = [];
         const keys = candidateCategoryKeys(node).map(normalizeCategoryToken).filter(Boolean);
         if (keys.length > 0) {
-            matchedIndex = categories.findIndex(
-                (facet, idx) => !used.has(idx) && keys.some((k) => normalizedFacetKeys[idx].has(k))
-            );
+            matchedIndices = categories
+                .map((facet, idx) => ({ facet, idx }))
+                .filter(({ idx }) => !used.has(idx) && keys.some((k) => normalizedFacetKeys[idx].has(k)))
+                .map(({ idx }) => idx);
+            matchedIndex = matchedIndices.length > 0 ? matchedIndices[0] : -1;
         }
 
         const results: ResolvedCategoryNode[] = [];
 
         if (matchedIndex >= 0) {
+            const isLeafNode = !node.children?.length;
+            if (isLeafNode && matchedIndices.length > 1) {
+                matchedIndices.forEach((idx) => used.add(idx));
+                const rolledCount = matchedIndices.reduce(
+                    (sum, idx) => sum + (categories[idx]?.count ?? 0),
+                    0
+                );
+                const slug = primaryCategorySlug(node);
+                const syntheticFacet: CategoryFacet = {
+                    value: slug,
+                    label: node.label,
+                    count: rolledCount,
+                };
+                results.push({
+                    type: "category",
+                    id: `cat-${slug}`,
+                    facet: syntheticFacet,
+                    depth,
+                    hasChildren: false,
+                    collapsibleAncestors: ancestors,
+                });
+                return results;
+            }
+
             used.add(matchedIndex);
             const matchedFacet = categories[matchedIndex];
+            const leafAliasMatched =
+                isLeafNode &&
+                normalizeCategoryToken(matchedFacet.value) !== normalizeCategoryToken(primaryCategorySlug(node));
             const isEmpty = matchedFacet.count === 0;
             const catId = `cat-${matchedFacet.value}`;
             const childAncestorIds =
@@ -507,7 +537,13 @@ function buildCategorySidebarParts(
             results.push({
                 type: "category",
                 id: catId,
-                facet: matchedFacet,
+                facet: leafAliasMatched
+                    ? {
+                        value: primaryCategorySlug(node),
+                        label: node.label,
+                        count: matchedFacet.count,
+                    }
+                    : matchedFacet,
                 depth,
                 hasChildren: childResults.length > 0,
                 collapsibleAncestors: ancestors,
@@ -584,10 +620,23 @@ function buildCategorySidebarParts(
     layoutSegments.forEach(({ root, nodes }, layoutIndex) => {
         const { main, sub } = splitLayoutRootSegment(nodes, root);
         if (main) {
+            const summedTopLevelSubCount = sub
+                .filter((n): n is Extract<ResolvedCategoryNode, { type: "category" }> => n.type === "category" && n.depth === 0)
+                .reduce((sum, n) => sum + n.facet.count, 0);
+            const normalizedMain =
+                main.type === "category"
+                    ? {
+                        ...main,
+                        facet: {
+                            ...main.facet,
+                            count: summedTopLevelSubCount > 0 ? summedTopLevelSubCount : main.facet.count,
+                        },
+                    }
+                    : main;
             mainEntries.push({
                 layoutIndex,
                 node: {
-                    ...main,
+                    ...normalizedMain,
                     hasChildren: sub.length > 0,
                 },
             });
@@ -911,7 +960,14 @@ export default function DynamicFilterSidebar({
             const baselineMainCount = mainCategoryBaselineByLayout?.get(layoutIndex);
             const fallbackCount =
                 fallback?.node.type === "category" ? fallback.node.facet.count : 0;
-            const stableCount = baselineCount ?? baselineMainCount ?? fallbackCount;
+            // Parent rows with layout children may roll up subcategory counts in `fallbackCount`
+            // (sum of visible top-level subs). Baseline snapshot can still reflect only the parent
+            // facet row (e.g. `storage` count), so take the max to avoid showing a smaller parent total.
+            const stableCount = Math.max(
+                baselineCount ?? 0,
+                baselineMainCount ?? 0,
+                fallbackCount
+            );
             if (stableCount <= 0) return;
 
             const fallbackSlug =
@@ -945,6 +1001,19 @@ export default function DynamicFilterSidebar({
         });
         return out;
     }, [mainEntries, categoryBaselineCounts, mainCategoryBaselineByLayout]);
+    useEffect(() => {
+        const storageMain = stableMainCategoryEntries.find(
+            (entry) =>
+                entry.node.type === "category" &&
+                (entry.node.facet.value === "storage" || entry.node.facet.label.toLowerCase() === "storage")
+        );
+        const storageSubs = subForest
+            .filter((n) => n.type === "category")
+            .map((n) => ({ value: n.facet.value, label: n.facet.label, count: n.facet.count }));
+        // #region agent log
+        fetch('http://127.0.0.1:7405/ingest/fc9bb09e-38e3-439b-a2a2-45095cb5014e',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'9a1013'},body:JSON.stringify({sessionId:'9a1013',runId:'run-count-debug',hypothesisId:'C2',location:'client/components/DynamicFilterSidebar.tsx:categorySidebarParts',message:'Sidebar category counts resolved',data:{selectedCategory:typeof filters.category==='string'?filters.category:null,selectedSubcategories:typeof filters.subcategories==='string'?filters.subcategories:null,storageMain:storageMain&&storageMain.node.type==='category'?{value:storageMain.node.facet.value,label:storageMain.node.facet.label,count:storageMain.node.facet.count}:null,subMode,storageSubs,rawStorageFacet:(facets.categories||[]).filter((c)=>['storage','internal-storage','external-storage','hdd','sata-ssd','nvme-ssd'].includes(String(c.value))).map((c)=>({value:c.value,label:c.label,count:c.count}))},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
+    }, [stableMainCategoryEntries, subForest, subMode, filters.category, filters.subcategories, facets.categories]);
 
     // Only show sub-tree nodes whose every collapsible ancestor is currently expanded.
     const visibleSubForest = useMemo(

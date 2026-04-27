@@ -72,7 +72,7 @@ export interface Product {
     attributeGroups?: { category: string; attributes: { name?: string; value: string }[] }[];
 }
 
-interface ProductsResponse {
+export interface ProductsResponse {
     products: Product[];
     page: number;
     pages: number;
@@ -103,7 +103,7 @@ function normalizeCategoryForApi(category: string): string {
     return /^[a-fA-F0-9]{24}$/.test(c) ? c : c.toLowerCase();
 }
 
-function buildProductsQueryString(options: UseProductsOptions): string {
+export function buildProductsQueryString(options: UseProductsOptions): string {
     const params = new URLSearchParams();
     // Always send limit so server returns full facets when limit >= 20 (shop page)
     const limit = options.limit ?? DEFAULT_PRODUCTS_LIMIT;

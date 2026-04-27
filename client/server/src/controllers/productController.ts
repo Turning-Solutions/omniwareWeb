@@ -187,6 +187,12 @@ function withDiscountInfo(product: any): any {
     };
 }
 
+function stripAdminOnlyProductFields(product: any): any {
+    if (!product || typeof product !== 'object') return product;
+    const { dealerPrice: _dealerPrice, ...safeProduct } = product;
+    return safeProduct;
+}
+
 export const getProducts = async (req: Request, res: Response) => {
     try {
         // Filtered listings must not be publicly cached: intermediaries/browsers may answer 304
@@ -221,8 +227,30 @@ export const getProducts = async (req: Request, res: Response) => {
                 ]),
                 Product.countDocuments(matchStage),
             ]);
+            const reqSpec = (req.query as any)?.spec ?? {};
+            const requestedFormFactor =
+                (typeof reqSpec?.Form_Factor === 'string' && reqSpec.Form_Factor.trim())
+                    ? reqSpec.Form_Factor.trim()
+                    : (typeof (req.query as any)?.['spec[Form_Factor]'] === 'string'
+                        ? String((req.query as any)['spec[Form_Factor]']).trim()
+                        : '');
+            if (requestedFormFactor && lookupCache.categoryIds && lookupCache.categoryIds.length > 0) {
+                const formFactorDistribution = await Product.aggregate([
+                    { $match: { isActive: true, categoryIds: { $in: lookupCache.categoryIds } } },
+                    { $group: { _id: '$specs.Form_Factor', count: { $sum: 1 } } },
+                    { $sort: { count: -1 } },
+                ]);
+                const matchedProducts = (products as any[]).map((p) => ({
+                    id: String(p?._id ?? ''),
+                    title: p?.title ?? '',
+                    formFactor: p?.specs?.Form_Factor ?? null,
+                    categoryIds: Array.isArray(p?.categoryIds) ? p.categoryIds.map((id: any) => String(id)) : [],
+                }));
+            }
 
-            const productsWithDiscount = products.map(withDiscountInfo);
+            const productsWithDiscount = products
+                .map(stripAdminOnlyProductFields)
+                .map(withDiscountInfo);
 
             return res.json({
                 products: productsWithDiscount,
@@ -256,7 +284,9 @@ export const getProducts = async (req: Request, res: Response) => {
             ]);
             res.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=120');
 
-            const productsWithDiscount = products.map(withDiscountInfo);
+            const productsWithDiscount = products
+                .map(stripAdminOnlyProductFields)
+                .map(withDiscountInfo);
 
             return res.json({
                 products: productsWithDiscount,
@@ -276,6 +306,22 @@ export const getProducts = async (req: Request, res: Response) => {
         const brandMatchStage = await buildProductMatchStage(req, ['brand'], lookupCache);
         const priceMatchStage = await buildProductMatchStage(req, ['price'], lookupCache);
         const specsMatchStage = await buildProductMatchStage(req, ['specs'], lookupCache);
+
+        const reqSpec = (req.query as any)?.spec ?? {};
+        const requestedFormFactor =
+            (typeof reqSpec?.Form_Factor === 'string' && reqSpec.Form_Factor.trim())
+                ? reqSpec.Form_Factor.trim()
+                : (typeof (req.query as any)?.['spec[Form_Factor]'] === 'string'
+                    ? String((req.query as any)['spec[Form_Factor]']).trim()
+                    : '');
+        if (requestedFormFactor && lookupCache.categoryIds && lookupCache.categoryIds.length > 0) {
+            const formFactorDistribution = await Product.aggregate([
+                { $match: { isActive: true, categoryIds: { $in: lookupCache.categoryIds } } },
+                { $group: { _id: '$specs.Form_Factor', count: { $sum: 1 } } },
+                { $sort: { count: -1 } },
+            ]);
+            const strictCount = await Product.countDocuments(matchStage);
+        }
 
         // --- Aggregation Pipeline ---
         // Note: We cannot start with a common $match because facets need DIFFERENT matches.
@@ -355,6 +401,14 @@ export const getProducts = async (req: Request, res: Response) => {
 
         const results = await Product.aggregate(pipeline as any);
         const data = results[0];
+        if (requestedFormFactor && data?.products) {
+            const matchedProducts = (data.products as any[]).map((p) => ({
+                id: String(p?._id ?? ''),
+                title: p?.title ?? '',
+                formFactor: p?.specs?.Form_Factor ?? null,
+                categoryIds: Array.isArray(p?.categoryIds) ? p.categoryIds.map((id: any) => String(id)) : [],
+            }));
+        }
         if (!data) {
             return res.json({
                 products: [],
@@ -394,7 +448,9 @@ export const getProducts = async (req: Request, res: Response) => {
         };
 
         res.json({
-            products: (data.products || []).map(withDiscountInfo),
+            products: (data.products || [])
+                .map(stripAdminOnlyProductFields)
+                .map(withDiscountInfo),
             pagination: {
                 total,
                 page: pageNum,
@@ -504,6 +560,9 @@ export const getProductFacets = async (req: Request, res: Response) => {
             availability: data.availability || [],
             specs: specsFacet
         };
+        // #region agent log
+        fetch('http://127.0.0.1:7405/ingest/fc9bb09e-38e3-439b-a2a2-45095cb5014e',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'9a1013'},body:JSON.stringify({sessionId:'9a1013',runId:'run-count-debug',hypothesisId:'C1',location:'client/server/src/controllers/productController.ts:getProductFacets',message:'Facet categories generated',data:{queryCategory:req.query.category??null,querySpec:(req.query as any).spec??null,categoryFacetSample:(finalFacets.categories||[]).filter((c:any)=>['storage','internal-storage','external-storage','hdd','sata-ssd','nvme-ssd'].includes(String(c?.value))).map((c:any)=>({value:c.value,label:c.label,count:c.count})),categoryFacetTotal:(finalFacets.categories||[]).length},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
 
 
         res.json({
@@ -536,7 +595,8 @@ export const getProductBySlug = async (req: Request, res: Response) => {
 
         if (product) {
             const normalized = normalizeProductAttributeGroups(product);
-            res.json(withDiscountInfo(normalized));
+            const sanitized = stripAdminOnlyProductFields(normalized);
+            res.json(withDiscountInfo(sanitized));
         } else {
             res.status(404).json({ message: 'Product not found' });
         }
@@ -658,7 +718,8 @@ export const getProductById = async (req: Request, res: Response) => {
 
         if (product) {
             const normalized = normalizeProductAttributeGroups(product);
-            res.json(withDiscountInfo(normalized));
+            const sanitized = stripAdminOnlyProductFields(normalized);
+            res.json(withDiscountInfo(sanitized));
         } else {
             res.status(404).json({ message: 'Product not found' });
         }
@@ -713,8 +774,14 @@ export const getProductsGrouped = async (req: Request, res: Response) => {
         ];
 
         const groupedProducts = await Product.aggregate(pipeline as any[]);
+        const sanitizedGroups = groupedProducts.map((group: any) => ({
+            ...group,
+            products: Array.isArray(group?.products)
+                ? group.products.map(stripAdminOnlyProductFields)
+                : [],
+        }));
 
-        res.json(groupedProducts);
+        res.json(sanitizedGroups);
 
     } catch (error) {
         console.error("getProductsGrouped Error:", error);

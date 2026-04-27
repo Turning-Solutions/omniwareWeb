@@ -233,10 +233,11 @@ function collectSubtreeSlugs(node: CategoryLayoutNode): string[] {
     return Array.from(new Set(out));
 }
 
-function findLayoutParentNodeWithChildrenBySlug(slug: string): CategoryLayoutNode | null {
+/** First layout node whose aliases/label match `slug` (any depth — parent or leaf). */
+function findLayoutNodeBySlug(slug: string): CategoryLayoutNode | null {
     function walk(nodes: CategoryLayoutNode[]): CategoryLayoutNode | null {
         for (const n of nodes) {
-            if (n.children && n.children.length > 0 && matchesSlug(n, slug)) return n;
+            if (matchesSlug(n, slug)) return n;
             const sub = walk(n.children ?? []);
             if (sub) return sub;
         }
@@ -246,14 +247,13 @@ function findLayoutParentNodeWithChildrenBySlug(slug: string): CategoryLayoutNod
 }
 
 /**
- * When the URL filter uses a layout department slug (e.g. `audio`, `peripherals`), products are
- * usually tagged with leaf category IDs. If Category.parentId links are missing, expanding only
- * from the parent row's DB document misses those leaves. We union all layout alias slugs under
- * that department so Category.find + expandCategoryTreeIds match the same products the sidebar
- * rolls up in counts.
+ * When the URL filter uses a layout slug (department or leaf), union all layout alias slugs for
+ * that node and its subtree so Category.find matches DB rows products may be tagged with (e.g.
+ * `keyboard` vs `keyboards` under Peripherals). Previously only parents with children matched,
+ * so leaf filters sent a single slug and missed sibling alias categories.
  */
 export function expandLayoutSlugForCategoryFilter(slug: string): string[] | null {
-    const n = findLayoutParentNodeWithChildrenBySlug(slug);
+    const n = findLayoutNodeBySlug(slug);
     if (!n) return null;
     return collectSubtreeSlugs(n);
 }

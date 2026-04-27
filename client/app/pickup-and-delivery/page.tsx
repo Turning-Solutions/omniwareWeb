@@ -46,9 +46,9 @@ export default function PickupAndDeliveryPage() {
                         <h3 className="mt-3 font-semibold text-[#F1F1F1]">Islandwide Courier Delivery</h3>
                         <ul className="mt-2 list-disc space-y-1 pl-5">
                             <li>We deliver across Sri Lanka using reliable courier services.</li>
-                            <li>Delivery time: 1-3 working days.</li>
+                            <li>Delivery time: 1-3 working days</li>
                             <li>Available for all eligible items.</li>
-                            <li>Tracking provided after dispatch.</li>
+                            <li>Tracking provided after dispatch</li>
                         </ul>
                     </section>
 
@@ -82,17 +82,17 @@ export default function PickupAndDeliveryPage() {
                             Once your order is shipped, you&apos;ll receive a tracking link via WhatsApp or SMS. With this, you can
                             monitor your delivery status.
                         </p>
-                        <p className="mt-3">
-                            Track Your Order:{" "}
+                        <div className="mt-4 rounded-xl border border-[#D12B28]/45 bg-[#D12B28]/[0.12] p-4">
+                            <p className="text-sm font-semibold text-[#F1F1F1]">Track Your Order</p>
                             <a
                                 href="https://www.fdedomestic.com/#track"
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-[#D12B28] hover:underline"
+                                className="mt-1 inline-flex items-center rounded-md bg-[#D12B28] px-3 py-1.5 font-semibold text-white transition hover:bg-[#E53A36]"
                             >
                                 https://www.fdedomestic.com/#track
                             </a>
-                        </p>
+                        </div>
                     </section>
 
                     <section className={sectionCardClass}>

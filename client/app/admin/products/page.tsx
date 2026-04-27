@@ -12,6 +12,7 @@ interface Product {
     _id: string;
     title: string;
     price: number;
+    dealerPrice?: number;
     stock: { qty: number };
     brandId: { name: string } | null;
     categoryIds: { name: string }[] | null;
@@ -364,6 +365,7 @@ export default function ProductsPage() {
                             <tr>
                                 <th className="px-4 sm:px-6 py-4">Title</th>
                                 <th className="px-4 sm:px-6 py-4">Price</th>
+                                <th className="px-4 sm:px-6 py-4">Dealer Price</th>
                                 <th className="px-4 sm:px-6 py-4">Stock</th>
                                 <th className="px-4 sm:px-6 py-4">Brand</th>
                                 <th className="px-4 sm:px-6 py-4">Category</th>
@@ -374,9 +376,9 @@ export default function ProductsPage() {
                         </thead>
                         <tbody className="divide-y divide-border-soft text-main">
                             {loading ? (
-                                <tr><td colSpan={8} className="px-6 py-8 text-center text-sub">Loading...</td></tr>
+                                <tr><td colSpan={9} className="px-6 py-8 text-center text-sub">Loading...</td></tr>
                             ) : filteredProducts.length === 0 ? (
-                                <tr><td colSpan={8} className="px-6 py-8 text-center text-sub">No products found</td></tr>
+                                <tr><td colSpan={9} className="px-6 py-8 text-center text-sub">No products found</td></tr>
                             ) : (
                                 filteredProducts.map((product) => {
                                     const isRecentlyUpdated = recentlyUpdatedId === product._id;
@@ -396,6 +398,9 @@ export default function ProductsPage() {
                                             ) : null}
                                         </td>
                                         <td className="px-4 sm:px-6 py-4 whitespace-nowrap">LKR {product.price.toLocaleString()}</td>
+                                        <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
+                                            {product.dealerPrice != null ? `LKR ${product.dealerPrice.toLocaleString()}` : "-"}
+                                        </td>
                                         <td className="px-4 sm:px-6 py-4 whitespace-nowrap">{product.stock?.qty || 0}</td>
                                         <td className="px-4 sm:px-6 py-4 whitespace-nowrap">{product.brandId?.name || '-'}</td>
                                         <td className="px-4 sm:px-6 py-4 max-w-[260px] truncate" title={product.categoryIds?.map(c => c.name).join(', ') || '-'}>

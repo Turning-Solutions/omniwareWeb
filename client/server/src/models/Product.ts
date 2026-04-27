@@ -7,6 +7,7 @@ const productSchema = new mongoose.Schema({
     brandId: { type: mongoose.Schema.Types.ObjectId, ref: 'Brand', index: true },
     categoryIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Category', index: true }],
     price: { type: Number, required: true, index: true },
+    dealerPrice: { type: Number, required: false, min: 0 },
     /**
      * Optional product-level discount override amount.
      * If null/0, category discount may apply.

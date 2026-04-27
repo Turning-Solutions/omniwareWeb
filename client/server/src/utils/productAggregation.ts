@@ -145,11 +145,34 @@ export const buildProductMatchStage = async (
     });
 
     if (Object.keys(specsFilter).length > 0 && !exclude.includes('specs')) {
+        let hardDiskValues: string[] | null = null;
         Object.entries(specsFilter).forEach(([key, value]) => {
             if (!value) return;
             const values = Array.isArray(value) ? value : (value as string).split(',');
+            if (key === 'Form_Factor' && values.some((v) => String(v).trim().toLowerCase() === 'hard disk')) {
+                hardDiskValues = values.map((v) => String(v));
+                return;
+            }
             matchStage[`specs.${key}`] = { $in: values };
         });
+
+        if (hardDiskValues) {
+            const hddCategory = await Category.findOne({ slug: 'hdd' }).select('_id').lean();
+            const hddId = hddCategory?._id ? new mongoose.Types.ObjectId(String(hddCategory._id)) : null;
+            const hasCategoryConstraint =
+                Boolean((matchStage as any).categoryIds?.$in) &&
+                Array.isArray((matchStage as any).categoryIds.$in);
+            const categoryIn = hasCategoryConstraint ? (matchStage as any).categoryIds.$in : [];
+
+            if (hddId && hasCategoryConstraint && categoryIn.some((id: mongoose.Types.ObjectId) => String(id) === String(hddId))) {
+                matchStage.$or = [
+                    { 'specs.Form_Factor': { $in: hardDiskValues } },
+                    { 'specs.Form_Factor': { $in: [null, ''] }, categoryIds: { $in: [hddId] } },
+                ];
+            } else {
+                matchStage['specs.Form_Factor'] = { $in: hardDiskValues };
+            }
+        }
     }
 
     return matchStage;
