@@ -2,7 +2,7 @@
 
 import { useState, useEffect, use } from "react";
 import { isAxiosError } from "axios";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Save, ArrowLeft, Trash2, Edit2, Plus, ChevronUp, ChevronDown, ImagePlus, Upload, Loader2, ArrowRightLeft, ExternalLink } from "lucide-react";
 import Link from "next/link";
 import api from "@/lib/api";
@@ -18,6 +18,7 @@ interface Category {
     name: string;
     slug?: string;
     discountPercent?: number | null;
+    parentId?: string | null;
 }
 
 interface Attribute {
@@ -129,7 +130,12 @@ function normalizeCategorySlugInput(value: string): string {
 export default function ProductFormPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
     const router = useRouter();
+    const searchParams = useSearchParams();
     const isNew = id === 'new';
+    const rawReturnTo = searchParams?.get("returnTo");
+    const decodedReturnTo = rawReturnTo ? decodeURIComponent(rawReturnTo) : "";
+    const returnToPath =
+        decodedReturnTo.startsWith("/admin/products") ? decodedReturnTo : "/admin/products";
 
     const [formData, setFormData] = useState({
         title: "",
@@ -156,6 +162,8 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
 
     const [brands, setBrands] = useState<Brand[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
+    const [mainCategoryId, setMainCategoryId] = useState("");
+    const [subCategoryId, setSubCategoryId] = useState("");
     const [featuredSpecKeys, setFeaturedSpecKeys] = useState<string[]>([]);
     const [featuredSpecsLoading, setFeaturedSpecsLoading] = useState(false);
     const [loading, setLoading] = useState(false);
@@ -168,6 +176,9 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
     const [selectedAttributeKeys, setSelectedAttributeKeys] = useState<Set<string>>(new Set());
     const previewTarget = !isNew ? (formData.slug?.trim() || id) : "";
     const previewPath = previewTarget ? `/product/${previewTarget}?preview=${previewRefreshKey}` : "";
+    const mainCategories = categories.filter((category) => !category.parentId);
+    const subCategories = categories.filter((category) => category.parentId === mainCategoryId);
+    const effectiveCategoryId = subCategoryId || mainCategoryId;
 
     const notifyProductsListUpdated = (productId: string) => {
         if (typeof window === "undefined") return;
@@ -236,9 +247,6 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                             : [];
 
                 const productDiscountPercent = data.discountPercent != null ? String(data.discountPercent) : "";
-                const firstCategory = Array.isArray(data.categoryIds) ? data.categoryIds[0] : null;
-                const categoryDiscountPercent = firstCategory?.discountPercent != null ? String(firstCategory.discountPercent) : "";
-                setInitialCategoryDiscountPercent(categoryDiscountPercent);
                 const rawCategoryIds: string[] =
                     data.categoryIds
                         ?.map((c: unknown) => {
@@ -249,9 +257,64 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                             }
                             return undefined;
                         })
-                        .filter((id: string | undefined): id is string => Boolean(id)) ?? [];
-                // Single category dropdown: keep only the primary id so a save does not re-post stray ids (e.g. legacy / migration).
-                const categoryIdsForForm = rawCategoryIds.length > 0 ? [rawCategoryIds[0]] : [];
+                        .filter((catId: string | undefined): catId is string => Boolean(catId)) ?? [];
+                const categoryIdsSet = new Set(rawCategoryIds);
+                const availableCategoryById = new Map(categories.map((category) => [category._id, category] as const));
+                let nextMainCategoryId = "";
+                let nextSubCategoryId = "";
+                for (const catId of rawCategoryIds) {
+                    const category = availableCategoryById.get(catId);
+                    if (!category) continue;
+                    if (!category.parentId) {
+                        if (!nextMainCategoryId) nextMainCategoryId = category._id;
+                        continue;
+                    }
+                    const parentCategory = availableCategoryById.get(category.parentId);
+                    if (parentCategory && !nextMainCategoryId) nextMainCategoryId = parentCategory._id;
+                    if (!nextSubCategoryId) nextSubCategoryId = category._id;
+                }
+                if (!nextMainCategoryId) {
+                    const fallbackSubCategory = rawCategoryIds
+                        .map((catId) => availableCategoryById.get(catId))
+                        .find((category): category is Category => Boolean(category?.parentId));
+                    if (fallbackSubCategory?.parentId) {
+                        nextMainCategoryId = fallbackSubCategory.parentId;
+                        nextSubCategoryId = fallbackSubCategory._id;
+                    }
+                }
+                if (!nextMainCategoryId) {
+                    const fallbackMainCategory = rawCategoryIds
+                        .map((catId) => availableCategoryById.get(catId))
+                        .find((category): category is Category => Boolean(category && !category.parentId));
+                    if (fallbackMainCategory) {
+                        nextMainCategoryId = fallbackMainCategory._id;
+                    }
+                }
+                if (nextSubCategoryId && nextMainCategoryId) {
+                    const selectedSub = availableCategoryById.get(nextSubCategoryId);
+                    if (selectedSub?.parentId !== nextMainCategoryId) {
+                        nextSubCategoryId = "";
+                    }
+                }
+                // Keep any legacy extra category IDs after main+sub so existing data is not silently dropped.
+                const nextCategoryIds = [
+                    ...(nextMainCategoryId ? [nextMainCategoryId] : []),
+                    ...(nextSubCategoryId ? [nextSubCategoryId] : []),
+                    ...rawCategoryIds.filter(
+                        (catId) => catId !== nextMainCategoryId && catId !== nextSubCategoryId && categoryIdsSet.has(catId)
+                    ),
+                ];
+                const selectedCategoryForDiscount =
+                    availableCategoryById.get(nextSubCategoryId) ||
+                    availableCategoryById.get(nextMainCategoryId) ||
+                    null;
+                const categoryDiscountPercent =
+                    selectedCategoryForDiscount?.discountPercent != null
+                        ? String(selectedCategoryForDiscount.discountPercent)
+                        : "";
+                setInitialCategoryDiscountPercent(categoryDiscountPercent);
+                setMainCategoryId(nextMainCategoryId);
+                setSubCategoryId(nextSubCategoryId);
 
                 setFormData({
                     title: data.title ?? "",
@@ -264,7 +327,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                     description: data.description ?? "",
                     warranty: data.warranty ?? "",
                     brandId: data.brandId?._id || data.brandId || "",
-                    categoryIds: categoryIdsForForm,
+                    categoryIds: nextCategoryIds,
                     categoryDiscountPercent,
                     attributeGroups,
                     filterSpecs,
@@ -279,11 +342,11 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
             }
         };
         fetchProduct();
-    }, [id, isNew]);
+    }, [id, isNew, categories]);
 
     // Fetch featured spec keys for the selected category (only these show in Filter Specs)
     useEffect(() => {
-        const categoryId = formData.categoryIds[0];
+        const categoryId = effectiveCategoryId;
         if (!categoryId) {
             setFeaturedSpecKeys([]);
             return;
@@ -299,7 +362,22 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
             .then(({ data }: { data: { featuredSpecKeys?: string[] } }) => setFeaturedSpecKeys(data.featuredSpecKeys || []))
             .catch(() => setFeaturedSpecKeys([]))
             .finally(() => setFeaturedSpecsLoading(false));
-    }, [formData.categoryIds[0], categories]);
+    }, [effectiveCategoryId, categories]);
+
+    useEffect(() => {
+        const normalizedCategoryIds = [
+            ...(mainCategoryId ? [mainCategoryId] : []),
+            ...(subCategoryId ? [subCategoryId] : []),
+        ];
+        setFormData((prev) => {
+            const currentMain = prev.categoryIds[0] || "";
+            const currentSub = prev.categoryIds[1] || "";
+            if (currentMain === mainCategoryId && currentSub === subCategoryId && prev.categoryIds.length <= 2) {
+                return prev;
+            }
+            return { ...prev, categoryIds: normalizedCategoryIds };
+        });
+    }, [mainCategoryId, subCategoryId]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -310,8 +388,12 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                 formData.dealerPrice.trim() === "" ? null : parseFloat(formData.dealerPrice);
             const parsedStockQty = parseInt(formData.stock, 10);
             const normalizedBrandId = formData.brandId.trim();
-            const primaryCategoryId = formData.categoryIds[0]?.trim();
-            const normalizedCategoryIds = primaryCategoryId ? [primaryCategoryId] : [];
+            const normalizedMainCategoryId = mainCategoryId.trim();
+            const normalizedSubCategoryId = subCategoryId.trim();
+            const normalizedCategoryIds = [
+                ...(normalizedMainCategoryId ? [normalizedMainCategoryId] : []),
+                ...(normalizedSubCategoryId ? [normalizedSubCategoryId] : []),
+            ];
             const hasIncompleteAttributeValue = formData.attributeGroups.some((group) =>
                 group.attributes.some((attribute) => {
                     const hasAnyValue = attribute.name.trim() || attribute.value.trim();
@@ -355,7 +437,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                     ? null
                     : Math.max(0, Number(formData.discountPercent));
 
-            const selectedCategoryId = formData.categoryIds[0];
+            const selectedCategoryId = normalizedSubCategoryId || normalizedMainCategoryId;
             const parsedCategoryDiscountPercent =
                 formData.categoryDiscountPercent.trim() === ""
                     ? null
@@ -733,7 +815,9 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
             const nextCategoryDiscount =
                 newCategory?.discountPercent != null ? String(newCategory.discountPercent) : "";
             setInitialCategoryDiscountPercent(nextCategoryDiscount);
-            setFormData({ ...formData, categoryIds: [newCategory._id], categoryDiscountPercent: nextCategoryDiscount });
+            setMainCategoryId(newCategory._id);
+            setSubCategoryId("");
+            setFormData((prev) => ({ ...prev, categoryDiscountPercent: nextCategoryDiscount }));
         } catch (e) {
             console.error(e);
             toast.error("Failed to create category");
@@ -741,11 +825,12 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
     };
 
     const handleEditCategory = async () => {
-        if (!formData.categoryIds[0]) {
+        const selectedCategoryId = subCategoryId || mainCategoryId;
+        if (!selectedCategoryId) {
             toast("Select a category first");
             return;
         }
-        const category = categories.find(c => c._id === formData.categoryIds[0]);
+        const category = categories.find(c => c._id === selectedCategoryId);
         if (!category) return;
         const newName = window.prompt("Edit category name:", category.name);
         if (!newName || newName === category.name) return;
@@ -844,7 +929,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
         <div className="mx-auto w-full max-w-[1500px] px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
             <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
-                    <Link href="/admin/products" className="rounded-lg border border-border-soft p-2 text-main transition-colors hover:bg-base">
+                    <Link href={returnToPath} className="rounded-lg border border-border-soft p-2 text-main transition-colors hover:bg-base">
                         <ArrowLeft className="h-5 w-5" />
                     </Link>
                     <div>
@@ -982,7 +1067,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
 
                         <div className="space-y-2">
                             <label className="text-sub text-sm flex justify-between">
-                                Category
+                                Main category
                                 <div className="space-x-2">
                                     <button type="button" onClick={handleEditCategory} title="Edit Category" className="text-sub hover:text-main"><Edit2 className="w-4 h-4 inline" /></button>
                                     <button type="button" onClick={handleAddCategory} title="Add Category" className="text-blue-500 hover:text-blue-400"><Plus className="w-4 h-4 inline" /></button>
@@ -990,23 +1075,51 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                             </label>
                             <select
                                 className="w-full bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent [&>option]:text-white"
-                                value={formData.categoryIds[0] || ""}
+                                value={mainCategoryId}
                                 onChange={(e) => {
-                                    const nextCategoryId = e.target.value;
-                                    const cat = categories.find((c) => c._id === nextCategoryId);
+                                    const nextMainCategoryId = e.target.value;
+                                    setMainCategoryId(nextMainCategoryId);
+                                    setSubCategoryId("");
+                                    const cat = categories.find((c) => c._id === nextMainCategoryId);
                                     const nextCategoryDiscount =
                                         cat?.discountPercent != null ? String(cat.discountPercent) : "";
                                     setInitialCategoryDiscountPercent(nextCategoryDiscount);
-                                    setFormData({
-                                        ...formData,
-                                        categoryIds: [nextCategoryId],
+                                    setFormData((prev) => ({
+                                        ...prev,
                                         categoryDiscountPercent: nextCategoryDiscount,
-                                    });
+                                    }));
                                 }}
                             >
-                                <option value="">Select Category</option>
-                                {categories.map(c => (
-                                    <option key={c._id} value={c._id}>{c.name}</option>
+                                <option value="">Select Main Category</option>
+                                {mainCategories.map((category) => (
+                                    <option key={category._id} value={category._id}>{category.name}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-sub text-sm">Sub category (optional)</label>
+                            <select
+                                className="w-full bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent [&>option]:text-white disabled:opacity-60"
+                                value={subCategoryId}
+                                disabled={!mainCategoryId}
+                                onChange={(e) => {
+                                    const nextSubCategoryId = e.target.value;
+                                    setSubCategoryId(nextSubCategoryId);
+                                    const selectedCategoryId = nextSubCategoryId || mainCategoryId;
+                                    const cat = categories.find((c) => c._id === selectedCategoryId);
+                                    const nextCategoryDiscount =
+                                        cat?.discountPercent != null ? String(cat.discountPercent) : "";
+                                    setInitialCategoryDiscountPercent(nextCategoryDiscount);
+                                    setFormData((prev) => ({
+                                        ...prev,
+                                        categoryDiscountPercent: nextCategoryDiscount,
+                                    }));
+                                }}
+                            >
+                                <option value="">No sub category</option>
+                                {subCategories.map((category) => (
+                                    <option key={category._id} value={category._id}>{category.name}</option>
                                 ))}
                             </select>
                         </div>
@@ -1078,7 +1191,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                                 value={formData.categoryDiscountPercent}
                                 onChange={(e) => setFormData({ ...formData, categoryDiscountPercent: e.target.value })}
                                 placeholder="e.g. 1500"
-                                disabled={!formData.categoryIds[0]}
+                                disabled={!effectiveCategoryId}
                             />
                             <p className="text-xs text-sub">Leave empty to remove the category discount.</p>
                         </div>
@@ -1269,10 +1382,10 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                     {featuredSpecsLoading && (
                         <p className="text-sub text-sm italic">Loading featured specs for category…</p>
                     )}
-                    {!featuredSpecsLoading && !formData.categoryIds[0] && (
+                    {!featuredSpecsLoading && !effectiveCategoryId && (
                         <p className="text-sub text-sm italic">Select a category to see filter specs.</p>
                     )}
-                    {!featuredSpecsLoading && formData.categoryIds[0] && featuredSpecKeys.length === 0 && (
+                    {!featuredSpecsLoading && effectiveCategoryId && featuredSpecKeys.length === 0 && (
                         <p className="text-sub text-sm italic">No featured specs for this category. Configure them under Admin → Categories → Featured Specs.</p>
                     )}
                     {!featuredSpecsLoading && featuredSpecKeys.length > 0 && (

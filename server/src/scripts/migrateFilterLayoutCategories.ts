@@ -19,6 +19,7 @@ import fs from 'fs';
 import path from 'path';
 import mongoose from 'mongoose';
 import Category from '../models/Category';
+import CategoryFeaturedSpecs from '../models/CategoryFeaturedSpecs';
 import Product from '../models/Product';
 import { expandMongoSrvUri } from '../utils/expandMongoSrvUri';
 
@@ -297,6 +298,35 @@ async function main(): Promise<void> {
 
     const power = await ensureCategory('Power', 'power', null);
     const ups = await ensureCategory('UPS', 'ups', power._id);
+
+    const audioFeatured = await CategoryFeaturedSpecs.findOneAndUpdate(
+        { categoryKey: 'audio' },
+        { $addToSet: { featuredSpecKeys: 'connectivity' } },
+        { upsert: false, returnDocument: 'after' }
+    );
+    console.log(
+        '[migrate:filter-layout] Audio featured specs (connectivity added only when config exists):',
+        audioFeatured?.featuredSpecKeys ?? '(default_all: no explicit config)'
+    );
+
+    const peripheralsFeatured = await CategoryFeaturedSpecs.findOneAndUpdate(
+        { categoryKey: 'peripherals' },
+        { $addToSet: { featuredSpecKeys: 'connectivity' } },
+        { upsert: false, returnDocument: 'after' }
+    );
+    console.log(
+        '[migrate:filter-layout] Peripherals featured specs (connectivity added only when config exists):',
+        peripheralsFeatured?.featuredSpecKeys ?? '(default_all: no explicit config)'
+    );
+
+    // Keep "featured specs filter visible" behavior for all categories:
+    // empty explicit configs force mode "none", so remove them to fall back to default_all.
+    const deletedEmptyConfigs = await CategoryFeaturedSpecs.deleteMany({ featuredSpecKeys: { $size: 0 } });
+    if (deletedEmptyConfigs.deletedCount) {
+        console.log(
+            `[migrate:filter-layout] Removed ${deletedEmptyConfigs.deletedCount} empty featured-spec configs to restore default_all behavior.`
+        );
+    }
 
     const leafBySlug: Record<LeafSlug, CatRef> = {
         headsets,

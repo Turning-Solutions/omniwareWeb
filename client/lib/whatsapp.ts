@@ -16,10 +16,7 @@ export function buildProductWhatsAppUrl(input: {
     quantity?: number;
 }) {
     const phone = normalizePhone(input.customPhone ?? process.env.NEXT_PUBLIC_WHATSAPP_NUMBER);
-    const productUrl =
-        typeof window !== "undefined"
-            ? `${window.location.origin}${input.productPath}`
-            : input.productPath;
+    const productUrl = input.productPath;
 
     const intent = input.intent ?? "inquiry";
     const message =

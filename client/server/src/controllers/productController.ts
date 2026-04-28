@@ -26,30 +26,89 @@ function normalizeCategoryKeyForFeaturedSpecs(category: unknown): string | null 
     return first ? first.toLowerCase() : null;
 }
 
+function buildSlugVariants(slug: string): string[] {
+    const s = String(slug ?? '').trim().toLowerCase();
+    if (!s) return [];
+    const out = new Set<string>([s]);
+    if (s === 'mice') out.add('mouse');
+    if (s === 'mouse') out.add('mice');
+    if (s.endsWith('ies') && s.length > 3) out.add(`${s.slice(0, -3)}y`);
+    if (s.endsWith('y') && s.length > 1) out.add(`${s.slice(0, -1)}ies`);
+    if (s.endsWith('s') && s.length > 1) out.add(s.slice(0, -1));
+    if (!s.endsWith('s')) out.add(`${s}s`);
+    return Array.from(out);
+}
+
 async function resolveFeaturedSpecsForCategoryKey(categoryKey: string | null): Promise<string[]> {
     if (!categoryKey) return [];
     const key = categoryKey.toLowerCase();
-    const visited = new Set<string>();
-    let current = await Category.findOne({ slug: key }).select('_id slug parentId').lean();
+    const keyVariants = buildSlugVariants(key);
+    const direct = await CategoryFeaturedSpecs.findOne({ categoryKey: { $in: keyVariants } }).lean();
+    if (direct?.featuredSpecKeys?.length) return direct.featuredSpecKeys;
 
-    if (!current) {
-        const direct = await CategoryFeaturedSpecs.findOne({ categoryKey: key }).lean();
-        return direct?.featuredSpecKeys ?? [];
+    const pushAncestors = async (
+        start: { slug?: string | null; parentId?: unknown } | null | undefined,
+        out: string[],
+        seen: Set<string>
+    ): Promise<void> => {
+        let current = start ?? null;
+        for (let depth = 0; depth < 64 && current; depth++) {
+            const slug = String(current.slug ?? '').toLowerCase();
+            if (slug && !seen.has(slug)) {
+                seen.add(slug);
+                out.push(slug);
+            }
+            const parentId = (current as any).parentId;
+            if (!parentId) break;
+            current = await Category.findById(parentId).select('slug parentId').lean();
+        }
+    };
+
+    const seen = new Set<string>();
+    const candidateSlugs: string[] = [];
+    const selected = await Category.findOne({ slug: { $in: keyVariants } }).select('_id slug parentId').lean();
+    await pushAncestors(selected, candidateSlugs, seen);
+
+    // If parent links are incomplete, derive candidates from real product category assignments.
+    if (selected?._id) {
+        const relatedCategoryIds = await Product.aggregate<{ _id: unknown }>([
+            { $match: { isActive: true, categoryIds: selected._id } },
+            { $unwind: '$categoryIds' },
+            { $group: { _id: '$categoryIds', count: { $sum: 1 } } },
+            { $sort: { count: -1 } },
+            { $limit: 24 },
+        ]);
+
+        for (const item of relatedCategoryIds) {
+            const cat = await Category.findById(item._id).select('slug parentId').lean();
+            await pushAncestors(cat, candidateSlugs, seen);
+        }
     }
 
-    for (let depth = 0; depth < 64 && current; depth++) {
-        const slug = String(current.slug ?? '').toLowerCase();
-        if (slug && !visited.has(slug)) {
-            visited.add(slug);
-            const cfg = await CategoryFeaturedSpecs.findOne({ categoryKey: slug }).lean();
-            if (cfg && Array.isArray(cfg.featuredSpecKeys) && cfg.featuredSpecKeys.length > 0) {
-                return cfg.featuredSpecKeys;
+    if (candidateSlugs.length > 0) {
+        const candidateVariants = Array.from(
+            new Set(candidateSlugs.flatMap((slug) => buildSlugVariants(slug)))
+        );
+        const cfgDocs = await CategoryFeaturedSpecs.find({
+            categoryKey: { $in: candidateVariants },
+            featuredSpecKeys: { $exists: true, $ne: [] },
+        }).lean();
+        const caseInsensitiveCfgDocs = await CategoryFeaturedSpecs.find({
+            categoryKey: { $regex: `^(${candidateVariants.map((s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})$`, $options: 'i' },
+            featuredSpecKeys: { $exists: true, $ne: [] },
+        })
+            .select('categoryKey featuredSpecKeys')
+            .lean();
+        const keysBySlug = new Map<string, string[]>(
+            cfgDocs.map((d) => [String(d.categoryKey).toLowerCase(), d.featuredSpecKeys ?? []])
+        );
+        for (const slug of candidateSlugs) {
+            for (const variant of buildSlugVariants(slug)) {
+                const keys = keysBySlug.get(variant);
+                if (keys && keys.length > 0) return keys;
             }
         }
-        if (!current.parentId) break;
-        current = await Category.findById(current.parentId).select('_id slug parentId').lean();
     }
-
     return [];
 }
 
