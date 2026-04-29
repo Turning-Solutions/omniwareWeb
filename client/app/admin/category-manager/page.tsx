@@ -145,7 +145,7 @@ export default function CategoryManagerPage() {
             setPopupInfo({
                 title: status === 409 ? "Update blocked" : "Update failed",
                 message: getApiErrorMessage(error, "Could not update category."),
-                tone: status === 409 ? "info" : "danger",
+                tone: "danger",
             });
         } finally {
             setSavingEdit(false);
@@ -170,7 +170,7 @@ export default function CategoryManagerPage() {
             setPopupInfo({
                 title: status === 409 ? "Delete blocked" : "Delete failed",
                 message: getApiErrorMessage(error, "Could not delete category."),
-                tone: status === 409 ? "info" : "danger",
+                tone: "danger",
             });
         } finally {
             setCategoryToDelete(null);
