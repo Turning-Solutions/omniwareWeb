@@ -28,7 +28,7 @@ export function countActiveFilters(filters: Record<string, unknown>): number {
     let n = 0;
     if (filters.category) n += 1;
     if (filters.subcategories && String(filters.subcategories).trim()) {
-        n += String(filters.subcategories).split(",").filter(Boolean).length;
+        n += 1;
     }
     if (filters.minPrice !== undefined || filters.maxPrice !== undefined) n += 1;
     if (filters.brand && String(filters.brand).trim()) n += 1;
@@ -828,18 +828,20 @@ export default function DynamicFilterSidebar({
 
     const selectedSubcategories = () => {
         const raw = typeof filters.subcategories === "string" ? filters.subcategories : "";
-        return raw.split(",").filter(Boolean);
+        const first = raw.split(",").filter(Boolean)[0];
+        return first ? [first] : [];
     };
 
     const isSubcategorySelected = (value: string) => selectedSubcategories().includes(value);
 
     const handleSubcategoryToggle = (value: string) => {
-        const current = selectedSubcategories();
-        const nextList = current.includes(value)
-            ? current.filter((v: string) => v !== value)
-            : [...current, value];
-        const next = { ...filters, page: 1, subcategories: nextList.join(",") };
-        if (nextList.length === 0) delete next.subcategories;
+        const isCurrent = isSubcategorySelected(value);
+        const next = { ...filters, page: 1 };
+        if (isCurrent) {
+            delete next.subcategories;
+        } else {
+            next.subcategories = value;
+        }
         setFilters(next);
     };
 

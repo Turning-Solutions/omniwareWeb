@@ -20,6 +20,11 @@ function normalizeCategorySlugInput(value: unknown): string {
         .replace(/(^-|-$)/g, '');
 }
 
+async function hasProductsInCategory(categoryId: string): Promise<boolean> {
+    const linkedProduct = await Product.exists({ categoryIds: categoryId });
+    return Boolean(linkedProduct);
+}
+
 // GET /api/v1/admin/products
 router.get('/', async (req: Request, res: Response) => {
     const { q, category, brand, isActive, isFeatured, page = '1', limit = '20' } = req.query;
@@ -218,6 +223,17 @@ router.post('/categories', async (req: Request, res: Response) => {
 
 router.put('/categories/:id', async (req: Request, res: Response) => {
     try {
+        const categoryId = String(req.params.id || '');
+        const existingCategory = await Category.findById(categoryId).lean();
+        if (!existingCategory) return res.status(404).json({ message: 'Category not found' });
+
+        const categoryHasProducts = await hasProductsInCategory(categoryId);
+        if (categoryHasProducts) {
+            return res.status(409).json({
+                message: 'This category is linked to products and cannot be edited.',
+            });
+        }
+
         const update: Record<string, unknown> = { ...req.body };
         if (typeof update.name === 'string') update.name = update.name.trim();
         if ('slug' in update || typeof update.name === 'string') {
@@ -225,9 +241,47 @@ router.put('/categories/:id', async (req: Request, res: Response) => {
                 (typeof update.slug === 'string' && update.slug.trim()) ? update.slug : update.name
             );
         }
-        const category = await Category.findByIdAndUpdate(req.params.id, update, { returnDocument: 'after' });
-        if (!category) return res.status(404).json({ message: 'Category not found' });
+        if ('parentId' in update) {
+            const parentId = update.parentId ? String(update.parentId) : '';
+            if (parentId && parentId === categoryId) {
+                return res.status(400).json({ message: 'A category cannot be its own parent.' });
+            }
+        }
+
+        const category = await Category.findByIdAndUpdate(categoryId, update, { returnDocument: 'after' });
         res.json(category);
+    } catch (error) {
+        res.status(400).json({ message: (error as Error).message });
+    }
+});
+
+router.delete('/categories/:id', async (req: Request, res: Response) => {
+    try {
+        const categoryId = String(req.params.id || '');
+        const category = await Category.findById(categoryId).lean();
+        if (!category) return res.status(404).json({ message: 'Category not found' });
+
+        const categoryHasProducts = await hasProductsInCategory(categoryId);
+        if (categoryHasProducts) {
+            return res.status(409).json({
+                message: 'This category is linked to products and cannot be deleted.',
+            });
+        }
+
+        const childCategories = await Category.find({ parentId: categoryId }).select('_id').lean();
+        if (childCategories.length > 0) {
+            const childCategoryIds = childCategories.map((child) => String(child._id));
+            const childHasProducts = await Product.exists({ categoryIds: { $in: childCategoryIds } });
+            if (childHasProducts) {
+                return res.status(409).json({
+                    message: 'One or more subcategories have linked products. Delete or reassign those products first.',
+                });
+            }
+            await Category.deleteMany({ parentId: categoryId });
+        }
+
+        await Category.findByIdAndDelete(categoryId);
+        res.status(204).send();
     } catch (error) {
         res.status(400).json({ message: (error as Error).message });
     }

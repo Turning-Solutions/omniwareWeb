@@ -112,12 +112,13 @@ export function ShopContent({
         (value: string) => {
             const cur = filtersRef.current;
             const raw = typeof cur.subcategories === "string" ? cur.subcategories : "";
-            const current = raw.split(",").filter(Boolean);
-            const nextList = current.includes(value)
-                ? current.filter((v: string) => v !== value)
-                : [...current, value];
-            const next: Filters = { ...cur, page: 1, subcategories: nextList.join(",") };
-            if (nextList.length === 0) delete next.subcategories;
+            const current = raw.split(",").filter(Boolean)[0];
+            const next: Filters = { ...cur, page: 1 };
+            if (current === value) {
+                delete next.subcategories;
+            } else {
+                next.subcategories = value;
+            }
             prefetchShopListState(next);
         },
         [prefetchShopListState]

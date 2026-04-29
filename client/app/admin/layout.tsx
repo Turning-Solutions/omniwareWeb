@@ -3,13 +3,14 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, ShoppingBag, Package, Settings, Filter, Tag, ShieldCheck, ExternalLink, Menu, X, FileText, Star, Handshake } from "lucide-react";
+import { LayoutDashboard, ShoppingBag, Package, Settings, Filter, Tag, ShieldCheck, ExternalLink, Menu, X, FileText, Star, Handshake, FolderTree } from "lucide-react";
 import AdminAuthGuard from "@/components/AdminAuthGuard";
 
 const navItems = [
     { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
     { href: "/admin/orders", label: "Orders", icon: ShoppingBag },
     { href: "/admin/products", label: "Products", icon: Package },
+    { href: "/admin/category-manager", label: "Category Manager", icon: FolderTree },
     { href: "/admin/quotes", label: "Quotations", icon: FileText },
     { href: "/admin/reviews", label: "Reviews", icon: Star },
     { href: "/admin/categories/spec-features", label: "Featured Specs", icon: Filter },

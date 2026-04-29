@@ -24,6 +24,7 @@ interface Product {
 interface Category {
     _id: string;
     name: string;
+    parentId?: string | null;
 }
 
 interface Brand {
@@ -48,7 +49,8 @@ export default function ProductsPage() {
     const [searchTerm, setSearchTerm] = useState("");
     const [categories, setCategories] = useState<Category[]>([]);
     const [brands, setBrands] = useState<Brand[]>([]);
-    const [selectedCategory, setSelectedCategory] = useState("");
+    const [selectedMainCategory, setSelectedMainCategory] = useState("");
+    const [selectedSubCategory, setSelectedSubCategory] = useState("");
     const [selectedBrand, setSelectedBrand] = useState("");
     const [featuredOnly, setFeaturedOnly] = useState(false);
     const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
@@ -118,7 +120,7 @@ export default function ProductsPage() {
             window.removeEventListener("storage", onStorage);
             window.removeEventListener("admin-products-updated", onCustomUpdated as EventListener);
         };
-    }, [selectedCategory, selectedBrand, debouncedSearchTerm, featuredOnly, currentPage]);
+    }, [selectedMainCategory, selectedSubCategory, selectedBrand, debouncedSearchTerm, featuredOnly, currentPage]);
 
     useEffect(() => {
         const handle = window.setTimeout(() => setDebouncedSearchTerm(searchTerm.trim()), 350);
@@ -127,21 +129,22 @@ export default function ProductsPage() {
 
     useEffect(() => {
         setCurrentPage(1);
-    }, [debouncedSearchTerm, selectedCategory, selectedBrand, featuredOnly]);
+    }, [debouncedSearchTerm, selectedMainCategory, selectedSubCategory, selectedBrand, featuredOnly]);
 
     // Single effect: fetch products on mount and when filters/search change (avoids duplicate calls on load)
     useEffect(() => {
         fetchProducts();
-    }, [selectedCategory, selectedBrand, debouncedSearchTerm, featuredOnly, currentPage]);
+    }, [selectedMainCategory, selectedSubCategory, selectedBrand, debouncedSearchTerm, featuredOnly, currentPage]);
 
     const fetchProducts = async () => {
         setIsFetching(true);
         try {
+            const effectiveCategory = selectedSubCategory || selectedMainCategory;
             const queryParams = new URLSearchParams({
                 limit: '20',
                 page: String(currentPage),
                 ...(debouncedSearchTerm && { q: debouncedSearchTerm }),
-                ...(selectedCategory && { category: selectedCategory }),
+                ...(effectiveCategory && { category: effectiveCategory }),
                 ...(selectedBrand && { brand: selectedBrand }),
                 ...(featuredOnly && { isFeatured: "true" }),
                 _t: String(Date.now()),
@@ -214,19 +217,23 @@ export default function ProductsPage() {
     };
 
     const filteredProducts = products; // Filtering handled by API now
-    const hasFilters = Boolean(searchTerm || selectedCategory || selectedBrand || featuredOnly);
+    const hasFilters = Boolean(searchTerm || selectedMainCategory || selectedSubCategory || selectedBrand || featuredOnly);
     const activeCount = filteredProducts.filter((p) => p.isActive).length;
     const featuredCount = filteredProducts.filter((p) => p.isFeatured).length;
     const inactiveCount = filteredProducts.length - activeCount;
     const lowStockCount = filteredProducts.filter((p) => (p.stock?.qty || 0) > 0 && (p.stock?.qty || 0) <= 5).length;
     const outOfStockCount = filteredProducts.filter((p) => (p.stock?.qty || 0) === 0).length;
-    const selectedCategoryName = categories.find((c) => c._id === selectedCategory)?.name;
+    const mainCategories = categories.filter((c) => !c.parentId);
+    const subCategories = categories.filter((c) => c.parentId === selectedMainCategory);
+    const selectedMainCategoryName = categories.find((c) => c._id === selectedMainCategory)?.name;
+    const selectedSubCategoryName = categories.find((c) => c._id === selectedSubCategory)?.name;
     const selectedBrandName = brands.find((b) => b._id === selectedBrand)?.name;
 
     const clearFilters = () => {
         setSearchTerm("");
         setDebouncedSearchTerm("");
-        setSelectedCategory("");
+        setSelectedMainCategory("");
+        setSelectedSubCategory("");
         setSelectedBrand("");
         setFeaturedOnly(false);
         setCurrentPage(1);
@@ -271,17 +278,32 @@ export default function ProductsPage() {
                             }}
                         />
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-[1fr_1fr_auto_auto] gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-[1fr_1fr_1fr_auto_auto] gap-3">
                         <select
                             className="bg-base border border-border-soft rounded-lg px-4 py-2.5 text-main focus:outline-none focus:border-accent [&>option]:text-white"
-                            value={selectedCategory}
+                            value={selectedMainCategory}
                             onChange={(e) => {
                                 setCurrentPage(1);
-                                setSelectedCategory(e.target.value);
+                                setSelectedMainCategory(e.target.value);
+                                setSelectedSubCategory("");
                             }}
                         >
-                            <option value="">All Categories</option>
-                            {categories.map((c) => (
+                            <option value="">All Main Categories</option>
+                            {mainCategories.map((c) => (
+                                <option key={c._id} value={c._id}>{c.name}</option>
+                            ))}
+                        </select>
+                        <select
+                            className="bg-base border border-border-soft rounded-lg px-4 py-2.5 text-main focus:outline-none focus:border-accent [&>option]:text-white disabled:opacity-60"
+                            value={selectedSubCategory}
+                            disabled={!selectedMainCategory}
+                            onChange={(e) => {
+                                setCurrentPage(1);
+                                setSelectedSubCategory(e.target.value);
+                            }}
+                        >
+                            <option value="">{selectedMainCategory ? "All Sub Categories" : "Select main category first"}</option>
+                            {subCategories.map((c) => (
                                 <option key={c._id} value={c._id}>{c.name}</option>
                             ))}
                         </select>
@@ -335,9 +357,14 @@ export default function ProductsPage() {
                             Search: {searchTerm}
                         </span>
                     ) : null}
-                    {selectedCategory ? (
+                    {selectedMainCategory ? (
                         <span className="text-xs px-2 py-1 rounded-full bg-base text-main border border-border-soft">
-                            Category: {selectedCategoryName || "Selected"}
+                            Main: {selectedMainCategoryName || "Selected"}
+                        </span>
+                    ) : null}
+                    {selectedSubCategory ? (
+                        <span className="text-xs px-2 py-1 rounded-full bg-base text-main border border-border-soft">
+                            Sub: {selectedSubCategoryName || "Selected"}
                         </span>
                     ) : null}
                     {selectedBrand ? (
@@ -365,8 +392,6 @@ export default function ProductsPage() {
                             <tr>
                                 <th className="px-4 sm:px-6 py-4">Title</th>
                                 <th className="px-4 sm:px-6 py-4">Price</th>
-                                <th className="px-4 sm:px-6 py-4">Dealer Price</th>
-                                <th className="px-4 sm:px-6 py-4">Stock</th>
                                 <th className="px-4 sm:px-6 py-4">Brand</th>
                                 <th className="px-4 sm:px-6 py-4">Category</th>
                                 <th className="px-4 sm:px-6 py-4">Status</th>
@@ -376,9 +401,9 @@ export default function ProductsPage() {
                         </thead>
                         <tbody className="divide-y divide-border-soft text-main">
                             {loading ? (
-                                <tr><td colSpan={9} className="px-6 py-8 text-center text-sub">Loading...</td></tr>
+                                <tr><td colSpan={7} className="px-6 py-8 text-center text-sub">Loading...</td></tr>
                             ) : filteredProducts.length === 0 ? (
-                                <tr><td colSpan={9} className="px-6 py-8 text-center text-sub">No products found</td></tr>
+                                <tr><td colSpan={7} className="px-6 py-8 text-center text-sub">No products found</td></tr>
                             ) : (
                                 filteredProducts.map((product) => {
                                     const isRecentlyUpdated = recentlyUpdatedId === product._id;
@@ -398,10 +423,7 @@ export default function ProductsPage() {
                                             ) : null}
                                         </td>
                                         <td className="px-4 sm:px-6 py-4 whitespace-nowrap">LKR {product.price.toLocaleString()}</td>
-                                        <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
-                                            {product.dealerPrice != null ? `LKR ${product.dealerPrice.toLocaleString()}` : "-"}
-                                        </td>
-                                        <td className="px-4 sm:px-6 py-4 whitespace-nowrap">{product.stock?.qty || 0}</td>
+                                       
                                         <td className="px-4 sm:px-6 py-4 whitespace-nowrap">{product.brandId?.name || '-'}</td>
                                         <td className="px-4 sm:px-6 py-4 max-w-[260px] truncate" title={product.categoryIds?.map(c => c.name).join(', ') || '-'}>
                                             {product.categoryIds?.map(c => c.name).join(", ") || "-"}
