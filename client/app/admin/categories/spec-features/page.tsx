@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Save, RefreshCw, Search, Plus, Trash2 } from "lucide-react";
 import api from "@/lib/api";
 import PopupDialog from "@/components/PopupDialog";
@@ -9,6 +9,7 @@ interface Category {
     _id: string;
     name: string;
     slug: string;
+    parentId?: string | null;
 }
 
 const sortByName = <T extends { name: string }>(items: T[]) =>
@@ -17,6 +18,7 @@ const sortByName = <T extends { name: string }>(items: T[]) =>
 export default function FeaturedSpecsAdmin() {
     const [categories, setCategories] = useState<Category[]>([]);
     const [selectedCategory, setSelectedCategory] = useState("");
+    const [productCategoryIds, setProductCategoryIds] = useState<Set<string>>(new Set());
 
     const [availableSpecKeys, setAvailableSpecKeys] = useState<string[]>([]);
     /** Featured specs in display order; selected are shown first and can be edited */
@@ -29,12 +31,122 @@ export default function FeaturedSpecsAdmin() {
     const [showResetConfirm, setShowResetConfirm] = useState(false);
     const [popupInfo, setPopupInfo] = useState<{ title: string; message: string; tone: "success" | "danger" } | null>(null);
     const sortedCategories = sortByName(categories);
+    const categoryById = useMemo(
+        () => new Map(categories.map((category) => [String(category._id), category])),
+        [categories]
+    );
+    const childrenByParentId = useMemo(() => {
+        const children = new Map<string, string[]>();
+        categories.forEach((category) => {
+            if (!category.parentId) return;
+            const parentId = String(category.parentId);
+            const current = children.get(parentId) || [];
+            current.push(String(category._id));
+            children.set(parentId, current);
+        });
+        return children;
+    }, [categories]);
+    const selectableCategories = useMemo(
+        () => {
+            const memo = new Map<string, boolean>();
+
+            const hasProductsInSelfOrDescendants = (categoryId: string, visiting = new Set<string>()): boolean => {
+                if (memo.has(categoryId)) return Boolean(memo.get(categoryId));
+                if (visiting.has(categoryId)) return false;
+                visiting.add(categoryId);
+
+                if (productCategoryIds.has(categoryId)) {
+                    memo.set(categoryId, true);
+                    visiting.delete(categoryId);
+                    return true;
+                }
+
+                const childIds = childrenByParentId.get(categoryId) || [];
+                for (const childId of childIds) {
+                    if (hasProductsInSelfOrDescendants(childId, visiting)) {
+                        memo.set(categoryId, true);
+                        visiting.delete(categoryId);
+                        return true;
+                    }
+                }
+
+                memo.set(categoryId, false);
+                visiting.delete(categoryId);
+                return false;
+            };
+
+            const getCategoryDepth = (category: Category): number => {
+                let depth = 0;
+                let parentId = category.parentId ? String(category.parentId) : "";
+                const seen = new Set<string>();
+                while (parentId && !seen.has(parentId)) {
+                    seen.add(parentId);
+                    depth += 1;
+                    const parent = categoryById.get(parentId);
+                    if (!parent) break;
+                    parentId = parent.parentId ? String(parent.parentId) : "";
+                }
+                return depth;
+            };
+
+            return sortedCategories.filter((category) =>
+                getCategoryDepth(category) <= 1 &&
+                hasProductsInSelfOrDescendants(String(category._id))
+            );
+        },
+        [sortedCategories, productCategoryIds, childrenByParentId, categoryById]
+    );
 
     useEffect(() => {
-        api.get("/products/categories")
-            .then(({ data }) => setCategories(data))
-            .catch(err => console.error("Failed to fetch categories", err));
+        const fetchCategoriesAndAvailability = async () => {
+            try {
+                const categoriesRes = await api.get("/products/categories");
+                setCategories(categoriesRes.data || []);
+
+                const usedCategoryIds = new Set<string>();
+                let page = 1;
+                let totalPages = 1;
+
+                while (page <= totalPages) {
+                    const { data } = await api.get(`/admin/products?page=${page}&limit=100`);
+                    const products = Array.isArray(data?.data) ? data.data : [];
+                    totalPages = Math.max(Number(data?.pagination?.pages ?? 1), 1);
+
+                    products.forEach((product: { categoryIds?: Array<string | { _id?: string }> }) => {
+                        const productCategories = Array.isArray(product?.categoryIds) ? product.categoryIds : [];
+                        productCategories.forEach((category) => {
+                            const categoryId =
+                                typeof category === "string"
+                                    ? category
+                                    : typeof category?._id === "string"
+                                        ? category._id
+                                        : "";
+                            if (categoryId) usedCategoryIds.add(String(categoryId));
+                        });
+                    });
+
+                    page += 1;
+                }
+
+                setProductCategoryIds(usedCategoryIds);
+            } catch (err) {
+                console.error("Failed to fetch categories", err);
+            }
+        };
+
+        void fetchCategoriesAndAvailability();
     }, []);
+
+    useEffect(() => {
+        if (!selectedCategory) return;
+        const stillSelectable = selectableCategories.some((category) => category.slug === selectedCategory);
+        if (!stillSelectable) {
+            setSelectedCategory("");
+            setAvailableSpecKeys([]);
+            setFeaturedSpecKeys([]);
+            setMode("default_all");
+        }
+    }, [selectedCategory, selectableCategories]);
 
     useEffect(() => {
         if (!selectedCategory) {
@@ -152,7 +264,7 @@ export default function FeaturedSpecsAdmin() {
                     onChange={(e) => setSelectedCategory(e.target.value)}
                 >
                     <option value="">-- Choose Category --</option>
-                    {sortedCategories.map(c => (
+                    {selectableCategories.map(c => (
                         <option key={c._id} value={c.slug}>{c.name}</option>
                     ))}
                 </select>
