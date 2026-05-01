@@ -183,8 +183,8 @@ export default function AdminReviewsPage() {
                         className="rounded-lg border border-border-soft bg-base px-3 py-2 text-sm text-main focus:border-accent focus:outline-none"
                     >
                         <option value="all">All</option>
-                        <option value="pending">Pending</option>
                         <option value="approved">Approved</option>
+                        <option value="pending">Pending</option>
                         <option value="rejected">Rejected</option>
                     </select>
                 </div>
@@ -196,8 +196,8 @@ export default function AdminReviewsPage() {
                         className="rounded-lg border border-border-soft bg-base px-3 py-2 text-sm text-main focus:border-accent focus:outline-none"
                     >
                         <option value="all">Shop & product</option>
-                        <option value="shop">Shop only</option>
                         <option value="product">Product only</option>
+                        <option value="shop">Shop only</option>
                     </select>
                 </div>
             </div>

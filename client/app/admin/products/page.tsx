@@ -39,6 +39,9 @@ interface PaginationState {
     limit: number;
 }
 
+const sortByName = <T extends { name: string }>(items: T[]) =>
+    [...items].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+
 export default function ProductsPage() {
     const router = useRouter();
     const pathname = usePathname();
@@ -223,11 +226,12 @@ export default function ProductsPage() {
     const inactiveCount = filteredProducts.length - activeCount;
     const lowStockCount = filteredProducts.filter((p) => (p.stock?.qty || 0) > 0 && (p.stock?.qty || 0) <= 5).length;
     const outOfStockCount = filteredProducts.filter((p) => (p.stock?.qty || 0) === 0).length;
-    const mainCategories = categories.filter((c) => !c.parentId);
-    const subCategories = categories.filter((c) => c.parentId === selectedMainCategory);
+    const mainCategories = sortByName(categories.filter((c) => !c.parentId));
+    const subCategories = sortByName(categories.filter((c) => c.parentId === selectedMainCategory));
     const selectedMainCategoryName = categories.find((c) => c._id === selectedMainCategory)?.name;
     const selectedSubCategoryName = categories.find((c) => c._id === selectedSubCategory)?.name;
     const selectedBrandName = brands.find((b) => b._id === selectedBrand)?.name;
+    const sortedBrands = sortByName(brands);
 
     const clearFilters = () => {
         setSearchTerm("");
@@ -316,7 +320,7 @@ export default function ProductsPage() {
                             }}
                         >
                             <option value="">All Brands</option>
-                            {brands.map((b) => (
+                            {sortedBrands.map((b) => (
                                 <option key={b._id} value={b._id}>{b.name}</option>
                             ))}
                         </select>

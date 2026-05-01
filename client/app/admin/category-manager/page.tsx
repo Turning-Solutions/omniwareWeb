@@ -25,6 +25,9 @@ function getApiStatus(error: unknown): number | undefined {
     return undefined;
 }
 
+const sortByName = <T extends { name: string }>(items: T[]) =>
+    [...items].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+
 export default function CategoryManagerPage() {
     const [categories, setCategories] = useState<Category[]>([]);
     const [loading, setLoading] = useState(true);
@@ -63,9 +66,11 @@ export default function CategoryManagerPage() {
     }, []);
 
     const mainCategories = useMemo(
-        () => categories.filter((category) => !category.parentId),
+        () => sortByName(categories.filter((category) => !category.parentId)),
         [categories]
     );
+
+    const sortedCategories = useMemo(() => sortByName(categories), [categories]);
 
     const subcategoriesByParent = useMemo(() => {
         const map = new Map<string, Category[]>();
@@ -240,7 +245,7 @@ export default function CategoryManagerPage() {
                                 className="w-full rounded-lg border border-border-soft bg-base px-4 py-2 text-main focus:border-accent focus:outline-none [&>option]:text-white"
                             >
                                 <option value="">Choose category...</option>
-                                {categories.map((category) => (
+                                {sortedCategories.map((category) => (
                                     <option key={category._id} value={category._id}>
                                         {category.name}
                                     </option>

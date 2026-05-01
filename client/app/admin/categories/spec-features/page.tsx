@@ -11,6 +11,9 @@ interface Category {
     slug: string;
 }
 
+const sortByName = <T extends { name: string }>(items: T[]) =>
+    [...items].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+
 export default function FeaturedSpecsAdmin() {
     const [categories, setCategories] = useState<Category[]>([]);
     const [selectedCategory, setSelectedCategory] = useState("");
@@ -25,6 +28,7 @@ export default function FeaturedSpecsAdmin() {
     const [searchQuery, setSearchQuery] = useState("");
     const [showResetConfirm, setShowResetConfirm] = useState(false);
     const [popupInfo, setPopupInfo] = useState<{ title: string; message: string; tone: "success" | "danger" } | null>(null);
+    const sortedCategories = sortByName(categories);
 
     useEffect(() => {
         api.get("/products/categories")
@@ -148,7 +152,7 @@ export default function FeaturedSpecsAdmin() {
                     onChange={(e) => setSelectedCategory(e.target.value)}
                 >
                     <option value="">-- Choose Category --</option>
-                    {categories.map(c => (
+                    {sortedCategories.map(c => (
                         <option key={c._id} value={c.slug}>{c.name}</option>
                     ))}
                 </select>

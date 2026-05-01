@@ -104,13 +104,13 @@ export default function AdminOrdersPage() {
                         onChange={(e) => setStatus(e.target.value)}
                     >
                         <option value="">All Statuses</option>
-                        <option value="waiting_confirmation">Waiting Confirmation</option>
                         <option value="confirmed">Confirmed</option>
+                        <option value="delivered">Delivered</option>
+                        <option value="out_for_delivery">Out for Delivery</option>
                         <option value="preparing">Preparing</option>
                         <option value="ready_for_pickup">Ready for Pickup</option>
-                        <option value="out_for_delivery">Out for Delivery</option>
-                        <option value="delivered">Delivered</option>
                         <option value="rejected">Rejected</option>
+                        <option value="waiting_confirmation">Waiting Confirmation</option>
                     </select>
                     <select
                         className="bg-base border border-border-soft rounded-lg px-4 py-2 text-main text-sm focus:outline-none focus:border-accent [&>option]:text-white"

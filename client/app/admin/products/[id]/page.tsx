@@ -81,6 +81,9 @@ const COLOR_NAME_TO_HEX: Record<string, string> = {
     beige: "#F5F5DC",
 };
 
+const sortByName = <T extends { name: string }>(items: T[]) =>
+    [...items].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+
 function getApiErrorMessage(error: unknown) {
     if (!isAxiosError(error)) return "Failed to save product";
     const message = error.response?.data?.message;
@@ -176,9 +179,17 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
     const [selectedAttributeKeys, setSelectedAttributeKeys] = useState<Set<string>>(new Set());
     const previewTarget = !isNew ? (formData.slug?.trim() || id) : "";
     const previewPath = previewTarget ? `/product/${previewTarget}?preview=${previewRefreshKey}` : "";
-    const mainCategories = categories.filter((category) => !category.parentId);
-    const subCategories = categories.filter((category) => category.parentId === mainCategoryId);
+    const mainCategories = sortByName(categories.filter((category) => !category.parentId));
+    const subCategories = sortByName(categories.filter((category) => category.parentId === mainCategoryId));
     const effectiveCategoryId = subCategoryId || mainCategoryId;
+    const sortedBrands = sortByName(brands);
+    const sortedAttributeGroupTargets = useMemo(
+        () =>
+            formData.attributeGroups
+                .map((group, index) => ({ index, label: group.category || `Category ${index + 1}` }))
+                .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" })),
+        [formData.attributeGroups]
+    );
 
     const notifyProductsListUpdated = (productId: string) => {
         if (typeof window === "undefined") return;
@@ -1038,10 +1049,10 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                                 value={formData.availability}
                                 onChange={(e) => setFormData({ ...formData, availability: e.target.value as typeof formData.availability })}
                             >
+                                <option value="coming_soon">Coming Soon</option>
                                 <option value="in_stock">In Stock</option>
                                 <option value="out_of_stock">Out of Stock</option>
                                 <option value="pre_order">Pre-Order</option>
-                                <option value="coming_soon">Coming Soon</option>
                             </select>
                         </div>
 
@@ -1059,7 +1070,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                                 onChange={(e) => setFormData({ ...formData, brandId: e.target.value })}
                             >
                                 <option value="">Select Brand</option>
-                                {brands.map(b => (
+                                {sortedBrands.map(b => (
                                     <option key={b._id} value={b._id}>{b.name}</option>
                                 ))}
                             </select>
@@ -1468,9 +1479,9 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                                 className="bg-base border border-border-soft rounded-lg px-3 py-1.5 text-sm text-main focus:outline-none focus:border-accent [&>option]:text-white"
                             >
                                 <option value="">Move to category…</option>
-                                {formData.attributeGroups.map((g, i) => (
-                                    <option key={i} value={i}>
-                                        {g.category || `Category ${i + 1}`}
+                                {sortedAttributeGroupTargets.map((target) => (
+                                    <option key={target.index} value={target.index}>
+                                        {target.label}
                                     </option>
                                 ))}
                             </select>
