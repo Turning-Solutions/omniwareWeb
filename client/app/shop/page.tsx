@@ -1,6 +1,7 @@
 import { dehydrate, HydrationBoundary, QueryClient } from "@tanstack/react-query";
 import ShopPageClient from "./ShopPageClient";
 import {
+    prefetchShopFacets,
     prefetchShopProductsList,
     shopProductsListQueryOptionsForHydration,
 } from "@/lib/shopInitialProductsFetch";
@@ -21,7 +22,11 @@ export default async function ShopPage({ searchParams }: ShopPageProps) {
 
     const queryClient = new QueryClient();
     const listOptions = shopProductsListQueryOptionsForHydration({ search: initialSearch });
-    await prefetchShopProductsList(queryClient, listOptions);
+    const facetOptions = { search: initialSearch };
+    await Promise.all([
+        prefetchShopProductsList(queryClient, listOptions),
+        prefetchShopFacets(queryClient, facetOptions),
+    ]);
 
     return (
         <HydrationBoundary state={dehydrate(queryClient)}>

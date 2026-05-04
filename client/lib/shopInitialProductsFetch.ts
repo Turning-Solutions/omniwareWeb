@@ -2,7 +2,9 @@ import { headers } from "next/headers";
 import { QueryClient } from "@tanstack/react-query";
 import {
     buildProductsQueryString,
+    getProductFacetsQueryOptions,
     getProductsQueryOptions,
+    type Facets,
     type ProductsResponse,
     type UseProductsOptions,
 } from "@/hooks/useProducts";
@@ -47,6 +49,41 @@ export async function prefetchShopProductsList(queryClient: QueryClient, options
     await queryClient.prefetchQuery({
         ...getProductsQueryOptions(options),
         queryFn: () => fetchShopProductsJson(options),
+        staleTime: 2 * 60 * 1000,
+    });
+}
+
+export async function fetchShopFacetsJson(options: UseProductsOptions): Promise<{ facets: Facets }> {
+    const base = await resolveServerApiBaseUrl();
+    const params = new URLSearchParams();
+    if (options.search) params.append("search", options.search);
+    if (options.category) params.append("category", options.category);
+    if (options.brand) params.append("brand", options.brand);
+    if (options.minPrice != null) params.append("minPrice", String(options.minPrice));
+    if (options.maxPrice != null) params.append("maxPrice", String(options.maxPrice));
+    if (options.availability) params.append("availability", options.availability);
+    if (options.inStock) params.append("inStock", options.inStock);
+    if (options.isFeatured != null) params.append("isFeatured", String(options.isFeatured));
+    if (options.facetMode === "lite") params.append("mode", "lite");
+    if (options.spec && typeof options.spec === "object") {
+        for (const [key, value] of Object.entries(options.spec)) {
+            if (value != null && value !== "") params.append(`spec[${key}]`, value);
+        }
+    }
+    const query = params.toString();
+    const url = `${base}/api/v1/products/facets${query ? `?${query}` : ""}`;
+    const res = await fetch(url, {
+        next: { revalidate: PRODUCTS_REVALIDATE_SECONDS },
+        headers: { Accept: "application/json" },
+    });
+    if (!res.ok) throw new Error(`GET facets failed: ${res.status}`);
+    return (await res.json()) as { facets: Facets };
+}
+
+export async function prefetchShopFacets(queryClient: QueryClient, options: UseProductsOptions) {
+    await queryClient.prefetchQuery({
+        ...getProductFacetsQueryOptions(options),
+        queryFn: () => fetchShopFacetsJson(options),
         staleTime: 2 * 60 * 1000,
     });
 }

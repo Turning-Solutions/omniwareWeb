@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { HOME_PROMOTIONS_QUERY_KEY, type HomePromotion } from "@/lib/homePromotionsQuery";
 import { fetchShopProductsJson } from "@/lib/shopInitialProductsFetch";
 import { getHomeFeaturedProductsQueryOptions, HOME_FEATURED_PRODUCTS_OPTIONS } from "@/lib/homeFeaturedProductsQuery";
+import { FALLBACK_TOP_BRANDS, HOME_PARTNERS_QUERY_KEY, type PartnerBrand } from "@/lib/homePartnersQuery";
 
 const PROMOTIONS_REVALIDATE_SECONDS = 60;
 
@@ -48,6 +49,26 @@ export async function prefetchHomeFeaturedProducts(queryClient: QueryClient): Pr
         ...getHomeFeaturedProductsQueryOptions(),
         queryFn: () => fetchShopProductsJson(HOME_FEATURED_PRODUCTS_OPTIONS),
         staleTime: 2 * 60 * 1000,
+    });
+}
+
+export async function fetchHomePartnersJson(): Promise<PartnerBrand[]> {
+    const base = await resolveServerApiBaseUrl();
+    const url = `${base}/api/v1/partners/active`;
+    const res = await fetch(url, {
+        next: { revalidate: 300 },
+        headers: { Accept: "application/json" },
+    });
+    if (!res.ok) return FALLBACK_TOP_BRANDS;
+    const data = (await res.json()) as unknown;
+    return Array.isArray(data) ? (data as PartnerBrand[]) : FALLBACK_TOP_BRANDS;
+}
+
+export async function prefetchHomePartners(queryClient: QueryClient): Promise<void> {
+    await queryClient.prefetchQuery({
+        queryKey: HOME_PARTNERS_QUERY_KEY,
+        queryFn: fetchHomePartnersJson,
+        staleTime: 20 * 60 * 1000,
     });
 }
 

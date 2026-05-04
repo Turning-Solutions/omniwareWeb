@@ -24,6 +24,7 @@ import FlowSectionHeader from "@/components/FlowSectionHeader";
 import api from "@/lib/api";
 import LoadingAnimation from "@/components/LoadingAnimation";
 import { HOME_FEATURED_PRODUCTS_OPTIONS } from "@/lib/homeFeaturedProductsQuery";
+import { useHomePartners } from "@/lib/homePartnersQuery";
 
 const DeferredShopReviewsStrip = dynamic(() => import("@/components/ShopReviewsStrip"), {
     ssr: false,
@@ -109,39 +110,7 @@ export default function Home() {
     const [searchDraft, setSearchDraft] = useState("");
     const [previewQuery, setPreviewQuery] = useState("");
 
-    const FALLBACK_TOP_BRANDS: Array<{ _id?: string; name: string; logoUrl?: string }> = [
-        { name: "AMD" },
-        { name: "INTEL" },
-        { name: "NVIDIA" },
-        { name: "ASUS" },
-        { name: "MSI" },
-        { name: "GIGABYTE" },
-        { name: "ZOTAG" },
-        { name: "CORSAIR" },
-        { name: "NZXT" },
-        { name: "ANTEC" },
-        { name: "PROLINK" },
-        { name: "OMIKUMA" },
-        { name: "WD" },
-        { name: "SAMSUNG" },
-    ];
-
-    type PartnerBrand = { _id?: string; name: string; logoUrl?: string };
-
-    const { data: topBrands = [] } = useQuery({
-        queryKey: ["partners", "active"] as const,
-        queryFn: async (): Promise<PartnerBrand[]> => {
-            try {
-                const res = await fetch("/api/v1/partners/active");
-                if (!res.ok) throw new Error("Failed to load partners");
-                const data: unknown = await res.json();
-                return Array.isArray(data) ? (data as PartnerBrand[]) : [];
-            } catch {
-                return FALLBACK_TOP_BRANDS;
-            }
-        },
-        staleTime: 20 * 60 * 1000,
-    });
+    const { data: topBrands = [] } = useHomePartners();
 
     const { data: featuredData, isLoading: loadingFeatured } = useProducts({
         ...HOME_FEATURED_PRODUCTS_OPTIONS,
