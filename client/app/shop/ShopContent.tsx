@@ -16,12 +16,26 @@ import { SlidersHorizontal, ArrowUpDown, X, ChevronLeft, ChevronRight, Search } 
 import { SHOP_PRODUCTS_PER_PAGE } from "@/lib/shopConstants";
 
 const SEARCH_DEBOUNCE_MS = 380;
+const HOVER_PREFETCH_DEBOUNCE_MS = 180;
 const SHOP_RETURN_STATE_PREFIX = "shop:return-state:";
 const SHOP_LIST_STALE_MS = 2 * 60 * 1000;
 
 type Filters = Record<string, any>;
 
 const DEFAULT_FILTERS: Filters = { search: "", sort: "newest", page: 1 };
+
+function hasNarrowingFilters(filters: Filters): boolean {
+    if (typeof filters.category === "string" && filters.category.trim()) return true;
+    if (typeof filters.subcategories === "string" && filters.subcategories.trim()) return true;
+    if (typeof filters.brand === "string" && filters.brand.trim()) return true;
+    if (filters.minPrice !== undefined || filters.maxPrice !== undefined) return true;
+    if (typeof filters.search === "string" && filters.search.trim()) return true;
+    if (filters.availability) return true;
+    if (filters.inStock === "true") return true;
+    if (filters.isFeatured === true || filters.isFeatured === false || filters.isFeatured === "true" || filters.isFeatured === "false") return true;
+    if (filters.spec && typeof filters.spec === "object" && Object.keys(filters.spec).length > 0) return true;
+    return false;
+}
 
 export interface ShopContentProps {
     basePath?: string;
@@ -64,6 +78,8 @@ export function ShopContent({
     const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const filtersRef = useRef(filters);
     filtersRef.current = filters;
+    const hoverPrefetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const lastHoverPrefetchKeyRef = useRef<string>("");
 
     const rememberCurrentShopState = useCallback(() => {
         if (typeof window === "undefined") return;
@@ -87,6 +103,19 @@ export function ShopContent({
         [queryClient]
     );
 
+    const scheduleHoverPrefetch = useCallback(
+        (key: string, next: Filters) => {
+            if (lastHoverPrefetchKeyRef.current === key) return;
+            lastHoverPrefetchKeyRef.current = key;
+            if (hoverPrefetchTimerRef.current) clearTimeout(hoverPrefetchTimerRef.current);
+            hoverPrefetchTimerRef.current = setTimeout(() => {
+                hoverPrefetchTimerRef.current = null;
+                prefetchShopListState(next);
+            }, HOVER_PREFETCH_DEBOUNCE_MS);
+        },
+        [prefetchShopListState]
+    );
+
     const prefetchCategoryHover = useCallback(
         (facetValue: string) => {
             const cur = filtersRef.current;
@@ -103,9 +132,9 @@ export function ShopContent({
                 delete next.brand;
                 delete next.spec;
             }
-            prefetchShopListState(next);
+            scheduleHoverPrefetch(`cat:${facetValue}:${cur.category === facetValue ? "toggle-off" : "toggle-on"}`, next);
         },
-        [prefetchShopListState]
+        [scheduleHoverPrefetch]
     );
 
     const prefetchSubcategoryHover = useCallback(
@@ -119,17 +148,17 @@ export function ShopContent({
             } else {
                 next.subcategories = value;
             }
-            prefetchShopListState(next);
+            scheduleHoverPrefetch(`sub:${value}:${current === value ? "toggle-off" : "toggle-on"}`, next);
         },
-        [prefetchShopListState]
+        [scheduleHoverPrefetch]
     );
 
     const prefetchPageHover = useCallback(
         (page: number) => {
             if (page < 1) return;
-            prefetchShopListState({ ...filtersRef.current, page });
+            scheduleHoverPrefetch(`page:${page}`, { ...filtersRef.current, page });
         },
-        [prefetchShopListState]
+        [scheduleHoverPrefetch]
     );
 
     // Fetch products first (fast path without expensive facets aggregation)
@@ -145,7 +174,15 @@ export function ShopContent({
         includeFacets: false,
     });
     // Fetch facets asynchronously so grid can render sooner
-    const { data: facetsData, refetch: refetchFacets } = useProductFacets(filters);
+    const facetsFilters = useMemo(() => {
+        const { page: _page, sort: _sort, ...rest } = filters;
+        return rest;
+    }, [filters]);
+    const facetsMode = hasNarrowingFilters(facetsFilters) ? "full" : "lite";
+    const { data: facetsData, refetch: refetchFacets } = useProductFacets({
+        ...facetsFilters,
+        facetMode: facetsMode,
+    });
     const products = data?.products || [];
     const facets = useMemo(() => {
         const fd = facetsData as { facets?: Facets; featuredSpecKeys?: string[] } | undefined;
@@ -262,6 +299,12 @@ export function ShopContent({
     }, []);
 
     useEffect(() => () => flushSearchDebounce(), [flushSearchDebounce]);
+    useEffect(
+        () => () => {
+            if (hoverPrefetchTimerRef.current) clearTimeout(hoverPrefetchTimerRef.current);
+        },
+        []
+    );
 
     const onSearchInputChange = (value: string) => {
         setSearchDraft(value);

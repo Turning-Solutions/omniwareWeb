@@ -22,6 +22,7 @@ import PromotionStripe from "@/components/PromotionStripe";
 import FlowSectionHeader from "@/components/FlowSectionHeader";
 import ShopReviewsStrip from "@/components/ShopReviewsStrip";
 import ReviewForm from "@/components/reviews/ReviewForm";
+import api from "@/lib/api";
 
 const SEARCH_PREVIEW_DEBOUNCE_MS = 320;
 /** Featured strip: fetch more than the old 4-up grid; slider steps through them product-by-product. */
@@ -32,6 +33,7 @@ const FEATURED_AUTO_SCROLL_MS = 4500;
 const FEATURED_SLIDE_TRANSITION_MS = 520;
 /** Render extra copies so we can recenter off-screen and keep the loop feeling continuous. */
 const FEATURED_LOOP_COPIES = 5;
+const PROMOTIONS_STALE_MS = 20 * 60 * 1000;
 
 /**
  * Appends an optional cache-busting query string to partner logo URLs.
@@ -42,6 +44,30 @@ function withLogoCacheBust(path: string): string {
 }
 
 export default function Home() {
+    type Promotion = {
+        _id: string;
+        title: string;
+        description: string;
+        imageUrl: string;
+        link: string;
+        badgeText: string;
+        validFrom: string;
+        validTo: string;
+    };
+
+    const { data: promotions = [], isPending: loadingPromotions, isFetched: promotionsFetched } = useQuery({
+        queryKey: ["promotions", "active"] as const,
+        queryFn: async (): Promise<Promotion[]> => {
+            try {
+                const res = await api.get<Promotion[]>("/promotions/active");
+                return Array.isArray(res.data) ? res.data : [];
+            } catch {
+                return [];
+            }
+        },
+        staleTime: PROMOTIONS_STALE_MS,
+    });
+
     const router = useRouter();
     const [searchDraft, setSearchDraft] = useState("");
     const [previewQuery, setPreviewQuery] = useState("");
@@ -85,6 +111,7 @@ export default function Home() {
         sort: "newest",
         isFeatured: true,
         includeFacets: false,
+        enabled: promotionsFetched,
     });
     const featuredProducts = featuredData?.products || [];
     const baseFeaturedCount = featuredProducts.length;
@@ -208,6 +235,11 @@ export default function Home() {
         runFullSearch();
     };
 
+    useEffect(() => {
+        if (!promotionsFetched || loadingFeatured) return;
+        void router.prefetch("/shop");
+    }, [loadingFeatured, promotionsFetched, router]);
+
     /**
      * `slug` must match each category’s `slug` in Admin → Categories (lowercase recommended).
      */
@@ -263,7 +295,7 @@ export default function Home() {
 
     return (
         <div className="relative flex min-h-screen flex-col overflow-x-hidden bg-[#0a0a0a] pb-[env(safe-area-inset-bottom,0px)] text-[#F1F1F1]">
-            <PromotionStripe asHero />
+            <PromotionStripe asHero promotions={promotions} loading={loadingPromotions} />
 
             {/* One continuous storefront canvas — gradient ties sections together */}
             <div className="relative flex flex-col bg-[linear-gradient(180deg,#080808_0%,#0c0c0c_18%,#101010_45%,#0d0d0d_72%,#0a0a0a_100%)] pb-5 sm:pb-8">

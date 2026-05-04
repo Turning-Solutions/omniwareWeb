@@ -6,7 +6,6 @@ import Link from "next/link";
 import { ArrowRight, ChevronLeft, ChevronRight, Clock, X, Zap } from "lucide-react";
 import api from "@/lib/api";
 import { AnimatePresence, motion } from "framer-motion";
-import LoadingAnimation from "@/components/LoadingAnimation";
 
 interface Promotion {
     _id: string;
@@ -48,10 +47,12 @@ const PROMOTIONS_STALE_MS = 20 * 60 * 1000;
 
 interface PromotionStripeProps {
     asHero?: boolean;
+    promotions?: Promotion[];
+    loading?: boolean;
 }
 
-export default function PromotionStripe({ asHero = false }: PromotionStripeProps) {
-    const { data: promotions = [], isPending: loading } = useQuery({
+export default function PromotionStripe({ asHero = false, promotions: promotionsOverride, loading: loadingOverride }: PromotionStripeProps) {
+    const { data: fetchedPromotions = [], isPending: fetchedLoading } = useQuery({
         queryKey: ["promotions", "active"] as const,
         queryFn: async () => {
             try {
@@ -62,7 +63,10 @@ export default function PromotionStripe({ asHero = false }: PromotionStripeProps
             }
         },
         staleTime: PROMOTIONS_STALE_MS,
+        enabled: !Array.isArray(promotionsOverride),
     });
+    const promotions = Array.isArray(promotionsOverride) ? promotionsOverride : fetchedPromotions;
+    const loading = typeof loadingOverride === "boolean" ? loadingOverride : fetchedLoading;
 
     const [activeIndex, setActiveIndex] = useState(0);
     const [direction,   setDirection]   = useState(1);
@@ -95,9 +99,10 @@ export default function PromotionStripe({ asHero = false }: PromotionStripeProps
         return (
             <section className={`relative overflow-hidden bg-[#080808] ${asHero ? "py-4 sm:py-8 lg:py-10" : "border-y border-[#D12B28]/20 py-10 sm:py-14"}`}>
                 <div className={`relative mx-auto max-w-7xl sm:px-6 lg:px-8 ${asHero ? "px-3" : "px-4"}`}>
-                    <div className={`rounded-2xl border border-white/[0.06] bg-[#121212] ${asHero ? "py-24 sm:py-28 lg:py-32" : "py-16"}`}>
-                        <LoadingAnimation size="md" label="Loading promotions..." />
-                    </div>
+                    <div
+                        className={`rounded-2xl border border-white/[0.06] bg-[#121212] ${asHero ? "min-h-[440px] sm:min-h-[540px] lg:min-h-[620px]" : "min-h-[300px] sm:min-h-[340px] lg:min-h-[360px]"}`}
+                        aria-hidden
+                    />
                 </div>
             </section>
         );

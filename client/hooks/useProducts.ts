@@ -20,6 +20,7 @@ export interface UseProductsOptions {
     inStock?: string;
     isFeatured?: boolean;
     includeFacets?: boolean;
+    facetMode?: 'full' | 'lite';
     enabled?: boolean;
 }
 
@@ -191,6 +192,7 @@ export function getProductFacetsQueryOptions(options: UseProductsOptions = {}) {
             if (options.availability) params.append('availability', options.availability);
             if (options.inStock) params.append('inStock', options.inStock);
             if (options.isFeatured != null) params.append('isFeatured', String(options.isFeatured));
+            if (options.facetMode === 'lite') params.append('mode', 'lite');
             if (options.spec && typeof options.spec === 'object') {
                 for (const [key, value] of Object.entries(options.spec)) {
                     if (value != null && value !== '') params.append(`spec[${key}]`, value);

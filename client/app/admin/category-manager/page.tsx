@@ -81,6 +81,9 @@ export default function CategoryManagerPage() {
                 const existing = map.get(key) || [];
                 map.set(key, [...existing, subcategory]);
             });
+        map.forEach((subcategories, key) => {
+            map.set(key, sortByName(subcategories));
+        });
         return map;
     }, [categories]);
 
@@ -247,11 +250,26 @@ export default function CategoryManagerPage() {
                                 className="w-full rounded-lg border border-border-soft bg-base px-4 py-2 text-main focus:border-accent focus:outline-none [&>option]:text-white"
                             >
                                 <option value="">Choose category...</option>
-                                {sortedCategories.map((category) => (
-                                    <option key={category._id} value={category._id}>
-                                        {category.name}
-                                    </option>
-                                ))}
+                                <optgroup label="Main Categories">
+                                    {mainCategories.map((category) => (
+                                        <option key={category._id} value={category._id}>
+                                            {category.name}
+                                        </option>
+                                    ))}
+                                </optgroup>
+                                {mainCategories.map((mainCategory) => {
+                                    const subcategories = subcategoriesByParent.get(mainCategory._id) || [];
+                                    if (subcategories.length === 0) return null;
+                                    return (
+                                        <optgroup key={mainCategory._id} label={`Subcategories - ${mainCategory.name}`}>
+                                            {subcategories.map((subcategory) => (
+                                                <option key={subcategory._id} value={subcategory._id}>
+                                                    {subcategory.name}
+                                                </option>
+                                            ))}
+                                        </optgroup>
+                                    );
+                                })}
                             </select>
                         </div>
 

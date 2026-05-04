@@ -39,12 +39,26 @@ function buildSlugVariants(slug: string): string[] {
     return Array.from(out);
 }
 
+const FEATURED_SPECS_CACHE_TTL_MS = 5 * 60 * 1000;
+const featuredSpecsByCategoryKeyCache = new Map<string, { expiresAt: number; keys: string[] }>();
+
 async function resolveFeaturedSpecsForCategoryKey(categoryKey: string | null): Promise<string[]> {
     if (!categoryKey) return [];
     const key = categoryKey.toLowerCase();
+    const cached = featuredSpecsByCategoryKeyCache.get(key);
+    if (cached && cached.expiresAt > Date.now()) {
+        return cached.keys;
+    }
     const keyVariants = buildSlugVariants(key);
     const direct = await CategoryFeaturedSpecs.findOne({ categoryKey: { $in: keyVariants } }).lean();
-    if (direct?.featuredSpecKeys?.length) return direct.featuredSpecKeys;
+    if (direct?.featuredSpecKeys?.length) {
+        const keys = [...direct.featuredSpecKeys];
+        featuredSpecsByCategoryKeyCache.set(key, {
+            expiresAt: Date.now() + FEATURED_SPECS_CACHE_TTL_MS,
+            keys,
+        });
+        return keys;
+    }
 
     const pushAncestors = async (
         start: { slug?: string | null; parentId?: unknown } | null | undefined,
@@ -105,10 +119,21 @@ async function resolveFeaturedSpecsForCategoryKey(categoryKey: string | null): P
         for (const slug of candidateSlugs) {
             for (const variant of buildSlugVariants(slug)) {
                 const keys = keysBySlug.get(variant);
-                if (keys && keys.length > 0) return keys;
+                if (keys && keys.length > 0) {
+                    const resolved = [...keys];
+                    featuredSpecsByCategoryKeyCache.set(key, {
+                        expiresAt: Date.now() + FEATURED_SPECS_CACHE_TTL_MS,
+                        keys: resolved,
+                    });
+                    return resolved;
+                }
             }
         }
     }
+    featuredSpecsByCategoryKeyCache.set(key, {
+        expiresAt: Date.now() + FEATURED_SPECS_CACHE_TTL_MS,
+        keys: [],
+    });
     return [];
 }
 
@@ -540,7 +565,8 @@ export const getProductFacets = async (req: Request, res: Response) => {
         // For simplicity/DRY, one could extract the 'buildMatchStage' logic.
         // For now, I will duplicate the precise match logic to ensure it behaves exactly as the listing.
 
-        const { search, minPrice, maxPrice, brand, category, ...dynamicFilters } = req.query;
+        const { search, minPrice, maxPrice, brand, category, mode, ...dynamicFilters } = req.query;
+        const isLiteMode = String(mode ?? '').toLowerCase() === 'lite';
 
         const lookupCache: MatchStageCache = {};
         // 1. Full Match
@@ -551,46 +577,65 @@ export const getProductFacets = async (req: Request, res: Response) => {
         const priceMatchStage = await buildProductMatchStage(req, ['price'], lookupCache);
         const specsMatchStage = await buildProductMatchStage(req, ['specs'], lookupCache);
 
-        const pipeline = [
-            {
-                $facet: {
-                    price: [
-                        { $match: priceMatchStage },
-                        { $group: { _id: null, min: { $min: "$price" }, max: { $max: "$price" } } }
-                    ],
-                    categories: categoryFacetWithAncestors(categoryMatchStage),
-                    brands: [
-                        { $match: brandMatchStage },
-                        { $group: { _id: "$brandId", count: { $sum: 1 } } },
-                        { $lookup: { from: 'brands', localField: '_id', foreignField: '_id', as: 'brand' } },
-                        { $unwind: "$brand" },
-                        { $project: { value: "$brand.slug", label: "$brand.name", count: 1 } }
-                    ],
-                    availability: [
-                        { $match: matchStage },
-                        { $group: { _id: "$availability", count: { $sum: 1 } } },
-                        { $project: { value: "$_id", count: 1, _id: 0 } }
-                    ],
-                    specs: [
-                        { $match: specsMatchStage },
-                        SPECS_OBJECT_TO_ARRAY_PROJECT,
-                        { $unwind: "$specs" },
-                        {
-                            $group: {
-                                _id: { key: "$specs.k", value: "$specs.v" },
-                                count: { $sum: 1 }
-                            }
-                        },
-                        {
-                            $group: {
-                                _id: "$_id.key",
-                                values: { $push: { value: "$_id.value", count: "$count" } }
-                            }
-                        }
-                    ]
+        const pipeline = isLiteMode
+            ? [
+                {
+                    $facet: {
+                        price: [
+                            { $match: priceMatchStage },
+                            { $group: { _id: null, min: { $min: "$price" }, max: { $max: "$price" } } }
+                        ],
+                        categories: categoryFacetWithAncestors(categoryMatchStage),
+                        brands: [
+                            { $match: brandMatchStage },
+                            { $group: { _id: "$brandId", count: { $sum: 1 } } },
+                            { $lookup: { from: 'brands', localField: '_id', foreignField: '_id', as: 'brand' } },
+                            { $unwind: "$brand" },
+                            { $project: { value: "$brand.slug", label: "$brand.name", count: 1 } }
+                        ]
+                    }
                 }
-            }
-        ];
+            ]
+            : [
+                {
+                    $facet: {
+                        price: [
+                            { $match: priceMatchStage },
+                            { $group: { _id: null, min: { $min: "$price" }, max: { $max: "$price" } } }
+                        ],
+                        categories: categoryFacetWithAncestors(categoryMatchStage),
+                        brands: [
+                            { $match: brandMatchStage },
+                            { $group: { _id: "$brandId", count: { $sum: 1 } } },
+                            { $lookup: { from: 'brands', localField: '_id', foreignField: '_id', as: 'brand' } },
+                            { $unwind: "$brand" },
+                            { $project: { value: "$brand.slug", label: "$brand.name", count: 1 } }
+                        ],
+                        availability: [
+                            { $match: matchStage },
+                            { $group: { _id: "$availability", count: { $sum: 1 } } },
+                            { $project: { value: "$_id", count: 1, _id: 0 } }
+                        ],
+                        specs: [
+                            { $match: specsMatchStage },
+                            SPECS_OBJECT_TO_ARRAY_PROJECT,
+                            { $unwind: "$specs" },
+                            {
+                                $group: {
+                                    _id: { key: "$specs.k", value: "$specs.v" },
+                                    count: { $sum: 1 }
+                                }
+                            },
+                            {
+                                $group: {
+                                    _id: "$_id.key",
+                                    values: { $push: { value: "$_id.value", count: "$count" } }
+                                }
+                            }
+                        ]
+                    }
+                }
+            ];
 
         const results = await Product.aggregate(pipeline as any);
         const data = results[0];
@@ -599,7 +644,7 @@ export const getProductFacets = async (req: Request, res: Response) => {
         let featuredSpecKeys: string[] = [];
 
         const categoryKeyForSpecsFacets = normalizeCategoryKeyForFeaturedSpecs(category);
-        if (categoryKeyForSpecsFacets) {
+        if (!isLiteMode && categoryKeyForSpecsFacets) {
             const resolvedFeaturedSpecKeys = await resolveFeaturedSpecsForCategoryKey(categoryKeyForSpecsFacets);
             if (resolvedFeaturedSpecKeys.length > 0) {
                 featuredSpecKeys = resolvedFeaturedSpecKeys;
