@@ -235,7 +235,9 @@ export default function CategoryManagerPage() {
 
                 <section className="rounded-xl border border-border-soft bg-base/20 p-5">
                     <h2 className="text-lg font-semibold text-main">Edit category</h2>
-                    <p className="mt-1 text-sm text-sub">Rename categories or move a category under a different parent.</p>
+                    <p className="mt-1 text-sm text-sub">
+                        Rename categories or move a category under a different parent. Products stay linked by category ID, so renaming updates product category names automatically.
+                    </p>
                     <form onSubmit={handleUpdate} className="mt-4 space-y-3">
                         <div className="space-y-1.5">
                             <label className="text-sm text-sub">Select category</label>
@@ -291,6 +293,19 @@ export default function CategoryManagerPage() {
                         >
                             <Save className="h-4 w-4" />
                             {savingEdit ? "Updating..." : "Update"}
+                        </button>
+                        <button
+                            type="button"
+                            disabled={!selectedEditCategory}
+                            onClick={() => {
+                                if (selectedEditCategory) {
+                                    setCategoryToDelete(selectedEditCategory);
+                                }
+                            }}
+                            className="ml-2 inline-flex items-center gap-2 rounded-lg border border-red-500/40 px-4 py-2 text-red-400 hover:bg-red-500/10 disabled:opacity-50"
+                        >
+                            <Trash2 className="h-4 w-4" />
+                            Delete
                         </button>
                     </form>
                 </section>
