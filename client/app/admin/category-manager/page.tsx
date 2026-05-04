@@ -333,7 +333,7 @@ export default function CategoryManagerPage() {
             <PopupDialog
                 open={pendingUpdateConfirm}
                 title="Confirm category update"
-                message="Are you sure you want to update this category? If products are linked, update will be blocked."
+                message="Are you sure you want to update this category?"
                 tone="info"
                 confirmText="Update"
                 cancelText="Cancel"

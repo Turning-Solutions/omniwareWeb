@@ -227,13 +227,6 @@ router.put('/categories/:id', async (req: Request, res: Response) => {
         const existingCategory = await Category.findById(categoryId).lean();
         if (!existingCategory) return res.status(404).json({ message: 'Category not found' });
 
-        const categoryHasProducts = await hasProductsInCategory(categoryId);
-        if (categoryHasProducts) {
-            return res.status(409).json({
-                message: 'This category is linked to products and cannot be edited.',
-            });
-        }
-
         const update: Record<string, unknown> = { ...req.body };
         if (typeof update.name === 'string') update.name = update.name.trim();
         if ('slug' in update || typeof update.name === 'string') {
