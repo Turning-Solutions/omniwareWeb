@@ -97,16 +97,7 @@ export default function PromotionStripe({ asHero = false, promotions: promotions
     };
 
     if (loading) {
-        return (
-            <section className={`relative overflow-hidden bg-[#080808] ${asHero ? "py-4 sm:py-8 lg:py-10" : "border-y border-[#D12B28]/20 py-10 sm:py-14"}`}>
-                <div className={`relative mx-auto max-w-7xl sm:px-6 lg:px-8 ${asHero ? "px-3" : "px-4"}`}>
-                    <div
-                        className={`rounded-2xl border border-white/[0.06] bg-[#121212] ${asHero ? "min-h-[440px] sm:min-h-[540px] lg:min-h-[620px]" : "min-h-[300px] sm:min-h-[340px] lg:min-h-[360px]"}`}
-                        aria-hidden
-                    />
-                </div>
-            </section>
-        );
+        return null;
     }
 
     if (promotions.length === 0) return null;
