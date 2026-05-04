@@ -14,7 +14,8 @@ const updateFeaturedSpecsSchema = z.object({
 
 export const getAvailableSpecKeys = async (req: Request, res: Response, next: any): Promise<void> => {
     try {
-        const { categoryKey } = req.params;
+        const categoryKeyRaw = req.params.categoryKey;
+        const categoryKey = Array.isArray(categoryKeyRaw) ? categoryKeyRaw[0] : categoryKeyRaw;
 
         const category = await Category.findOne({ slug: categoryKey });
         if (!category) {
@@ -48,7 +49,8 @@ export const getAvailableSpecKeys = async (req: Request, res: Response, next: an
 
 export const getFeaturedSpecs = async (req: Request, res: Response, next: any): Promise<void> => {
     try {
-        const { categoryKey } = req.params;
+        const categoryKeyRaw = req.params.categoryKey;
+        const categoryKey = Array.isArray(categoryKeyRaw) ? categoryKeyRaw[0] : categoryKeyRaw;
 
         const config = await CategoryFeaturedSpecs.findOne({ categoryKey });
 
@@ -72,7 +74,8 @@ export const getFeaturedSpecs = async (req: Request, res: Response, next: any): 
 
 export const updateFeaturedSpecs = async (req: Request, res: Response, next: any): Promise<void> => {
     try {
-        const { categoryKey } = req.params;
+        const categoryKeyRaw = req.params.categoryKey;
+        const categoryKey = Array.isArray(categoryKeyRaw) ? categoryKeyRaw[0] : categoryKeyRaw;
 
         const result = updateFeaturedSpecsSchema.safeParse(req.body);
         if (!result.success) {
@@ -121,7 +124,8 @@ export const updateFeaturedSpecs = async (req: Request, res: Response, next: any
 
 export const deleteFeaturedSpecs = async (req: Request, res: Response, next: any): Promise<void> => {
     try {
-        const { categoryKey } = req.params;
+        const categoryKeyRaw = req.params.categoryKey;
+        const categoryKey = Array.isArray(categoryKeyRaw) ? categoryKeyRaw[0] : categoryKeyRaw;
 
         const result = await CategoryFeaturedSpecs.findOneAndDelete({ categoryKey });
 
