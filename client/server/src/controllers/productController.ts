@@ -3,8 +3,10 @@ import Product from '../models/Product';
 import Brand from '../models/Brand';
 import Category from '../models/Category';
 import CategoryFeaturedSpecs from '../models/CategoryFeaturedSpecs';
+import FacetSnapshot from '../models/FacetSnapshot';
 import { buildProductMatchStage, SPECS_OBJECT_TO_ARRAY_PROJECT, type MatchStageCache } from '../utils/productAggregation';
 import { normalizeSpecKey } from '../utils/normalizeSpecKey';
+import { buildFacetRequestCacheKey, clearFacetResponseCache, getFacetResponseCache, setFacetResponseCache } from '../utils/facetRuntimeCache';
 
 /** Maps shop URL values like price-asc to Mongo sort (also accepts price_asc). */
 function buildProductSortStage(sort: unknown): Record<string, 1 | -1> {
@@ -41,6 +43,64 @@ function buildSlugVariants(slug: string): string[] {
 
 const FEATURED_SPECS_CACHE_TTL_MS = 5 * 60 * 1000;
 const featuredSpecsByCategoryKeyCache = new Map<string, { expiresAt: number; keys: string[] }>();
+const FACET_SNAPSHOT_TTL_MS = 2 * 60 * 1000;
+
+function cacheFlagEnabled(name: string): boolean {
+    return String(process.env[name] ?? '').toLowerCase() === 'true';
+}
+
+function shouldUseFacetRequestCache(req: Request): boolean {
+    if (!cacheFlagEnabled('FACET_REQUEST_CACHE_ENABLED')) return false;
+    const path = req.path ?? '';
+    if (path.includes('/admin')) return false;
+    if (req.headers.authorization) return false;
+    return true;
+}
+
+function shouldUseFacetSnapshot(req: Request): boolean {
+    if (!cacheFlagEnabled('FACET_SNAPSHOT_ENABLED')) return false;
+    const q = req.query as Record<string, unknown>;
+    const hasSearch = Boolean(String(q.search ?? '').trim());
+    const hasSpec = Object.keys(q).some((k) => k.startsWith('spec['));
+    const hasCategory = Boolean(String(q.category ?? '').trim());
+    const hasAdvanced =
+        Boolean(String(q.brand ?? '').trim()) ||
+        q.minPrice != null ||
+        q.maxPrice != null ||
+        Boolean(String(q.availability ?? '').trim()) ||
+        Boolean(String(q.inStock ?? '').trim());
+    return hasCategory && !hasSearch && !hasSpec && !hasAdvanced;
+}
+
+function maybeExplainAggregate(req: Request, label: string, pipeline: any[]): void {
+    if (!cacheFlagEnabled('FACET_EXPLAIN_SAMPLING_ENABLED')) return;
+    const sampleRate = Number(process.env.FACET_EXPLAIN_SAMPLE_RATE ?? '0.02');
+    if (!Number.isFinite(sampleRate) || sampleRate <= 0) return;
+    if (Math.random() > sampleRate) return;
+    void Product.aggregate(pipeline as any)
+        .explain('executionStats')
+        .then((plan) => {
+            const requestId = (req as any)?.id ?? 'n/a';
+            console.info(`[EXPLAIN] ${label} requestId=${requestId}`, plan);
+        })
+        .catch((error) => {
+            console.warn(`[EXPLAIN] ${label} failed`, (error as Error).message);
+        });
+}
+
+export function clearFeaturedSpecsCache(categoryKey?: string | null): void {
+    if (!categoryKey) {
+        featuredSpecsByCategoryKeyCache.clear();
+        return;
+    }
+    const variants = buildSlugVariants(String(categoryKey).toLowerCase());
+    variants.forEach((variant) => featuredSpecsByCategoryKeyCache.delete(variant));
+}
+
+export function invalidateFacetCaches(): void {
+    clearFacetResponseCache();
+    void FacetSnapshot.deleteMany({}).catch(() => undefined);
+}
 
 async function resolveFeaturedSpecsForCategoryKey(categoryKey: string | null): Promise<string[]> {
     if (!categoryKey) return [];
@@ -482,6 +542,7 @@ export const getProducts = async (req: Request, res: Response) => {
                 }
             }
         ];
+        maybeExplainAggregate(req, 'getProducts', pipeline as any[]);
 
         const results = await Product.aggregate(pipeline as any);
         const data = results[0];
@@ -567,6 +628,26 @@ export const getProductFacets = async (req: Request, res: Response) => {
 
         const { search, minPrice, maxPrice, brand, category, mode, ...dynamicFilters } = req.query;
         const isLiteMode = String(mode ?? '').toLowerCase() === 'lite';
+        const cacheKey = buildFacetRequestCacheKey(req.query as Record<string, unknown>);
+        const canUseRequestCache = shouldUseFacetRequestCache(req);
+        const canUseSnapshot = shouldUseFacetSnapshot(req);
+
+        if (canUseRequestCache) {
+            const cached = getFacetResponseCache<any>(cacheKey);
+            if (cached) {
+                return res.json(cached);
+            }
+        }
+
+        if (canUseSnapshot) {
+            const snapshot = await FacetSnapshot.findOne({ cacheKey }).lean();
+            if (snapshot && new Date(snapshot.expiresAt).getTime() > Date.now()) {
+                if (canUseRequestCache) {
+                    setFacetResponseCache(cacheKey, snapshot.payload, 30_000);
+                }
+                return res.json(snapshot.payload);
+            }
+        }
 
         const lookupCache: MatchStageCache = {};
         // 1. Full Match
@@ -637,6 +718,8 @@ export const getProductFacets = async (req: Request, res: Response) => {
                 }
             ];
 
+        maybeExplainAggregate(req, 'getProductFacets', pipeline as any[]);
+
         const results = await Product.aggregate(pipeline as any);
         const data = results[0];
 
@@ -665,12 +748,32 @@ export const getProductFacets = async (req: Request, res: Response) => {
             specs: specsFacet
         };
 
-        res.json({
+        const responsePayload = {
             categoryKey: categoryKeyForSpecsFacets ?? (typeof category === 'string' ? category : null),
             featuredMode,
             featuredSpecKeys,
             facets: finalFacets
-        });
+        };
+
+        if (canUseRequestCache) {
+            setFacetResponseCache(cacheKey, responsePayload, 30_000);
+        }
+        if (canUseSnapshot) {
+            const categoryKeySnapshot = String(categoryKeyForSpecsFacets ?? category ?? '');
+            void FacetSnapshot.findOneAndUpdate(
+                { cacheKey },
+                {
+                    cacheKey,
+                    categoryKey: categoryKeySnapshot,
+                    mode: isLiteMode ? 'lite' : 'full',
+                    payload: responsePayload,
+                    expiresAt: new Date(Date.now() + FACET_SNAPSHOT_TTL_MS),
+                },
+                { upsert: true, returnDocument: 'after' }
+            ).catch(() => undefined);
+        }
+
+        res.json(responsePayload);
 
     } catch (error) {
         res.status(500).json({ message: (error as Error).message });

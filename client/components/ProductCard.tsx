@@ -2,6 +2,7 @@
 
 import type { CSSProperties, MouseEvent } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { ShoppingCart, ShieldCheck } from "lucide-react";
 import toast from "react-hot-toast";
 import { Product } from "@/hooks/useProducts";
@@ -94,9 +95,12 @@ export default function ProductCard({
                         </div>
                     </div>
                 ) : null}
-                <img
+                <Image
                     src={product.images?.[0] || "/placeholder.svg"}
                     alt={product.title}
+                    fill
+                    sizes="(max-width: 640px) 100vw, (max-width: 1280px) 33vw, 20rem"
+                    quality={72}
                     className="h-full w-full object-cover transition-transform duration-500 ease-out will-change-transform group-hover:scale-[1.09] group-hover:brightness-[1.06]"
                 />
                 <div

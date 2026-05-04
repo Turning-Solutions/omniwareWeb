@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
+import Image from "next/image";
 import { ArrowRight, ChevronLeft, ChevronRight, Clock, X, Zap } from "lucide-react";
 import api from "@/lib/api";
 import { AnimatePresence, motion } from "framer-motion";
@@ -130,13 +131,14 @@ export default function PromotionStripe({ asHero = false, promotions: promotions
                     className="absolute inset-0 z-0"
                 >
                     {promo.imageUrl ? (
-                        <img
+                        <Image
                             src={promo.imageUrl}
                             alt={promo.title}
+                            fill
+                            sizes={asHero ? "100vw" : "(max-width: 1024px) 100vw, 80vw"}
+                            quality={asHero ? 72 : 68}
                             className="h-full w-full object-cover object-center"
-                            loading={safeIndex === 0 ? "eager" : "lazy"}
-                            referrerPolicy="no-referrer"
-                            draggable={false}
+                            priority={safeIndex === 0}
                         />
                     ) : (
                         <div className="absolute inset-0 bg-[#181818]" />

@@ -8,7 +8,7 @@ declare global {
 }
 
 const cached = global.mongooseCache ?? { conn: null, promise: null };
-if (process.env.NODE_ENV !== 'production') global.mongooseCache = cached;
+global.mongooseCache = cached;
 
 export class DatabaseError extends Error {
     status = 503;
@@ -85,6 +85,9 @@ async function connectDB(): Promise<typeof mongoose> {
         });
     }
     cached.conn = await cached.promise;
+    if (process.env.VERCEL_REGION) {
+        console.info(`[DB] Connected in region ${process.env.VERCEL_REGION}`);
+    }
     return cached.conn;
 }
 

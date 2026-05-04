@@ -6,6 +6,7 @@ import Category from '../models/Category';
 import { normalizeSpecKey } from '../utils/normalizeSpecKey';
 import { SPECS_OBJECT_TO_ARRAY_PROJECT } from '../utils/productAggregation';
 import { AppError } from '../middleware/errorMiddleware';
+import { clearFeaturedSpecsCache, invalidateFacetCaches } from './productController';
 
 const updateFeaturedSpecsSchema = z.object({
     featuredSpecKeys: z.array(z.string()),
@@ -100,6 +101,8 @@ export const updateFeaturedSpecs = async (req: Request, res: Response, next: any
             },
             { returnDocument: 'after', upsert: true, setDefaultsOnInsert: true }
         );
+        clearFeaturedSpecsCache(categoryKey);
+        invalidateFacetCaches();
 
         let mode = 'default_all';
         if (config) {
@@ -128,6 +131,8 @@ export const deleteFeaturedSpecs = async (req: Request, res: Response, next: any
             err.status = 404;
             return next(err);
         }
+        clearFeaturedSpecsCache(categoryKey);
+        invalidateFacetCaches();
 
         res.json({ message: 'Configuration deleted, reverted to default behavior' });
     } catch (error) {

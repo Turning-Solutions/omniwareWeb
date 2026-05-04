@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Image from "next/image";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import {
     ArrowRight,
@@ -20,9 +21,16 @@ import { useProducts } from "@/hooks/useProducts";
 import ProductCard from "@/components/ProductCard";
 import PromotionStripe from "@/components/PromotionStripe";
 import FlowSectionHeader from "@/components/FlowSectionHeader";
-import ShopReviewsStrip from "@/components/ShopReviewsStrip";
-import ReviewForm from "@/components/reviews/ReviewForm";
 import api from "@/lib/api";
+
+const DeferredShopReviewsStrip = dynamic(() => import("@/components/ShopReviewsStrip"), {
+    ssr: false,
+    loading: () => <div className="h-32 rounded-xl border border-white/[0.06] bg-white/[0.02]" />,
+});
+const DeferredReviewForm = dynamic(() => import("@/components/reviews/ReviewForm"), {
+    ssr: false,
+    loading: () => <div className="h-28 rounded-xl border border-white/[0.06] bg-white/[0.02]" />,
+});
 
 const SEARCH_PREVIEW_DEBOUNCE_MS = 320;
 /** Featured strip: fetch more than the old 4-up grid; slider steps through them product-by-product. */
@@ -421,9 +429,13 @@ export default function Home() {
                                                                     href={productPath}
                                                                     className="group flex items-center gap-3 rounded-lg p-2 transition hover:bg-white/[0.06]"
                                                                 >
-                                                                    <img
+                                                                    <Image
                                                                         src={product.images?.[0] || "/placeholder.svg"}
                                                                         alt={product.title}
+                                                                        width={48}
+                                                                        height={48}
+                                                                        sizes="48px"
+                                                                        quality={65}
                                                                         className="h-12 w-12 rounded-md object-cover"
                                                                     />
                                                                     <div className="min-w-0">
@@ -814,12 +826,12 @@ export default function Home() {
                                 Write a review
                             </span>
                         </div>
-                        <ReviewForm variant="shop" wide />
+                        <DeferredReviewForm variant="shop" wide />
                     </div>
                 </div>
 
                 <div className="relative mt-0 w-full">
-                    <ShopReviewsStrip fullWidthStrip />
+                    <DeferredShopReviewsStrip fullWidthStrip />
                 </div>
             </section>
             </div>

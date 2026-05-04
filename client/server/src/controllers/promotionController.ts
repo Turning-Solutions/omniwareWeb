@@ -30,6 +30,8 @@ const updateSchema = promotionSchema.partial();
 export const getActivePromotions = async (req: Request, res: Response, next: any): Promise<void> => {
     try {
         const now = new Date();
+        // Make public promo payload edge-cacheable on Vercel.
+        res.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
 
         // Cache for 30s to keep the home page snappy.
         if (activePromotionsCache && Date.now() < activePromotionsCache.expiresAt) {
@@ -90,7 +92,7 @@ export const getActivePromotions = async (req: Request, res: Response, next: any
         }
 
         activePromotionsCache = {
-            expiresAt: Date.now() + 10_000,
+            expiresAt: Date.now() + 30_000,
             data: promotions,
         };
 

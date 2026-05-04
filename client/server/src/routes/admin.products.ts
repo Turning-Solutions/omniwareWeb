@@ -6,6 +6,7 @@ import { requireAuth } from '../middleware/requireAuth';
 import { requireAdmin } from '../middleware/requireAdmin';
 import { adminRateLimit } from '../middleware/adminRateLimit';
 import { createAuditLog } from '../utils/audit';
+import { clearFeaturedSpecsCache, invalidateFacetCaches } from '../controllers/productController';
 
 const router = express.Router();
 
@@ -126,6 +127,7 @@ function buildProductUpdate(body: Record<string, unknown>): Record<string, unkno
 router.post('/', async (req: Request, res: Response) => {
     try {
         const product = await Product.create(normalizeProductBody(req.body));
+        invalidateFacetCaches();
 
         await createAuditLog(req, {
             action: 'CREATE_PRODUCT',
@@ -150,6 +152,7 @@ router.patch('/:id', async (req: Request, res: Response) => {
             returnDocument: 'after',
             runValidators: true,
         }).lean();
+        invalidateFacetCaches();
 
         await createAuditLog(req, {
             action: 'UPDATE_PRODUCT',
@@ -171,6 +174,7 @@ router.delete('/:id', async (req: Request, res: Response) => {
     if (!before) return res.status(404).json({ message: 'Product not found' });
 
     await Product.findByIdAndDelete(req.params.id);
+    invalidateFacetCaches();
 
     await createAuditLog(req, {
         action: 'DELETE_PRODUCT',
@@ -215,6 +219,7 @@ router.post('/categories', async (req: Request, res: Response) => {
             parentId,
             isActive: true,
         });
+        invalidateFacetCaches();
         res.status(201).json(category);
     } catch (error) {
         res.status(400).json({ message: (error as Error).message });
@@ -242,6 +247,11 @@ router.put('/categories/:id', async (req: Request, res: Response) => {
         }
 
         const category = await Category.findByIdAndUpdate(categoryId, update, { returnDocument: 'after' });
+        invalidateFacetCaches();
+        clearFeaturedSpecsCache(existingCategory.slug);
+        if (category) {
+            clearFeaturedSpecsCache(category.slug);
+        }
         res.json(category);
     } catch (error) {
         res.status(400).json({ message: (error as Error).message });
@@ -274,6 +284,8 @@ router.delete('/categories/:id', async (req: Request, res: Response) => {
         }
 
         await Category.findByIdAndDelete(categoryId);
+        invalidateFacetCaches();
+        clearFeaturedSpecsCache(category.slug);
         res.status(204).send();
     } catch (error) {
         res.status(400).json({ message: (error as Error).message });
@@ -308,6 +320,7 @@ router.put('/categories/:id/discount', async (req: Request, res: Response) => {
             { discountPercent: normalized },
             { returnDocument: 'after' }
         ).lean();
+        invalidateFacetCaches();
 
         await createAuditLog(req, {
             action: 'UPDATE_CATEGORY_DISCOUNT',

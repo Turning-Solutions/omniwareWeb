@@ -66,11 +66,12 @@ productSchema.index({ title: 1 });
 productSchema.index({ brandId: 1, price: 1 });
 productSchema.index({ categoryIds: 1, price: 1 });
 productSchema.index({ categoryIds: 1, brandId: 1, price: 1 });
-productSchema.index({ categoryIds: 1, brandId: 1, price: 1 });
 productSchema.index({ isActive: 1, price: 1 });
 productSchema.index({ isActive: 1, createdAt: -1 });
 productSchema.index({ isActive: 1, categoryIds: 1, createdAt: -1 });
 productSchema.index({ isActive: 1, brandId: 1, createdAt: -1 });
+productSchema.index({ isActive: 1, categoryIds: 1, brandId: 1, createdAt: -1 });
+productSchema.index({ isActive: 1, availability: 1, categoryIds: 1 });
 productSchema.index({ availability: 1 });
 // Wildcard index for dynamic specs used in faceted filters
 productSchema.index({ 'specs.$**': 1 });
