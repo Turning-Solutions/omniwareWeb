@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, type ReactNode } from "react";
 import { ChevronDown, Search, X, SlidersHorizontal, Check } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { Facets } from "@/hooks/useProducts";
 import {
     CATEGORY_FILTER_LAYOUT,
@@ -10,6 +11,7 @@ import {
     slugifyCategoryLabel,
 } from "@/lib/categoryFilterLayout";
 import { normalizeSpecKey } from "@/lib/normalizeSpecKey";
+import api from "@/lib/api";
 
 interface DynamicFilterSidebarProps {
     facets: Facets;
@@ -22,6 +24,13 @@ interface DynamicFilterSidebarProps {
     /** Prefetch when hovering a subcategory row (toggle outcome vs current selection). */
     onSubcategoryPrefetchEnter?: (facetValue: string) => void;
 }
+
+type CategoryTreeItem = {
+    _id: string;
+    name: string;
+    slug: string;
+    parentId?: string | null;
+};
 
 /** Count active filters (excluding search/sort/page) for badge and toolbar */
 export function countActiveFilters(filters: Record<string, unknown>): number {
@@ -403,7 +412,7 @@ function splitLayoutRootSegment(
 }
 
 type CategoryMainEntry = {
-    layoutIndex: number;
+    layoutIndex: number | null;
     node: ResolvedCategoryNode;
 };
 
@@ -676,7 +685,7 @@ function buildCategorySidebarParts(
     const slugNorm = categorySlug ? normalizeSlugForMatch(categorySlug) : "";
 
     let subForest: ResolvedCategoryNode[] = [];
-    let subMode: "layout" | "more" | "none" = "none";
+    let subMode: "layout" | "none" = "none";
     let activeLayoutIndex: number | null = null;
 
     if (slugNorm) {
@@ -694,38 +703,30 @@ function buildCategorySidebarParts(
             subForest = subsByLayoutIndex[layoutHit] ?? [];
             subMode = "layout";
             activeLayoutIndex = layoutHit;
-        } else if (
-            unmatched.some(
-                ({ facet }) =>
-                    normalizeSlugForMatch(facet.value) === slugNorm ||
-                    normalizeSlugForMatch(facet.label) === slugNorm
-            )
-        ) {
-            subForest = [
-                {
-                    type: "group",
-                    id: "group-more-categories",
-                    label: "More Categories",
-                    depth: 0,
-                    hasChildren: true,
-                    collapsibleAncestors: [],
-                },
-                ...unmatched.map(({ facet }) => ({
-                    type: "category" as const,
-                    id: `cat-${facet.value}`,
-                    facet,
-                    depth: 1,
-                    hasChildren: false,
-                    collapsibleAncestors: ["group-more-categories"] as string[],
-                })),
-            ];
-            subMode = "more";
-            activeLayoutIndex = null;
         }
     }
     // No category filter: keep subMode "none" and subForest empty — subcategories only after a main row is selected.
 
-    return { mainEntries, subForest, subMode, activeLayoutIndex };
+    const moreMainEntries: CategoryMainEntry[] = unmatched
+        .filter(({ facet }) => facet.count > 0)
+        .map(({ facet }) => ({
+            layoutIndex: null,
+            node: {
+                type: "category" as const,
+                id: `cat-${facet.value}`,
+                facet,
+                depth: 0,
+                hasChildren: false,
+                collapsibleAncestors: [],
+            },
+        }));
+
+    return {
+        mainEntries: [...mainEntries, ...moreMainEntries],
+        subForest,
+        subMode,
+        activeLayoutIndex,
+    };
 }
 
 export default function DynamicFilterSidebar({
@@ -744,6 +745,14 @@ export default function DynamicFilterSidebar({
     /** Snapshot of category facet counts from the last unfiltered shop view (used to hide always-empty categories even under filters). */
     const [categoryBaselineCounts, setCategoryBaselineCounts] = useState<Map<string, number> | null>(null);
     const [mainCategoryBaselineByLayout, setMainCategoryBaselineByLayout] = useState<Map<number, number> | null>(null);
+    const { data: categoryTreeData } = useQuery<CategoryTreeItem[]>({
+        queryKey: ["shop-category-tree"],
+        queryFn: async () => {
+            const { data } = await api.get("/products/categories");
+            return Array.isArray(data) ? (data as CategoryTreeItem[]) : [];
+        },
+        staleTime: 5 * 60 * 1000,
+    });
 
     useEffect(() => {
         if (hasNarrowingFilters(filters as Record<string, unknown>)) return;
@@ -944,89 +953,59 @@ export default function DynamicFilterSidebar({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [facets.brands, facets.categories, facets.price, filters]);
 
-    const categorySidebarParts = useMemo(
-        () =>
-            buildCategorySidebarParts(
-                facets.categories ?? [],
-                filters as Record<string, unknown>,
-                categoryBaselineCounts
-            ),
-        [facets.categories, filters, categoryBaselineCounts]
+    const categoryTree = useMemo(() => {
+        const list = Array.isArray(categoryTreeData) ? categoryTreeData : [];
+        return [...list].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+    }, [categoryTreeData]);
+    const mainCategoryTree = useMemo(
+        () => categoryTree.filter((c) => !c.parentId),
+        [categoryTree]
     );
-
-    const { mainEntries, subForest, subMode, activeLayoutIndex } = categorySidebarParts;
-
-    useEffect(() => {
-        if (hasNarrowingFilters(filters as Record<string, unknown>)) return;
-        const m = new Map<number, number>();
-        for (const entry of mainEntries) {
-            if (entry.node.type !== "category") continue;
-            m.set(entry.layoutIndex, entry.node.facet.count);
+    const categoryBySlug = useMemo(
+        () => new Map(categoryTree.map((c) => [String(c.slug).toLowerCase(), c])),
+        [categoryTree]
+    );
+    const subcategoriesByParent = useMemo(() => {
+        const map = new Map<string, CategoryTreeItem[]>();
+        for (const c of categoryTree) {
+            if (!c.parentId) continue;
+            const key = String(c.parentId);
+            const existing = map.get(key) ?? [];
+            existing.push(c);
+            map.set(key, existing);
         }
-        setMainCategoryBaselineByLayout(m);
-    }, [mainEntries, filters]);
-    const stableMainCategoryEntries = useMemo(() => {
-        const mainByLayout = new Map<number, CategoryMainEntry>();
-        for (const entry of mainEntries) mainByLayout.set(entry.layoutIndex, entry);
-
-        const out: CategoryMainEntry[] = [];
-        CATEGORY_FILTER_LAYOUT.forEach((layoutNode, layoutIndex) => {
-            const baselineCount = maxBaselineForNode(categoryBaselineCounts, layoutNode);
-            const fallback = mainByLayout.get(layoutIndex);
-            const baselineMainCount = mainCategoryBaselineByLayout?.get(layoutIndex);
-            const fallbackCount =
-                fallback?.node.type === "category" ? fallback.node.facet.count : 0;
-            // Parent rows with layout children may roll up subcategory counts in `fallbackCount`
-            // (sum of visible top-level subs). Baseline snapshot can still reflect only the parent
-            // facet row (e.g. `storage` count), so take the max to avoid showing a smaller parent total.
-            const stableCount = Math.max(
-                baselineCount ?? 0,
-                baselineMainCount ?? 0,
-                fallbackCount
-            );
-            if (stableCount <= 0) return;
-
-            const fallbackSlug =
-                fallback?.node.type === "category"
-                    ? fallback.node.facet.value
-                    : primaryCategorySlug(layoutNode);
-            const fallbackId =
-                fallback?.node.type === "category"
-                    ? fallback.node.id
-                    : `cat-${primaryCategorySlug(layoutNode)}`;
-            const hasChildren =
-                fallback?.node.type === "category"
-                    ? fallback.node.hasChildren
-                    : (layoutNode.children?.length ?? 0) > 0;
-
-            out.push({
-                layoutIndex,
-                node: {
-                    type: "category",
-                    id: fallbackId,
-                    facet: {
-                        value: fallbackSlug,
-                        label: layoutNode.label,
-                        count: stableCount,
-                    },
-                    depth: 0,
-                    hasChildren,
-                    collapsibleAncestors: [],
-                },
-            });
-        });
-        return out;
-    }, [mainEntries, categoryBaselineCounts, mainCategoryBaselineByLayout]);
-
-    // Only show sub-tree nodes whose every collapsible ancestor is currently expanded.
-    const visibleSubForest = useMemo(
-        () =>
-            subForest.filter((node) =>
-                node.collapsibleAncestors.every((aid) => isCatNodeExpanded(aid))
-            ),
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-        [subForest, collapsedCategories]
+        for (const [k, items] of map.entries()) {
+            map.set(k, [...items].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" })));
+        }
+        return map;
+    }, [categoryTree]);
+    const categoryCountBySlug = useMemo(() => {
+        const map = new Map<string, number>();
+        for (const item of facets.categories ?? []) {
+            map.set(String(item.value).toLowerCase(), item.count);
+        }
+        return map;
+    }, [facets.categories]);
+    const isCategoryActiveBySlug = (slug: string) =>
+        (categoryCountBySlug.get(String(slug).toLowerCase()) ?? 0) > 0;
+    const selectedCategorySlug =
+        typeof filters.category === "string" ? String(filters.category).trim().toLowerCase() : "";
+    const selectedMainCategoryId = useMemo(() => {
+        if (!selectedCategorySlug) return "";
+        const selected = categoryBySlug.get(selectedCategorySlug);
+        if (!selected) return "";
+        return selected.parentId ? String(selected.parentId) : selected._id;
+    }, [categoryBySlug, selectedCategorySlug]);
+    const activeMainCategoryTree = useMemo(
+        () => mainCategoryTree.filter((c) => isCategoryActiveBySlug(c.slug)),
+        [mainCategoryTree, categoryCountBySlug]
     );
+    const selectedSubTree = useMemo(() => {
+        if (!selectedMainCategoryId) return [];
+        return (subcategoriesByParent.get(selectedMainCategoryId) ?? []).filter((c) =>
+            isCategoryActiveBySlug(c.slug)
+        );
+    }, [selectedMainCategoryId, subcategoriesByParent, categoryCountBySlug]);
 
     /** Stable spec section order: admin `featuredSpecKeys`, then any extras alphabetically. */
     const orderedSpecFilterEntries = useMemo((): [string, { value: string; count: number }[]][] => {
@@ -1148,7 +1127,7 @@ export default function DynamicFilterSidebar({
                             expanded={isSectionOpen("categories")}
                             onToggle={() => toggleSection("categories")}
                         >
-                            {(facets.categories?.length ?? 0) === 0 ? (
+                            {(activeMainCategoryTree.length ?? 0) === 0 ? (
                                 <p className="py-2 text-sm text-zinc-500">
                                     No categories match these filters.
                                 </p>
@@ -1158,35 +1137,26 @@ export default function DynamicFilterSidebar({
                                         <p className="pb-1 text-[10px] font-bold uppercase tracking-[0.12em] text-zinc-500">
                                             Category
                                         </p>
-                                        {stableMainCategoryEntries.map(({ layoutIndex, node }) => {
-                                            if (node.type !== "category") return null;
-                                            const slugMatchesMain =
-                                                typeof filters.category === "string" &&
-                                                filters.category === node.facet.value;
-                                            const branchActive =
-                                                subMode === "layout" &&
-                                                activeLayoutIndex != null &&
-                                                activeLayoutIndex === layoutIndex;
-                                            const isChecked = Boolean(slugMatchesMain || branchActive);
+                                        {activeMainCategoryTree.map((category) => {
+                                            const categorySlug = String(category.slug).toLowerCase();
+                                            const isChecked = selectedMainCategoryId === category._id;
                                             return (
-                                                <div key={node.id} className="flex items-center">
+                                                <div key={category._id} className="flex items-center">
                                                     <div className="min-w-0 flex-1">
                                                         <FilterRadio
                                                             name="categoryFilterMain"
                                                             checked={isChecked}
-                                                            onChange={() => handleCategoryChange(node.facet.value)}
+                                                            onChange={() => handleCategoryChange(categorySlug)}
                                                             onClick={() => {
-                                                                if (!slugMatchesMain && branchActive) {
-                                                                    handleCategoryChange(node.facet.value);
-                                                                    return;
+                                                                if (selectedCategorySlug === categorySlug) {
+                                                                    handleCategoryChange(categorySlug);
                                                                 }
-                                                                if (slugMatchesMain) handleCategoryChange(node.facet.value);
                                                             }}
-                                                            label={node.facet.label}
-                                                            count={node.facet.count}
+                                                            label={category.name}
+                                                            count={categoryCountBySlug.get(categorySlug) ?? 0}
                                                             onPrefetchPointerEnter={
                                                                 onCategoryPrefetchEnter
-                                                                    ? () => onCategoryPrefetchEnter(node.facet.value)
+                                                                    ? () => onCategoryPrefetchEnter(categorySlug)
                                                                     : undefined
                                                             }
                                                         />
@@ -1200,87 +1170,36 @@ export default function DynamicFilterSidebar({
                                         <p className="pb-1 text-[10px] font-bold uppercase tracking-[0.12em] text-zinc-500">
                                             Subcategory
                                         </p>
-                                        {subMode === "none" ? (
+                                        {selectedMainCategoryId === "" ? (
                                             <p className="py-1 text-sm text-zinc-500">
                                                 Select a category above to refine.
                                             </p>
-                                        ) : subMode === "layout" && visibleSubForest.length === 0 ? (
+                                        ) : selectedSubTree.length === 0 ? (
                                             <p className="py-1 text-sm text-zinc-500">
                                                 No further subcategories for this selection.
                                             </p>
                                         ) : (
-                                            visibleSubForest.map((node) => {
-                                                const isExpanded = isCatNodeExpanded(node.id);
-
-                                                if (node.type === "group") {
-                                                    return (
-                                                        <div
-                                                            key={node.id}
-                                                            style={{ paddingLeft: `${node.depth * 14}px` }}
-                                                            className="flex items-center gap-2 pt-3 pb-1"
-                                                        >
-                                                            <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-zinc-500">
-                                                                {node.label}
-                                                            </span>
-                                                            <div className="h-px flex-1 bg-zinc-800" />
-                                                            {node.hasChildren ? (
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => toggleCatNode(node.id)}
-                                                                    className="shrink-0 rounded p-0.5 text-zinc-600 transition-colors hover:text-zinc-400"
-                                                                    aria-label={isExpanded ? "Collapse" : "Expand"}
-                                                                >
-                                                                    <ChevronDown
-                                                                        className={`h-3 w-3 transition-transform duration-200 ${isExpanded ? "" : "-rotate-90"}`}
-                                                                    />
-                                                                </button>
-                                                            ) : null}
-                                                        </div>
-                                                    );
-                                                }
-
-                                                const isChecked = isSubcategorySelected(node.facet.value);
+                                            selectedSubTree.map((subcategory) => {
+                                                const subSlug = String(subcategory.slug).toLowerCase();
+                                                const isChecked = isSubcategorySelected(subSlug);
                                                 return (
                                                     <div
-                                                        key={node.id}
-                                                        style={{ marginLeft: `${node.depth * 12}px` }}
+                                                        key={subcategory._id}
                                                         className="relative flex items-center"
                                                     >
-                                                        <span
-                                                            className="pointer-events-none absolute left-0 top-0 h-full border-l border-zinc-800/90"
-                                                            style={{ transform: `translateX(${node.depth * 12 - 8}px)` }}
-                                                            aria-hidden
-                                                        />
-                                                        <span
-                                                            className="pointer-events-none absolute left-0 top-1/2 w-3 border-t border-zinc-800/90"
-                                                            style={{ transform: `translate(${node.depth * 12 - 8}px, -50%)` }}
-                                                            aria-hidden
-                                                        />
                                                         <div className="min-w-0 flex-1">
                                                             <FilterCheckbox
                                                                 checked={isChecked}
-                                                                onChange={() => handleSubcategoryToggle(node.facet.value)}
-                                                                label={node.facet.label}
-                                                                count={node.facet.count}
+                                                                onChange={() => handleSubcategoryToggle(subSlug)}
+                                                                label={subcategory.name}
+                                                                count={categoryCountBySlug.get(subSlug) ?? 0}
                                                                 onPrefetchPointerEnter={
                                                                     onSubcategoryPrefetchEnter
-                                                                        ? () => onSubcategoryPrefetchEnter(node.facet.value)
+                                                                        ? () => onSubcategoryPrefetchEnter(subSlug)
                                                                         : undefined
                                                                 }
                                                             />
                                                         </div>
-                                                        {node.hasChildren ? (
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => toggleCatNode(node.id)}
-                                                                className="ml-0.5 shrink-0 rounded p-1 text-zinc-600 transition-colors hover:text-zinc-300"
-                                                                aria-label={isExpanded ? "Collapse" : "Expand"}
-                                                            >
-                                                                <ChevronDown
-                                                                    className={`h-3.5 w-3.5 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`}
-                                                                />
-                                                            </button>
-                                                        ) : null}
                                                     </div>
                                                 );
                                             })
