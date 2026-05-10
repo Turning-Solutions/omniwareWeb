@@ -17,11 +17,14 @@ import type { PartnerBrand } from '@/lib/homePartnersQuery';
 import type { HomeSettings } from '@/lib/homeSettingsQuery';
 import type { ProductsResponse } from '@/hooks/useProducts';
 
-// Mongoose models
+// Mongoose models — Brand and Category must be imported so they're
+// registered before Product.populate('brandId') / .populate('categoryIds').
 import Promotion from '@/server/src/models/Promotion';
 import Partner from '@/server/src/models/Partner';
 import HomeSettingsModel from '@/server/src/models/HomeSettings';
 import Product from '@/server/src/models/Product';
+import '@/server/src/models/Brand';
+import '@/server/src/models/Category';
 
 import {
     withDiscountInfo,
