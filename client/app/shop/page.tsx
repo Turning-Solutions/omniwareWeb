@@ -6,6 +6,11 @@ import {
     shopProductsListQueryOptionsForHydration,
 } from "@/lib/shopInitialProductsFetch";
 import { hasShopFacetNarrowing, parseShopFiltersFromRouter } from "@/lib/shopUrlFilters";
+import { ensureDb } from "@/server/src/config/db";
+
+// Register models so populate() works if the API handler runs in this context.
+import "@/server/src/models/Brand";
+import "@/server/src/models/Category";
 
 /**
  * ISR: the default (no-filter) shop page is cached at the edge.
@@ -21,6 +26,11 @@ interface ShopPageProps {
 export default async function ShopPage({ searchParams }: ShopPageProps) {
     const sp = searchParams ? await searchParams : {};
     const parsed = parseShopFiltersFromRouter("/shop", sp);
+
+    // Warm the DB connection BEFORE the HTTP prefetches fire.
+    // This eliminates the cold-start penalty (~1-3s) that would otherwise
+    // happen inside the API route handler on the first request.
+    await ensureDb();
 
     const queryClient = new QueryClient();
     const listOptions = shopProductsListQueryOptionsForHydration(parsed);

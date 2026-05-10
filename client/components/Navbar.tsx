@@ -7,6 +7,7 @@ import { ShoppingCart, Menu, X } from "lucide-react";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useCart } from "@/context/CartContext";
+import { usePrefetchShopProducts } from "@/hooks/usePrefetch";
 
 const mainNav = [
     { href: "/shop", label: "Shop" },
@@ -27,6 +28,7 @@ export default function Navbar() {
     const [isOpen, setIsOpen] = useState(false);
     const { cartItems } = useCart();
     const cartCount = cartItems.reduce((acc, item) => acc + item.qty, 0);
+    const { onMouseEnter: prefetchShopProducts } = usePrefetchShopProducts();
 
     return (
         <nav className="fixed top-0 z-50 w-full border-b border-white/[0.07] bg-zinc-950/80 shadow-[0_1px_0_0_rgba(255,255,255,0.04)_inset] backdrop-blur-xl">
@@ -54,6 +56,7 @@ export default function Navbar() {
                             <Link
                                 key={`${href}-${label}`}
                                 href={href}
+                                onMouseEnter={href === "/shop" ? prefetchShopProducts : undefined}
                                 className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                                     active
                                         ? "bg-white/[0.08] text-white"

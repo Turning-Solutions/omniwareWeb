@@ -9,6 +9,7 @@ import { Product } from "@/hooks/useProducts";
 import { useCart } from "@/context/CartContext";
 import { buildProductWhatsAppUrl } from "@/lib/whatsapp";
 import WhatsAppLogo from "@/components/WhatsAppLogo";
+import { usePrefetchProduct } from "@/hooks/usePrefetch";
 
 type ProductCardProps = {
     product: Product;
@@ -24,7 +25,9 @@ export default function ProductCard({
     onNavigateToProduct,
 }: ProductCardProps) {
     const { addToCart } = useCart();
-    const productPath = `/product/${product.slug || product._id}`;
+    const productSlug = product.slug || product._id;
+    const productPath = `/product/${productSlug}`;
+    const { onMouseEnter: prefetchOnHover } = usePrefetchProduct(productSlug);
     const whatsappUrl = buildProductWhatsAppUrl({
         productTitle: product.title,
         productPath,
@@ -75,7 +78,10 @@ export default function ProductCard({
     };
 
     return (
-        <div className="group relative min-w-0 overflow-hidden rounded-2xl border border-[#5E5E5E]/30 bg-[#1a1a1a] transition-[transform,border-color,ring-width,ring-color] duration-500 ease-in-out hover:-translate-y-1.5 hover:border-[#D12B28]/55 hover:ring-1 hover:ring-[#D12B28]/35">
+        <div
+            className="group relative min-w-0 overflow-hidden rounded-2xl border border-[#5E5E5E]/30 bg-[#1a1a1a] transition-[transform,border-color,ring-width,ring-color] duration-500 ease-in-out hover:-translate-y-1.5 hover:border-[#D12B28]/55 hover:ring-1 hover:ring-[#D12B28]/35"
+            onMouseEnter={prefetchOnHover}
+        >
             <div className="relative z-10 aspect-square overflow-hidden bg-[#121212]/80">
                 {effectiveDiscountAmount != null && effectiveDiscountAmount > 0 && (
                     <div className="absolute top-3 right-3 z-10 rounded-full border border-[#D12B28]/35 bg-[#D12B28]/20 px-3 py-1 text-[10px] font-semibold text-[#F1F1F1] shadow-sm">
