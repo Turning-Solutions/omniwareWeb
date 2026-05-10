@@ -31,9 +31,9 @@ function formatTimeLeft(validTo: string): string {
 }
 
 const slide = {
-    enter: (d: number) => ({ x: d > 0 ? "100%" : "-100%", opacity: 0 }),
+    enter: (d: number) => ({ x: d > 0 ? "100%" : "-100%", opacity: 1 }),
     center:               { x: 0,     opacity: 1 },
-    exit:  (d: number) => ({ x: d > 0 ? "-100%" : "100%", opacity: 0 }),
+    exit:  (d: number) => ({ x: d > 0 ? "-100%" : "100%", opacity: 1 }),
 };
 
 const textSlide = {
@@ -110,7 +110,7 @@ export default function PromotionStripe({ asHero = false, promotions: promotions
         <div className={`relative overflow-hidden rounded-2xl border border-white/[0.06] ${asHero ? "min-h-[440px] sm:min-h-[540px] lg:min-h-[620px]" : "min-h-[300px] sm:min-h-[340px] lg:min-h-[360px]"}`}>
 
             {/* Full-bleed background image — slides in/out */}
-            <AnimatePresence mode="wait" custom={direction}>
+            <AnimatePresence custom={direction}>
                 <motion.div
                     key={promo._id + "-img"}
                     custom={direction}
@@ -166,7 +166,7 @@ export default function PromotionStripe({ asHero = false, promotions: promotions
                         </div>
 
                         {/* Middle: animated title + description — constrained to left ~55% */}
-                        <AnimatePresence mode="wait" custom={direction}>
+                        <AnimatePresence custom={direction}>
                             <motion.div
                                 key={promo._id + "-text"}
                                 custom={direction}
