@@ -3,7 +3,9 @@ import { headers } from "next/headers";
 import { HOME_PROMOTIONS_QUERY_KEY, type HomePromotion } from "@/lib/homePromotionsQuery";
 import { fetchShopProductsJson } from "@/lib/shopInitialProductsFetch";
 import { getHomeFeaturedProductsQueryOptions, HOME_FEATURED_PRODUCTS_OPTIONS } from "@/lib/homeFeaturedProductsQuery";
+import { getHomeDiscountedProductsQueryOptions, HOME_DISCOUNTED_PRODUCTS_OPTIONS } from "@/lib/homeDiscountedProductsQuery";
 import { FALLBACK_TOP_BRANDS, HOME_PARTNERS_QUERY_KEY, type PartnerBrand } from "@/lib/homePartnersQuery";
+import { getHomeSettingsQueryOptions } from "@/lib/homeSettingsQuery";
 
 const PROMOTIONS_REVALIDATE_SECONDS = 60;
 
@@ -52,6 +54,14 @@ export async function prefetchHomeFeaturedProducts(queryClient: QueryClient): Pr
     });
 }
 
+export async function prefetchHomeDiscountedProducts(queryClient: QueryClient): Promise<void> {
+    await queryClient.prefetchQuery({
+        ...getHomeDiscountedProductsQueryOptions(),
+        queryFn: () => fetchShopProductsJson(HOME_DISCOUNTED_PRODUCTS_OPTIONS),
+        staleTime: 2 * 60 * 1000,
+    });
+}
+
 export async function fetchHomePartnersJson(): Promise<PartnerBrand[]> {
     const base = await resolveServerApiBaseUrl();
     const url = `${base}/api/v1/partners/active`;
@@ -70,5 +80,9 @@ export async function prefetchHomePartners(queryClient: QueryClient): Promise<vo
         queryFn: fetchHomePartnersJson,
         staleTime: 20 * 60 * 1000,
     });
+}
+
+export async function prefetchHomeSettings(queryClient: QueryClient): Promise<void> {
+    await queryClient.prefetchQuery(getHomeSettingsQueryOptions());
 }
 

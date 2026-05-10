@@ -2,6 +2,7 @@ import { NextFunction, Request, Response } from "express";
 import { z } from "zod";
 import Partner from "../models/Partner";
 import { AppError } from "../middleware/errorMiddleware";
+import { triggerRevalidation } from "../utils/revalidate";
 
 const starterPartners = [
     "AMD",
@@ -46,6 +47,7 @@ async function ensureStarterPartners(): Promise<void> {
 export const getActivePartners = async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
         await ensureStarterPartners();
+        res.set('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
         const partners = await Partner.find({ isActive: true }).sort({ sortOrder: 1, createdAt: 1 });
         res.json(partners);
     } catch (error) {
@@ -75,6 +77,7 @@ export const createPartner = async (req: Request, res: Response, next: NextFunct
         }
 
         const partner = await Partner.create(result.data);
+        triggerRevalidation(['/']);
         res.status(201).json(partner);
     } catch (error: unknown) {
         const mongoError = error as { code?: number };
@@ -109,6 +112,7 @@ export const updatePartner = async (req: Request, res: Response, next: NextFunct
         }
 
         res.json(partner);
+        triggerRevalidation(['/']);
     } catch (error: unknown) {
         const mongoError = error as { code?: number };
         if (mongoError?.code === 11000) {
@@ -132,6 +136,7 @@ export const deletePartner = async (req: Request, res: Response, next: NextFunct
             return next(err);
         }
         res.json({ message: "Partner deleted" });
+        triggerRevalidation(['/']);
     } catch (error) {
         next(error);
     }

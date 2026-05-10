@@ -2,12 +2,13 @@
 
 import { ShopContent, ShopSkeleton } from "./ShopContent";
 import { Suspense } from "react";
+import type { UseProductsOptions } from "@/hooks/useProducts";
 
 interface ShopPageClientProps {
-    initialSearch: string;
+    initialFilters?: Partial<UseProductsOptions>;
 }
 
-export default function ShopPageClient({ initialSearch }: ShopPageClientProps) {
+export default function ShopPageClient({ initialFilters = {} }: ShopPageClientProps) {
     return (
         <div className="min-h-screen bg-[#121212] pb-16 pt-6 sm:pt-10">
             <div
@@ -16,7 +17,7 @@ export default function ShopPageClient({ initialSearch }: ShopPageClientProps) {
             />
             <div className="mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-10">
                 <Suspense fallback={<ShopSkeleton />}>
-                    <ShopContent heading="Shop" initialFilters={{ search: initialSearch }} />
+                    <ShopContent heading="Shop" initialFilters={initialFilters} />
                 </Suspense>
             </div>
         </div>

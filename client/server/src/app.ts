@@ -16,6 +16,7 @@ import partnerRoutes from './routes/partnerRoutes';
 import quoteRoutes from './routes/quoteRoutes';
 import adminQuotesRoutes from './routes/admin.quotes';
 import reviewRoutes from './routes/reviewRoutes';
+import homeSettingsRoutes from './routes/homeSettingsRoutes';
 import { errorHandler } from './middleware/errorMiddleware';
 import { requestIdMiddleware } from './middleware/requestId';
 
@@ -64,6 +65,7 @@ function createApp() {
     app.use('/api/v1/partners', partnerRoutes);
     app.use('/api/v1/quotes', quoteRoutes);
     app.use('/api/v1/reviews', reviewRoutes);
+    app.use('/api/v1/home-settings', homeSettingsRoutes);
 
     app.get('/api', (_req, res) => {
         res.send('Omniware API is running');

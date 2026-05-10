@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import {
     getProductFacetsQueryOptions,
@@ -8,19 +9,21 @@ import {
     useProducts,
     useProductFacets,
     type Facets,
+    type UseProductsOptions,
 } from "@/hooks/useProducts";
 import ProductCard from "@/components/ProductCard";
 import DynamicFilterSidebar, { countActiveFilters } from "@/components/DynamicFilterSidebar";
 import LoadingAnimation from "@/components/LoadingAnimation";
 import { SlidersHorizontal, ArrowUpDown, X, ChevronLeft, ChevronRight, Search } from "lucide-react";
 import { SHOP_PRODUCTS_PER_PAGE } from "@/lib/shopConstants";
+import { serializeShopListingUrl, shopListingUrlsEquivalent } from "@/lib/shopUrlFilters";
 
 const SEARCH_DEBOUNCE_MS = 380;
 const HOVER_PREFETCH_DEBOUNCE_MS = 180;
 const SHOP_RETURN_STATE_PREFIX = "shop:return-state:";
 const SHOP_LIST_STALE_MS = 2 * 60 * 1000;
 
-type Filters = Record<string, any>;
+type Filters = UseProductsOptions & Record<string, unknown>;
 
 const DEFAULT_FILTERS: Filters = { search: "", sort: "newest", page: 1 };
 
@@ -52,6 +55,7 @@ export function ShopContent({
     heading,
     subheading,
 }: ShopContentProps) {
+    const router = useRouter();
     const returnStateStorageKey = `${SHOP_RETURN_STATE_PREFIX}${basePath}`;
 
     // Compute the starting filter state exactly once on mount.
@@ -76,8 +80,7 @@ export function ShopContent({
     const productsTopRef = useRef<HTMLDivElement | null>(null);
     const [searchDraft, setSearchDraft] = useState(() => String(filters.search ?? ""));
     const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const filtersRef = useRef(filters);
-    filtersRef.current = filters;
+    const filtersRef = useRef<Filters>(filters);
     const hoverPrefetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const lastHoverPrefetchKeyRef = useRef<string>("");
 
@@ -161,6 +164,10 @@ export function ShopContent({
         [scheduleHoverPrefetch]
     );
 
+    useEffect(() => {
+        filtersRef.current = filters;
+    }, [filters]);
+
     // Fetch products first (fast path without expensive facets aggregation)
     const {
         data,
@@ -175,7 +182,9 @@ export function ShopContent({
     });
     // Fetch facets asynchronously so grid can render sooner
     const facetsFilters = useMemo(() => {
-        const { page: _page, sort: _sort, ...rest } = filters;
+        const rest = { ...filters };
+        delete rest.page;
+        delete rest.sort;
         return rest;
     }, [filters]);
     const facetsMode = hasNarrowingFilters(facetsFilters) ? "full" : "lite";
@@ -200,6 +209,7 @@ export function ShopContent({
     // Reset specs and brands when category changes
     useEffect(() => {
         if (prevCategoryRef.current !== filters.category) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect -- derived reset when department changes
             setFilters((prev) => {
                 const next = { ...prev };
                 delete next.spec;
@@ -212,7 +222,16 @@ export function ShopContent({
     }, [filters.category]);
 
     useEffect(() => {
-        const { page: _page, ...nonPageFilters } = filters as Filters;
+        if (typeof window === "undefined") return;
+        const next = serializeShopListingUrl(filtersRef.current, window.location.href);
+        const cur = `${window.location.pathname}${window.location.search}`;
+        if (shopListingUrlsEquivalent(cur, next)) return;
+        router.replace(next, { scroll: false });
+    }, [filters, router]);
+
+    useEffect(() => {
+        const nonPageFilters = { ...filters };
+        delete nonPageFilters.page;
         const serialized = JSON.stringify(nonPageFilters);
 
         if (!hasMountedRef.current) {
@@ -257,7 +276,8 @@ export function ShopContent({
         }
 
         if (changed) {
-            setFilters((prev: any) => {
+            // eslint-disable-next-line react-hooks/set-state-in-effect -- drop spec keys no longer in facet response
+            setFilters((prev: Filters) => {
                 const next = { ...prev };
                 if (Object.keys(newSpecParams).length > 0) {
                     next.spec = newSpecParams;
@@ -278,7 +298,7 @@ export function ShopContent({
     ] as const;
 
     const clearFilters = () => {
-        setFilters((prev: Record<string, unknown>) => ({
+        setFilters((prev: Filters) => ({
             search: prev.search,
             sort: prev.sort,
             page: 1,

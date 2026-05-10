@@ -4,6 +4,7 @@ import {
     buildProductsQueryString,
     getProductFacetsQueryOptions,
     getProductsQueryOptions,
+    normalizeCategoryForApi,
     type Facets,
     type ProductsResponse,
     type UseProductsOptions,
@@ -57,7 +58,22 @@ export async function fetchShopFacetsJson(options: UseProductsOptions): Promise<
     const base = await resolveServerApiBaseUrl();
     const params = new URLSearchParams();
     if (options.search) params.append("search", options.search);
-    if (options.category) params.append("category", options.category);
+    const subcategoryParts = options.subcategories
+        ? String(options.subcategories)
+              .split(",")
+              .map((s) => normalizeCategoryForApi(s))
+              .filter(Boolean)
+        : [];
+    const categoryParts: string[] =
+        subcategoryParts.length > 0
+            ? subcategoryParts
+            : options.category
+              ? [normalizeCategoryForApi(String(options.category))]
+              : [];
+    if (categoryParts.length > 0) {
+        const unique = Array.from(new Set(categoryParts));
+        params.append("category", unique.join(","));
+    }
     if (options.brand) params.append("brand", options.brand);
     if (options.minPrice != null) params.append("minPrice", String(options.minPrice));
     if (options.maxPrice != null) params.append("maxPrice", String(options.maxPrice));
@@ -89,19 +105,41 @@ export async function prefetchShopFacets(queryClient: QueryClient, options: UseP
 }
 
 /** Options object must match `useProducts({ ...filters, limit, includeFacets })` for the default shop list. */
-export function shopProductsListQueryOptionsForHydration(params: {
-    search?: string;
-    category?: string;
-}): UseProductsOptions {
+export function shopProductsListQueryOptionsForHydration(params: Partial<UseProductsOptions> = {}): UseProductsOptions {
+    const page = params.page !== undefined && params.page >= 1 ? Math.floor(params.page) : 1;
     const o: UseProductsOptions = {
-        search: params.search ?? "",
-        sort: "newest",
-        page: 1,
+        search: typeof params.search === "string" ? params.search : "",
+        sort: params.sort && String(params.sort).trim() ? String(params.sort).trim() : "newest",
+        page,
         limit: SHOP_PRODUCTS_PER_PAGE,
         includeFacets: false,
     };
     if (params.category) {
         o.category = params.category;
+    }
+    if (params.subcategories?.trim()) {
+        o.subcategories = params.subcategories.trim();
+    }
+    if (params.brand) {
+        o.brand = params.brand;
+    }
+    if (params.minPrice != null && !Number.isNaN(Number(params.minPrice))) {
+        o.minPrice = Number(params.minPrice);
+    }
+    if (params.maxPrice != null && !Number.isNaN(Number(params.maxPrice))) {
+        o.maxPrice = Number(params.maxPrice);
+    }
+    if (params.availability) {
+        o.availability = params.availability;
+    }
+    if (params.inStock) {
+        o.inStock = params.inStock;
+    }
+    if (params.isFeatured != null) {
+        o.isFeatured = params.isFeatured;
+    }
+    if (params.spec && typeof params.spec === "object") {
+        o.spec = params.spec;
     }
     return o;
 }

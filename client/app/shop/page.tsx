@@ -5,12 +5,14 @@ import {
     prefetchShopProductsList,
     shopProductsListQueryOptionsForHydration,
 } from "@/lib/shopInitialProductsFetch";
+import { hasShopFacetNarrowing, parseShopFiltersFromRouter } from "@/lib/shopUrlFilters";
 
-function pickSearchParam(value: string | string[] | undefined): string {
-    if (value == null) return "";
-    const raw = Array.isArray(value) ? value[0] : value;
-    return String(raw ?? "").trim();
-}
+/**
+ * ISR: the default (no-filter) shop page is cached at the edge.
+ * Filtered URLs (searchParams) still revalidate but the unfiltered landing
+ * is instant for most visitors.
+ */
+export const revalidate = 60;
 
 interface ShopPageProps {
     searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -18,11 +20,14 @@ interface ShopPageProps {
 
 export default async function ShopPage({ searchParams }: ShopPageProps) {
     const sp = searchParams ? await searchParams : {};
-    const initialSearch = pickSearchParam(sp.search ?? sp.q);
+    const parsed = parseShopFiltersFromRouter("/shop", sp);
 
     const queryClient = new QueryClient();
-    const listOptions = shopProductsListQueryOptionsForHydration({ search: initialSearch });
-    const facetOptions = { search: initialSearch };
+    const listOptions = shopProductsListQueryOptionsForHydration(parsed);
+    const facetOptions = {
+        ...listOptions,
+        facetMode: hasShopFacetNarrowing(parsed) ? ("full" as const) : ("lite" as const),
+    };
     await Promise.all([
         prefetchShopProductsList(queryClient, listOptions),
         prefetchShopFacets(queryClient, facetOptions),
@@ -30,7 +35,7 @@ export default async function ShopPage({ searchParams }: ShopPageProps) {
 
     return (
         <HydrationBoundary state={dehydrate(queryClient)}>
-            <ShopPageClient initialSearch={initialSearch} />
+            <ShopPageClient initialFilters={parsed} />
         </HydrationBoundary>
     );
 }

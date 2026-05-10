@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { z } from 'zod';
 import Promotion from '../models/Promotion';
 import { AppError } from '../middleware/errorMiddleware';
+import { triggerRevalidation } from '../utils/revalidate';
 
 // Short in-memory cache to avoid re-querying the DB on every page load.
 // This is safe because promotions only change occasionally (admin actions).
@@ -129,6 +130,7 @@ export const createPromotion = async (req: Request, res: Response, next: any): P
             validFrom: new Date(validFrom),
             validTo: new Date(validTo),
         });
+        triggerRevalidation(['/']);
 
         res.status(201).json(promotion);
     } catch (error) {
@@ -161,6 +163,7 @@ export const updatePromotion = async (req: Request, res: Response, next: any): P
             err.status = 404;
             return next(err);
         }
+        triggerRevalidation(['/']);
 
         res.json(promotion);
     } catch (error) {
@@ -178,6 +181,7 @@ export const deletePromotion = async (req: Request, res: Response, next: any): P
             err.status = 404;
             return next(err);
         }
+        triggerRevalidation(['/']);
         res.json({ message: 'Promotion deleted' });
     } catch (error) {
         next(error);

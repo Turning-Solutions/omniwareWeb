@@ -24,7 +24,9 @@ import FlowSectionHeader from "@/components/FlowSectionHeader";
 import api from "@/lib/api";
 import LoadingAnimation from "@/components/LoadingAnimation";
 import { HOME_FEATURED_PRODUCTS_OPTIONS } from "@/lib/homeFeaturedProductsQuery";
+import { HOME_DISCOUNTED_PRODUCTS_OPTIONS } from "@/lib/homeDiscountedProductsQuery";
 import { useHomePartners } from "@/lib/homePartnersQuery";
+import { useHomeSettings } from "@/lib/homeSettingsQuery";
 
 const DeferredShopReviewsStrip = dynamic(() => import("@/components/ShopReviewsStrip"), {
     ssr: false,
@@ -43,6 +45,7 @@ const FEATURED_AUTO_SCROLL_MS = 4500;
 const FEATURED_SLIDE_TRANSITION_MS = 520;
 /** Render extra copies so we can recenter off-screen and keep the loop feeling continuous. */
 const FEATURED_LOOP_COPIES = 5;
+const DISCOUNTED_ROW_LIMIT = 16;
 const PROMOTIONS_STALE_MS = 20 * 60 * 1000;
 const PROMOTIONS_CACHE_KEY = "home:promotions:active:v1";
 
@@ -115,7 +118,15 @@ export default function Home() {
     const { data: featuredData, isLoading: loadingFeatured } = useProducts({
         ...HOME_FEATURED_PRODUCTS_OPTIONS,
     });
+    const { data: discountedData, isLoading: loadingDiscounted } = useProducts({
+        ...HOME_DISCOUNTED_PRODUCTS_OPTIONS,
+    });
+    const { data: homeSettings } = useHomeSettings();
+    const showDiscountedProductsRow = homeSettings?.showDiscountedProductsRow ?? true;
     const featuredProducts = featuredData?.products || [];
+    const discountedProducts = (discountedData?.products || [])
+        .filter((product) => (product.effectiveDiscountPercent ?? 0) > 0)
+        .slice(0, DISCOUNTED_ROW_LIMIT);
     const baseFeaturedCount = featuredProducts.length;
     const featuredLoopedProducts = baseFeaturedCount > 1
         ? Array.from({ length: FEATURED_LOOP_COPIES }, (_, copyIdx) =>
@@ -203,6 +214,89 @@ export default function Home() {
         if (baseFeaturedCount <= 1) return;
         slideTo(featuredIndexRef.current + direction);
     }, [baseFeaturedCount, slideTo]);
+
+    const baseDiscountedCount = discountedProducts.length;
+    const discountedLoopedProducts = baseDiscountedCount > 1
+        ? Array.from({ length: FEATURED_LOOP_COPIES }, (_, copyIdx) =>
+            discountedProducts.map((product) => ({ product, copyIdx }))
+        ).flat()
+        : discountedProducts.map((product) => ({ product, copyIdx: 0 }));
+
+    const discountedTrackRef = useRef<HTMLDivElement>(null);
+    const discountedIndexRef = useRef(0);
+    const [discountedOffset, setDiscountedOffset] = useState(0);
+    const [discountedAnimate, setDiscountedAnimate] = useState(false);
+
+    const readDiscountedOffset = useCallback((index: number): number => {
+        const track = discountedTrackRef.current;
+        if (!track) return 0;
+        const items = track.querySelectorAll<HTMLElement>("[data-discounted-slider-item]");
+        return items[index]?.offsetLeft ?? 0;
+    }, []);
+
+    const jumpDiscountedTo = useCallback((index: number) => {
+        discountedIndexRef.current = index;
+        setDiscountedAnimate(false);
+        requestAnimationFrame(() => {
+            setDiscountedOffset(readDiscountedOffset(index));
+            requestAnimationFrame(() => {
+                setDiscountedAnimate(true);
+            });
+        });
+    }, [readDiscountedOffset]);
+
+    const slideDiscountedTo = useCallback((index: number) => {
+        discountedIndexRef.current = index;
+        requestAnimationFrame(() => {
+            setDiscountedOffset(readDiscountedOffset(index));
+        });
+    }, [readDiscountedOffset]);
+
+    useEffect(() => {
+        if (baseDiscountedCount <= 1) {
+            discountedIndexRef.current = 0;
+            setDiscountedOffset(0);
+            setDiscountedAnimate(false);
+            return;
+        }
+        jumpDiscountedTo(baseDiscountedCount * 2);
+    }, [baseDiscountedCount, jumpDiscountedTo]);
+
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        const handleResize = () => {
+            setDiscountedOffset(readDiscountedOffset(discountedIndexRef.current));
+        };
+        window.addEventListener("resize", handleResize);
+        return () => window.removeEventListener("resize", handleResize);
+    }, [readDiscountedOffset]);
+
+    useEffect(() => {
+        if (baseDiscountedCount <= 1) return;
+        if (typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+        const intervalId = window.setInterval(() => {
+            slideDiscountedTo(discountedIndexRef.current + 1);
+        }, FEATURED_AUTO_SCROLL_MS);
+        return () => window.clearInterval(intervalId);
+    }, [baseDiscountedCount, loadingDiscounted, slideDiscountedTo]);
+
+    const handleDiscountedTransitionEnd = useCallback((event: React.TransitionEvent<HTMLDivElement>) => {
+        if (event.propertyName !== "transform") return;
+        if (baseDiscountedCount <= 1) return;
+        const current = discountedIndexRef.current;
+        const minIdx = baseDiscountedCount * 2;
+        const maxIdx = baseDiscountedCount * 3 - 1;
+        if (current >= minIdx && current <= maxIdx) return;
+        const recentered = current > maxIdx
+            ? current - baseDiscountedCount
+            : current + baseDiscountedCount;
+        jumpDiscountedTo(recentered);
+    }, [baseDiscountedCount, jumpDiscountedTo]);
+
+    const handleDiscountedArrow = useCallback((direction: 1 | -1) => {
+        if (baseDiscountedCount <= 1) return;
+        slideDiscountedTo(discountedIndexRef.current + direction);
+    }, [baseDiscountedCount, slideDiscountedTo]);
 
     const normalizedPreviewQuery = previewQuery.trim();
     const shouldShowPreview = normalizedPreviewQuery.length > 0;
@@ -648,6 +742,99 @@ export default function Home() {
                     </div>
                 </div>
             </section>
+
+            {showDiscountedProductsRow && (
+                <section className="relative py-10 sm:py-16 lg:py-20" aria-labelledby="discounted-heading">
+                    <div className="mx-auto max-w-[96rem] px-3 sm:px-6 lg:px-8">
+                        <div className="mb-6 flex flex-col gap-4 sm:mb-10 sm:flex-row sm:items-end sm:justify-between sm:gap-6 lg:mb-12">
+                            <FlowSectionHeader
+                                className="mb-0 min-w-0 sm:mb-0 sm:flex-1 lg:mb-0"
+                                titleId="discounted-heading"
+                                watermark="DISCOUNTED"
+                                watermarkAlign="right"
+                                eyebrow="Deals"
+                                title="Discounted products"
+                                description="Price drops across popular hardware."
+                            />
+                            <Link
+                                href="/shop"
+                                className="inline-flex w-fit shrink-0 items-center gap-2 text-sm font-semibold text-[#D12B28] transition hover:text-[#F1F1F1]"
+                            >
+                                View all <ArrowRight className="h-4 w-4" />
+                            </Link>
+                        </div>
+
+                        <div className="relative overflow-hidden rounded-2xl border border-white/[0.07] bg-[#0c0c0c]/85 p-4 shadow-[0_24px_70px_rgba(0,0,0,0.45)] sm:rounded-[1.75rem] sm:p-7 lg:p-10">
+                            <div className="pointer-events-none absolute -right-20 top-1/2 h-48 w-48 -translate-y-1/2 rounded-full bg-[#D12B28]/[0.06] blur-3xl" aria-hidden />
+                            {loadingDiscounted ? (
+                                <div className="flex min-h-[16rem] items-center justify-center">
+                                    <LoadingAnimation size="md" label="Loading discounted products..." />
+                                </div>
+                            ) : discountedProducts.length === 0 ? (
+                                <div className="rounded-xl border border-white/[0.06] bg-[#141414] px-6 py-12 text-center text-[#8E8E8E]">
+                                    No discounted products.
+                                </div>
+                            ) : (
+                                <div className="relative">
+                                    <div className="pointer-events-none absolute inset-y-0 left-0 z-20 flex w-12 items-center justify-start pl-1 sm:w-14 sm:pl-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => handleDiscountedArrow(-1)}
+                                            className="pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full border border-white/[0.12] bg-[#141414]/95 text-[#F1F1F1] transition hover:border-[#D12B28]/40 hover:bg-[#1a1a1a] hover:text-[#D12B28] sm:h-11 sm:w-11"
+                                            aria-label="Previous discounted products"
+                                        >
+                                            <ChevronLeft className="h-5 w-5 sm:h-6 sm:w-6" aria-hidden />
+                                        </button>
+                                    </div>
+                                    <div className="pointer-events-none absolute inset-y-0 right-0 z-20 flex w-12 items-center justify-end pr-1 sm:w-14 sm:pr-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => handleDiscountedArrow(1)}
+                                            className="pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full border border-white/[0.12] bg-[#141414]/95 text-[#F1F1F1] transition hover:border-[#D12B28]/40 hover:bg-[#1a1a1a] hover:text-[#D12B28] sm:h-11 sm:w-11"
+                                            aria-label="Next discounted products"
+                                        >
+                                            <ChevronRight className="h-5 w-5 sm:h-6 sm:w-6" aria-hidden />
+                                        </button>
+                                    </div>
+                                    <div
+                                        className="overflow-hidden px-12 pb-2 pt-3 sm:px-14 lg:px-0"
+                                        role="region"
+                                        aria-roledescription="carousel"
+                                        aria-label="Discounted products"
+                                    >
+                                        <div
+                                            ref={discountedTrackRef}
+                                            onTransitionEnd={handleDiscountedTransitionEnd}
+                                            className="flex gap-4 lg:gap-6"
+                                            style={{
+                                                transform: `translate3d(${-discountedOffset}px, 0, 0)`,
+                                                transition: discountedAnimate
+                                                    ? `transform ${FEATURED_SLIDE_TRANSITION_MS}ms cubic-bezier(0.22, 1, 0.36, 1)`
+                                                    : "none",
+                                                willChange: "transform",
+                                            }}
+                                        >
+                                            {discountedLoopedProducts.map(({ product, copyIdx }) => (
+                                                <div
+                                                    key={`${product._id}-${copyIdx}`}
+                                                    data-discounted-slider-item
+                                                    className="w-[17rem] shrink-0 lg:w-[20rem]"
+                                                >
+                                                    <ProductCard
+                                                        product={product}
+                                                        showWhatsAppButton={false}
+                                                        showOrderNowButton
+                                                    />
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </section>
+            )}
 
             {/* Services — before partners, matching reference story beat */}
             <section className="relative py-10 sm:py-16 lg:py-20" aria-labelledby="services-heading">

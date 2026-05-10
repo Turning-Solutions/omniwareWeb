@@ -2,12 +2,14 @@
 
 import { Suspense } from "react";
 import { ShopContent, ShopSkeleton } from "../ShopContent";
+import type { UseProductsOptions } from "@/hooks/useProducts";
 
 interface CategoryShopPageClientProps {
     normalizedSlug: string;
+    initialFilters: Partial<UseProductsOptions>;
 }
 
-export default function CategoryShopPageClient({ normalizedSlug }: CategoryShopPageClientProps) {
+export default function CategoryShopPageClient({ normalizedSlug, initialFilters }: CategoryShopPageClientProps) {
     return (
         <div className="min-h-screen bg-[#121212] pb-16 pt-6 sm:pt-10">
             <div
@@ -18,7 +20,7 @@ export default function CategoryShopPageClient({ normalizedSlug }: CategoryShopP
                 <Suspense fallback={<ShopSkeleton />}>
                     <ShopContent
                         basePath={`/shop/${normalizedSlug}`}
-                        initialFilters={{ category: normalizedSlug }}
+                        initialFilters={initialFilters}
                         heading="Shop"
                         subheading="Products in this category. Refine with filters on the left."
                     />

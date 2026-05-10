@@ -99,7 +99,7 @@ function normalizeSortForApi(sort: string): string {
     return sort.trim().toLowerCase().replace(/-/g, '_');
 }
 
-function normalizeCategoryForApi(category: string): string {
+export function normalizeCategoryForApi(category: string): string {
     const c = category.trim();
     return /^[a-fA-F0-9]{24}$/.test(c) ? c : c.toLowerCase();
 }
