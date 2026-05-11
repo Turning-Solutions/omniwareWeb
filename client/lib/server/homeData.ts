@@ -65,6 +65,7 @@ export async function fetchPromotionsDirect(): Promise<HomePromotion[]> {
             badgeText: 1,
             validFrom: 1,
             validTo: 1,
+            directRedirect: 1,
         })
         .lean();
 

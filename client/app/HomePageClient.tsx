@@ -47,7 +47,7 @@ const FEATURED_SLIDE_TRANSITION_MS = 520;
 const FEATURED_LOOP_COPIES = 5;
 const DISCOUNTED_ROW_LIMIT = 16;
 const PROMOTIONS_STALE_MS = 20 * 60 * 1000;
-const PROMOTIONS_CACHE_KEY = "home:promotions:active:v1";
+const PROMOTIONS_CACHE_KEY = "home:promotions:active:v2";
 
 /**
  * Appends an optional cache-busting query string to partner logo URLs.
@@ -67,6 +67,7 @@ export default function Home() {
         badgeText: string;
         validFrom: string;
         validTo: string;
+        directRedirect?: boolean;
     };
 
     const readCachedPromotions = (): { data: Promotion[]; updatedAt: number } | null => {
@@ -368,23 +369,23 @@ export default function Home() {
 
     const servicePillars = [
         {
-            title: "Trusted Inventory",
-            description: "Top-tier hardware from brands builders already know and use.",
+            title: "Carefully Selected Hardware",
+            description: "Parts and peripherals from brands trusted by gamers, creators, and PC enthusiasts.",
             icon: ShieldCheck
         },
         {
-            title: "Fast Fulfillment",
-            description: "Quick delivery and careful packaging for sensitive components.",
+            title: "Reliable Islandwide Delivery",
+            description: "Secure packaging and fast fulfillment to keep sensitive components protected during transit.",
             icon: Truck
         },
         {
-            title: "Build Guidance",
-            description: "Get help choosing balanced parts for gaming, work, or hybrid builds.",
+            title: "Real Build Assistance",
+            description: "Get practical recommendations for balanced gaming, editing, streaming, or productivity setups.",
             icon: Cpu
         },
         {
-            title: "Support When You Need It",
-            description: "Questions about compatibility or your order, we are here to help you ship the build.",
+            title: "Support Beyond Checkout",
+            description: "Need help with compatibility, upgrades, or troubleshooting? We’re here before and after the purchase.",
             icon: LifeBuoy
         }
     ];
@@ -843,9 +844,9 @@ export default function Home() {
                         titleId="services-heading"
                         watermark="TRUST"
                         watermarkAlign="right"
-                        eyebrow="Why shop here"
-                        title="It's not just another Computer shop"
-                        description="From inventory to delivery, the experience is built for people who actually assemble systems, not just scroll specs."
+                        eyebrow="WHY SHOP HERE"
+                        title="Not Just Parts. People Behind Them"
+                        description="Because building a PC should feel personal, not transactional."
                     />
                     <div className="grid gap-3 sm:grid-cols-2 sm:gap-5">
                         {servicePillars.map((item) => {

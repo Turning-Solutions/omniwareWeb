@@ -17,6 +17,7 @@ interface Promotion {
     validTo: string;
     isActive: boolean;
     sortOrder: number;
+    directRedirect: boolean;
 }
 
 const EMPTY: Omit<Promotion, "_id"> = {
@@ -29,6 +30,7 @@ const EMPTY: Omit<Promotion, "_id"> = {
     validTo: "",
     isActive: true,
     sortOrder: 0,
+    directRedirect: false,
 };
 
 function toDatetimeLocal(iso: string): string {
@@ -88,6 +90,7 @@ export default function PromotionsPage() {
             validTo: toDatetimeLocal(promo.validTo),
             isActive: promo.isActive,
             sortOrder: promo.sortOrder,
+            directRedirect: promo.directRedirect ?? false,
         });
         setError("");
         setShowForm(true);
@@ -323,6 +326,19 @@ export default function PromotionsPage() {
                                     <span className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${form.isActive ? "translate-x-5" : "translate-x-0"}`} />
                                 </div>
                                 <span className="text-sm text-main">Active</span>
+                            </label>
+
+                            <label className="flex items-center gap-3 cursor-pointer select-none">
+                                <div
+                                    onClick={() => setForm(f => ({ ...f, directRedirect: !f.directRedirect }))}
+                                    className={`relative h-6 w-11 rounded-full transition-colors ${form.directRedirect ? "bg-accent" : "bg-[#3a3a3a]"}`}
+                                >
+                                    <span className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${form.directRedirect ? "translate-x-5" : "translate-x-0"}`} />
+                                </div>
+                                <div>
+                                    <span className="text-sm text-main block">Direct Redirect</span>
+                                    <span className="text-[10px] text-sub block">If enabled, clicking the promotion redirects immediately instead of showing details.</span>
+                                </div>
                             </label>
                         </div>
 

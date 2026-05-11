@@ -12,6 +12,7 @@ export interface HomePromotion {
     badgeText: string;
     validFrom: string;
     validTo: string;
+    directRedirect?: boolean;
 }
 
 export function getHomePromotionsQueryOptions() {

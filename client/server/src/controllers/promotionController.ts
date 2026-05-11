@@ -23,6 +23,7 @@ const promotionSchema = z.object({
     validTo: z.string().refine(d => !isNaN(Date.parse(d)), { message: 'Invalid validTo date' }),
     isActive: z.boolean().default(true),
     sortOrder: z.number().default(0),
+    directRedirect: z.boolean().default(false),
 });
 
 const updateSchema = promotionSchema.partial();

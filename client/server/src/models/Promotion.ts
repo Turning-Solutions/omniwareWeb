@@ -10,6 +10,7 @@ const promotionSchema = new mongoose.Schema({
     validTo: { type: Date, required: true },
     isActive: { type: Boolean, default: true },
     sortOrder: { type: Number, default: 0 },
+    directRedirect: { type: Boolean, default: false },
 }, {
     timestamps: true
 });

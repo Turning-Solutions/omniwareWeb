@@ -38,8 +38,6 @@ const googleReviewFeedSchema = new mongoose.Schema(
     { timestamps: true }
 );
 
-googleReviewFeedSchema.index({ sourceKey: 1 }, { unique: true });
-
 const GoogleReviewFeed =
     mongoose.models.GoogleReviewFeed || mongoose.model("GoogleReviewFeed", googleReviewFeedSchema);
 

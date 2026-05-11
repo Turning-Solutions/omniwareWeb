@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { ArrowRight, ChevronLeft, ChevronRight, Clock, X, Zap } from "lucide-react";
 import api from "@/lib/api";
 import { AnimatePresence, motion } from "framer-motion";
@@ -17,6 +18,7 @@ interface Promotion {
     badgeText: string;
     validFrom: string;
     validTo: string;
+    directRedirect?: boolean;
 }
 
 function formatTimeLeft(validTo: string): string {
@@ -72,6 +74,7 @@ export default function PromotionStripe({ asHero = false, promotions: promotions
     const [activeIndex, setActiveIndex] = useState(0);
     const [direction,   setDirection]   = useState(1);
     const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+    const router = useRouter();
 
     const safeIndex = useMemo(() => {
         if (promotions.length === 0) return 0;
@@ -343,11 +346,21 @@ export default function PromotionStripe({ asHero = false, promotions: promotions
                 <div
                     role="button"
                     tabIndex={0}
-                    onClick={() => setIsDetailsOpen(true)}
+                    onClick={() => {
+                        if (promo.directRedirect && promo.link) {
+                            router.push(promo.link);
+                        } else {
+                            setIsDetailsOpen(true);
+                        }
+                    }}
                     onKeyDown={(event) => {
                         if (event.key === "Enter" || event.key === " ") {
                             event.preventDefault();
-                            setIsDetailsOpen(true);
+                            if (promo.directRedirect && promo.link) {
+                                router.push(promo.link);
+                            } else {
+                                setIsDetailsOpen(true);
+                            }
                         }
                     }}
                     className="block cursor-pointer"
