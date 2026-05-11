@@ -131,12 +131,6 @@ export default function Footer() {
                                     Terms and Conditions
                                 </Link>
                             </li>
-                            {/* Only admin entry point */}
-                            <li>
-                                <Link href="/admin" className="text-base text-gray-400 hover:text-white">
-                                    Admin Panel
-                                </Link>
-                            </li>
                         </ul>
                     </div>
                 </div>
