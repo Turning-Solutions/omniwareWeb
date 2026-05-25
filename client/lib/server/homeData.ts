@@ -215,7 +215,21 @@ export async function fetchProductsDirect(options: ProductFetchOptions): Promise
 // Single Product (for product detail page SSR)
 // ────────────────────────────────────────────
 
+type ProductRuntimeCacheEntry = {
+    expiresAt: number;
+    value: unknown | null;
+};
+
+const productBySlugRuntimeCache = new Map<string, ProductRuntimeCacheEntry>();
+const PRODUCT_RUNTIME_CACHE_TTL_MS = 2 * 60 * 1000;
+
 export async function fetchProductBySlugDirect(slug: string) {
+    const key = slug.trim().toLowerCase();
+    const hit = productBySlugRuntimeCache.get(key);
+    if (hit && hit.expiresAt > Date.now()) {
+        return hit.value;
+    }
+
     await ensureDb();
 
     const isObjectId = /^[a-fA-F0-9]{24}$/.test(slug);
@@ -227,10 +241,21 @@ export async function fetchProductBySlugDirect(slug: string) {
         .populate('brandId', 'name slug logoUrl')
         .populate('categoryIds', 'name slug discountPercent');
 
-    if (!product) return null;
+    if (!product) {
+        productBySlugRuntimeCache.set(key, {
+            expiresAt: Date.now() + PRODUCT_RUNTIME_CACHE_TTL_MS,
+            value: null,
+        });
+        return null;
+    }
 
     // Same post-processing chain as getProductBySlug in productController
     const normalized = normalizeProductAttributeGroups(product);
     const sanitized = stripAdminOnlyProductFields(normalized);
-    return serialize(withDiscountInfo(sanitized));
+    const result = serialize(withDiscountInfo(sanitized));
+    productBySlugRuntimeCache.set(key, {
+        expiresAt: Date.now() + PRODUCT_RUNTIME_CACHE_TTL_MS,
+        value: result,
+    });
+    return result;
 }

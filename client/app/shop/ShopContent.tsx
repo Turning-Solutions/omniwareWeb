@@ -17,11 +17,14 @@ import LoadingAnimation from "@/components/LoadingAnimation";
 import { SlidersHorizontal, ArrowUpDown, X, ChevronLeft, ChevronRight, Search, Loader2 } from "lucide-react";
 import { SHOP_PRODUCTS_PER_PAGE } from "@/lib/shopConstants";
 import { serializeShopListingUrl, shopListingUrlsEquivalent } from "@/lib/shopUrlFilters";
+import api from "@/lib/api";
 
 const SEARCH_DEBOUNCE_MS = 380;
 const HOVER_PREFETCH_DEBOUNCE_MS = 180;
 const SHOP_RETURN_STATE_PREFIX = "shop:return-state:";
 const SHOP_LIST_STALE_MS = 2 * 60 * 1000;
+const PRODUCT_DETAIL_STALE_MS = 5 * 60 * 1000;
+const SHOP_AUTO_WARM_LIMIT = 8;
 /** Minimum time the grid overlay stays visible after a filter change (covers instant cache hits). */
 const PRODUCTS_REFRESH_MIN_MS = 400;
 
@@ -85,6 +88,7 @@ export function ShopContent({
     const filtersRef = useRef<Filters>(filters);
     const hoverPrefetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const lastHoverPrefetchKeyRef = useRef<string>("");
+    const warmedProductRoutesRef = useRef<Set<string>>(new Set());
 
     const rememberCurrentShopState = useCallback(() => {
         if (typeof window === "undefined") return;
@@ -302,6 +306,47 @@ export function ShopContent({
 
     const showProductsOverlay =
         products.length > 0 && (productsRefreshing || isFetching || isPlaceholderData);
+
+    // Warm the first visible product pages in the background, even without hover:
+    // 1) Next.js route/RSC payload cache via router.prefetch
+    // 2) React Query product detail cache via prefetchQuery
+    useEffect(() => {
+        if (products.length === 0 || typeof window === "undefined") return;
+
+        const warmTopProducts = () => {
+            for (const product of products.slice(0, SHOP_AUTO_WARM_LIMIT)) {
+                const slug = product.slug || product._id;
+                if (!slug || warmedProductRoutesRef.current.has(slug)) continue;
+
+                warmedProductRoutesRef.current.add(slug);
+                router.prefetch(`/product/${slug}`);
+
+                const queryKey = ["product", slug] as const;
+                const state = queryClient.getQueryState(queryKey);
+                const isFresh =
+                    state?.dataUpdatedAt != null &&
+                    Date.now() - state.dataUpdatedAt < PRODUCT_DETAIL_STALE_MS;
+                if (!isFresh) {
+                    void queryClient.prefetchQuery({
+                        queryKey,
+                        queryFn: async () => {
+                            const { data } = await api.get(`/products/${slug}`);
+                            return data;
+                        },
+                        staleTime: PRODUCT_DETAIL_STALE_MS,
+                    });
+                }
+            }
+        };
+
+        if (typeof globalThis.requestIdleCallback === "function") {
+            const idleId = globalThis.requestIdleCallback(warmTopProducts, { timeout: 1500 });
+            return () => globalThis.cancelIdleCallback?.(idleId);
+        }
+
+        const timeoutId = globalThis.setTimeout(warmTopProducts, 200);
+        return () => globalThis.clearTimeout(timeoutId);
+    }, [products, queryClient, router]);
 
     const facets = useMemo(() => {
         const fd = facetsData as { facets?: Facets; featuredSpecKeys?: string[] } | undefined;
