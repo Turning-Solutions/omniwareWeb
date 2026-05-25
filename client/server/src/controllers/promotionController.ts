@@ -60,6 +60,7 @@ export const getActivePromotions = async (req: Request, res: Response, next: any
                 badgeText: 1,
                 validFrom: 1,
                 validTo: 1,
+                directRedirect: 1,
             })
             .lean();
 
@@ -131,6 +132,7 @@ export const createPromotion = async (req: Request, res: Response, next: any): P
             validFrom: new Date(validFrom),
             validTo: new Date(validTo),
         });
+        activePromotionsCache = undefined;
         triggerRevalidation(['/']);
 
         res.status(201).json(promotion);
@@ -164,6 +166,7 @@ export const updatePromotion = async (req: Request, res: Response, next: any): P
             err.status = 404;
             return next(err);
         }
+        activePromotionsCache = undefined;
         triggerRevalidation(['/']);
 
         res.json(promotion);
@@ -182,6 +185,7 @@ export const deletePromotion = async (req: Request, res: Response, next: any): P
             err.status = 404;
             return next(err);
         }
+        activePromotionsCache = undefined;
         triggerRevalidation(['/']);
         res.json({ message: 'Promotion deleted' });
     } catch (error) {

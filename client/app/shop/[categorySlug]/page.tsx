@@ -5,7 +5,6 @@ import {
     shopProductsListQueryOptionsForHydration,
 } from "@/lib/shopInitialProductsFetch";
 import { parseShopFiltersFromRouter } from "@/lib/shopUrlFilters";
-import { ensureDb } from "@/server/src/config/db";
 import "@/server/src/models/Brand";
 import "@/server/src/models/Category";
 
@@ -25,9 +24,6 @@ export default async function CategoryShopPage({ params, searchParams }: Categor
     const sp = searchParams ? await searchParams : {};
     const pathname = `/shop/${encodeURIComponent(normalizedSlug)}`;
     const parsed = parseShopFiltersFromRouter(pathname, sp);
-
-    // Warm the DB connection before HTTP prefetch
-    await ensureDb();
 
     const queryClient = new QueryClient();
     const listOptions = shopProductsListQueryOptionsForHydration(parsed);

@@ -21,6 +21,7 @@ import { useProducts } from "@/hooks/useProducts";
 import ProductCard from "@/components/ProductCard";
 import PromotionStripe from "@/components/PromotionStripe";
 import FlowSectionHeader from "@/components/FlowSectionHeader";
+import HomeFaqSection from "@/components/HomeFaqSection";
 import api from "@/lib/api";
 import LoadingAnimation from "@/components/LoadingAnimation";
 import { HOME_FEATURED_PRODUCTS_OPTIONS } from "@/lib/homeFeaturedProductsQuery";
@@ -1011,6 +1012,8 @@ export default function Home() {
                         <DeferredShopReviewsStrip fullWidthStrip />
                     </div>
                 </section>
+
+                <HomeFaqSection />
             </div>
         </div>
     );

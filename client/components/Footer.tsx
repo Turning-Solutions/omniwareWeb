@@ -107,7 +107,7 @@ export default function Footer() {
                                 </Link>
                             </li>
                             <li>
-                                <Link href="#" className="text-base text-gray-400 hover:text-white">
+                                <Link href="/#faq" className="text-base text-gray-400 hover:text-white">
                                     FAQs
                                 </Link>
                             </li>
