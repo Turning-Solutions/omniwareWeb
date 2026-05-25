@@ -1,9 +1,13 @@
 "use client";
 
+import { useEffect, useState } from "react";
+
 interface LoadingAnimationProps {
     label?: string;
     size?: "sm" | "md" | "lg";
     className?: string;
+    /** Milliseconds to wait before showing the spinner. Defaults to 0 (show immediately). */
+    delayMs?: number;
 }
 
 const sizeClasses: Record<NonNullable<LoadingAnimationProps["size"]>, string> = {
@@ -16,7 +20,18 @@ export default function LoadingAnimation({
     label = "Loading...",
     size = "md",
     className = "",
+    delayMs = 0,
 }: LoadingAnimationProps) {
+    const [visible, setVisible] = useState(delayMs === 0);
+
+    useEffect(() => {
+        if (delayMs === 0) return;
+        const timer = setTimeout(() => setVisible(true), delayMs);
+        return () => clearTimeout(timer);
+    }, [delayMs]);
+
+    if (!visible) return null;
+
     return (
         <div className={`flex flex-col items-center justify-center gap-3 ${className}`}>
             <div className="relative">

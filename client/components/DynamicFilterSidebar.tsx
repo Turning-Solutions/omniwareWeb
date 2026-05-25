@@ -23,6 +23,10 @@ interface DynamicFilterSidebarProps {
     onCategoryPrefetchEnter?: (facetValue: string) => void;
     /** Prefetch when hovering a subcategory row (toggle outcome vs current selection). */
     onSubcategoryPrefetchEnter?: (facetValue: string) => void;
+    /** Prefetch when hovering a brand checkbox (toggle outcome vs current selection). */
+    onBrandPrefetchEnter?: (brandSlug: string) => void;
+    /** Prefetch when hovering a spec value checkbox (toggle outcome vs current selection). */
+    onSpecPrefetchEnter?: (key: string, value: string) => void;
 }
 
 type CategoryTreeItem = {
@@ -737,6 +741,8 @@ export default function DynamicFilterSidebar({
     onClose,
     onCategoryPrefetchEnter,
     onSubcategoryPrefetchEnter,
+    onBrandPrefetchEnter,
+    onSpecPrefetchEnter,
 }: DynamicFilterSidebarProps) {
     const [priceRange, setPriceRange] = useState<{ min: number; max: number }>({ min: 0, max: 0 });
     const [sectionSearch, setSectionSearch] = useState<Record<string, string>>({});
@@ -1315,6 +1321,7 @@ export default function DynamicFilterSidebar({
                                     brands={filterFacetOptions(facets.brands, "brands")}
                                     brandSelected={brandSelected}
                                     handleBrandChange={handleBrandChange}
+                                    onBrandPrefetchEnter={onBrandPrefetchEnter}
                                 />
                             </FilterSection>
                         ) : null}
@@ -1356,6 +1363,7 @@ export default function DynamicFilterSidebar({
                                         filterKey={key}
                                         filters={filters}
                                         handleSpecChange={handleSpecChange}
+                                        onSpecPrefetchEnter={onSpecPrefetchEnter}
                                     />
                                 </FilterSection>
                             ))}
@@ -1372,10 +1380,12 @@ function BrandList({
     brands,
     brandSelected,
     handleBrandChange,
+    onBrandPrefetchEnter,
 }: {
     brands: { value: string; label: string; count: number }[];
     brandSelected: (v: string) => boolean;
     handleBrandChange: (v: string) => void;
+    onBrandPrefetchEnter?: (brandSlug: string) => void;
 }) {
     const sortedBrands = sortFacetOptions(brands);
     const visible = orderOptionsSelectedFirst(sortedBrands, brandSelected);
@@ -1389,6 +1399,11 @@ function BrandList({
                     onChange={() => handleBrandChange(brand.value)}
                     label={brand.label}
                     count={brand.count}
+                    onPrefetchPointerEnter={
+                        onBrandPrefetchEnter
+                            ? () => onBrandPrefetchEnter(brand.value)
+                            : undefined
+                    }
                 />
             ))}
             {brands.length === 0 ? (
@@ -1403,11 +1418,13 @@ function SpecList({
     filterKey,
     filters,
     handleSpecChange,
+    onSpecPrefetchEnter,
 }: {
     items: { value: string; label: string; count: number }[];
     filterKey: string;
     filters: any; // eslint-disable-line @typescript-eslint/no-explicit-any
     handleSpecChange: (key: string, value: string) => void;
+    onSpecPrefetchEnter?: (key: string, value: string) => void;
 }) {
     const isSelected = (value: string) => {
         const specVal = filters.spec?.[filterKey];
@@ -1427,6 +1444,11 @@ function SpecList({
                         onChange={() => handleSpecChange(filterKey, item.value)}
                         label={item.value}
                         count={item.count}
+                        onPrefetchPointerEnter={
+                            onSpecPrefetchEnter
+                                ? () => onSpecPrefetchEnter(filterKey, item.value)
+                                : undefined
+                        }
                     />
                 );
             })}

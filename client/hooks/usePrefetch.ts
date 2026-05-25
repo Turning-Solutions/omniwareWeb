@@ -13,15 +13,26 @@ import type { Product } from "@/hooks/useProducts";
  *   const { onMouseEnter } = usePrefetchProduct(product.slug);
  *   <div onMouseEnter={onMouseEnter}>...</div>
  */
+const PRODUCT_DETAIL_STALE_MS = 5 * 60 * 1000;
+
 export function usePrefetchProduct(slugOrId: string | undefined) {
     const queryClient = useQueryClient();
     const prefetchedRef = useRef<Set<string>>(new Set());
 
     const onMouseEnter = useCallback(() => {
         if (!slugOrId) return;
-        // Only prefetch once per slug per session
         if (prefetchedRef.current.has(slugOrId)) return;
+
+        // If the product detail is already fresh in the cache (e.g. seeded by SSR
+        // hydration or a previous hover), mark it done and skip the network round-trip.
+        const cached = queryClient.getQueryState(["product", slugOrId]);
+        const isFresh =
+            cached?.dataUpdatedAt != null &&
+            Date.now() - cached.dataUpdatedAt < PRODUCT_DETAIL_STALE_MS;
+
         prefetchedRef.current.add(slugOrId);
+
+        if (isFresh) return;
 
         void queryClient.prefetchQuery<Product>({
             queryKey: ["product", slugOrId],
@@ -29,12 +40,14 @@ export function usePrefetchProduct(slugOrId: string | undefined) {
                 const { data } = await api.get(`/products/${slugOrId}`);
                 return data;
             },
-            staleTime: 5 * 60 * 1000,
+            staleTime: PRODUCT_DETAIL_STALE_MS,
         });
     }, [slugOrId, queryClient]);
 
     return { onMouseEnter };
 }
+
+const SHOP_LIST_STALE_MS = 2 * 60 * 1000;
 
 /**
  * Prefetch shop page products on hover (e.g. hovering "Shop" link in navbar).
@@ -48,13 +61,21 @@ export function usePrefetchShopProducts() {
         if (prefetchedRef.current) return;
         prefetchedRef.current = true;
 
+        // Skip if the default shop list is already fresh in cache.
+        const queryKey = ["products", { limit: 20, sort: "newest", page: 1, includeFacets: false }] as const;
+        const cached = queryClient.getQueryState(queryKey);
+        const isFresh =
+            cached?.dataUpdatedAt != null &&
+            Date.now() - cached.dataUpdatedAt < SHOP_LIST_STALE_MS;
+        if (isFresh) return;
+
         void queryClient.prefetchQuery({
-            queryKey: ["products", { limit: 20, sort: "newest", page: 1, includeFacets: false }],
+            queryKey,
             queryFn: async () => {
                 const { data } = await api.get("/products?limit=20&sort=newest&page=1&facets=false");
                 return data;
             },
-            staleTime: 2 * 60 * 1000,
+            staleTime: SHOP_LIST_STALE_MS,
         });
     }, [queryClient]);
 

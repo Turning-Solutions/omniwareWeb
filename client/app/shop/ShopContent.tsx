@@ -109,6 +109,20 @@ export function ShopContent({
     const scheduleHoverPrefetch = useCallback(
         (key: string, next: Filters) => {
             if (lastHoverPrefetchKeyRef.current === key) return;
+
+            // If the product-list data for this exact filter state is already fresh in the
+            // React Query cache, there is no need to schedule a timer or fire any request.
+            const listOpts = getProductsQueryOptions({
+                ...next,
+                limit: SHOP_PRODUCTS_PER_PAGE,
+                includeFacets: false,
+            });
+            const listState = queryClient.getQueryState(listOpts.queryKey);
+            const isListFresh =
+                listState?.dataUpdatedAt != null &&
+                Date.now() - listState.dataUpdatedAt < SHOP_LIST_STALE_MS;
+            if (isListFresh) return;
+
             lastHoverPrefetchKeyRef.current = key;
             if (hoverPrefetchTimerRef.current) clearTimeout(hoverPrefetchTimerRef.current);
             hoverPrefetchTimerRef.current = setTimeout(() => {
@@ -116,7 +130,7 @@ export function ShopContent({
                 prefetchShopListState(next);
             }, HOVER_PREFETCH_DEBOUNCE_MS);
         },
-        [prefetchShopListState]
+        [queryClient, prefetchShopListState]
     );
 
     const prefetchCategoryHover = useCallback(
@@ -163,6 +177,79 @@ export function ShopContent({
         },
         [scheduleHoverPrefetch]
     );
+
+    const prefetchBrandHover = useCallback(
+        (brandSlug: string) => {
+            const cur = filtersRef.current;
+            const brandStr = typeof cur.brand === "string" ? cur.brand : "";
+            const current = brandStr ? brandStr.split(",").filter(Boolean) : [];
+            const next: Filters = { ...cur, page: 1 };
+            if (current.includes(brandSlug)) {
+                const remaining = current.filter((b) => b !== brandSlug);
+                if (remaining.length > 0) next.brand = remaining.join(",");
+                else delete next.brand;
+            } else {
+                next.brand = [...current, brandSlug].join(",");
+            }
+            scheduleHoverPrefetch(
+                `brand:${brandSlug}:${current.includes(brandSlug) ? "off" : "on"}`,
+                next
+            );
+        },
+        [scheduleHoverPrefetch]
+    );
+
+    const prefetchSpecHover = useCallback(
+        (key: string, value: string) => {
+            const cur = filtersRef.current;
+            const currentSpec = cur.spec ?? {};
+            const currentVals =
+                currentSpec[key]
+                    ? (currentSpec[key] as string).split(",").filter(Boolean)
+                    : [];
+            const next: Filters = { ...cur, page: 1 };
+            const newSpec = { ...currentSpec };
+            if (currentVals.includes(value)) {
+                const remaining = currentVals.filter((v) => v !== value);
+                if (remaining.length > 0) newSpec[key] = remaining.join(",");
+                else delete newSpec[key];
+            } else {
+                newSpec[key] = [...currentVals, value].join(",");
+            }
+            if (Object.keys(newSpec).length > 0) next.spec = newSpec;
+            else delete next.spec;
+            scheduleHoverPrefetch(
+                `spec:${key}:${value}:${currentVals.includes(value) ? "off" : "on"}`,
+                next
+            );
+        },
+        [scheduleHoverPrefetch]
+    );
+
+    // Warm all four sort variants when the user mouses over the sort control.
+    // Each sort is individually checked against the React Query cache first; if that
+    // exact query is already fresh, no network request is made.
+    const prefetchSortHover = useCallback(() => {
+        const cur = filtersRef.current;
+        const sorts = ["newest", "price-asc", "price-desc", "name-asc"] as const;
+        for (const sort of sorts) {
+            if (sort === cur.sort) continue;
+            const opts = getProductsQueryOptions({
+                ...cur,
+                sort,
+                page: 1,
+                limit: SHOP_PRODUCTS_PER_PAGE,
+                includeFacets: false,
+            });
+            const state = queryClient.getQueryState(opts.queryKey);
+            const isFresh =
+                state?.dataUpdatedAt != null &&
+                Date.now() - state.dataUpdatedAt < SHOP_LIST_STALE_MS;
+            if (!isFresh) {
+                void prefetchShopListState({ ...cur, sort, page: 1 });
+            }
+        }
+    }, [queryClient, prefetchShopListState]);
 
     useEffect(() => {
         filtersRef.current = filters;
@@ -458,6 +545,8 @@ export function ShopContent({
                     onClose={() => setIsSidebarOpen(false)}
                     onCategoryPrefetchEnter={prefetchCategoryHover}
                     onSubcategoryPrefetchEnter={prefetchSubcategoryHover}
+                    onBrandPrefetchEnter={prefetchBrandHover}
+                    onSpecPrefetchEnter={prefetchSpecHover}
                 />
 
                 <div ref={productsTopRef} className="flex-1 min-w-0 space-y-6">
@@ -496,6 +585,8 @@ export function ShopContent({
                                 <select
                                     aria-label="Sort products"
                                     value={filters.sort}
+                                    onMouseEnter={prefetchSortHover}
+                                    onFocus={prefetchSortHover}
                                     onChange={(e) => {
                                         const sort = e.target.value;
                                         const next = { ...filtersRef.current, sort, page: 1 };
