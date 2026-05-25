@@ -1,6 +1,7 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 import { useCallback, useRef } from "react";
 import api from "@/lib/api";
 import type { Product } from "@/hooks/useProducts";
@@ -17,21 +18,24 @@ const PRODUCT_DETAIL_STALE_MS = 5 * 60 * 1000;
 
 export function usePrefetchProduct(slugOrId: string | undefined) {
     const queryClient = useQueryClient();
+    const router = useRouter();
     const prefetchedRef = useRef<Set<string>>(new Set());
 
     const onMouseEnter = useCallback(() => {
         if (!slugOrId) return;
         if (prefetchedRef.current.has(slugOrId)) return;
+        prefetchedRef.current.add(slugOrId);
 
-        // If the product detail is already fresh in the cache (e.g. seeded by SSR
-        // hydration or a previous hover), mark it done and skip the network round-trip.
+        // 1. Warm the Next.js RSC payload for /product/[slug]. Without this, Link only
+        //    does a partial prefetch on dynamic routes and the actual click triggers a
+        //    full server render (the slow `?_rsc=...` fetch in the network tab).
+        router.prefetch(`/product/${slugOrId}`);
+
+        // 2. Warm the React Query cache for the product detail unless it is already fresh.
         const cached = queryClient.getQueryState(["product", slugOrId]);
         const isFresh =
             cached?.dataUpdatedAt != null &&
             Date.now() - cached.dataUpdatedAt < PRODUCT_DETAIL_STALE_MS;
-
-        prefetchedRef.current.add(slugOrId);
-
         if (isFresh) return;
 
         void queryClient.prefetchQuery<Product>({
@@ -42,7 +46,7 @@ export function usePrefetchProduct(slugOrId: string | undefined) {
             },
             staleTime: PRODUCT_DETAIL_STALE_MS,
         });
-    }, [slugOrId, queryClient]);
+    }, [slugOrId, queryClient, router]);
 
     return { onMouseEnter };
 }

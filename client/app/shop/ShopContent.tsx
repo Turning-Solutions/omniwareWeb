@@ -14,7 +14,7 @@ import {
 import ProductCard from "@/components/ProductCard";
 import DynamicFilterSidebar, { countActiveFilters } from "@/components/DynamicFilterSidebar";
 import LoadingAnimation from "@/components/LoadingAnimation";
-import { SlidersHorizontal, ArrowUpDown, X, ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { SlidersHorizontal, ArrowUpDown, X, ChevronLeft, ChevronRight, Search, Loader2 } from "lucide-react";
 import { SHOP_PRODUCTS_PER_PAGE } from "@/lib/shopConstants";
 import { serializeShopListingUrl, shopListingUrlsEquivalent } from "@/lib/shopUrlFilters";
 
@@ -22,6 +22,8 @@ const SEARCH_DEBOUNCE_MS = 380;
 const HOVER_PREFETCH_DEBOUNCE_MS = 180;
 const SHOP_RETURN_STATE_PREFIX = "shop:return-state:";
 const SHOP_LIST_STALE_MS = 2 * 60 * 1000;
+/** Minimum time the grid overlay stays visible after a filter change (covers instant cache hits). */
+const PRODUCTS_REFRESH_MIN_MS = 400;
 
 type Filters = UseProductsOptions & Record<string, unknown>;
 
@@ -260,6 +262,7 @@ export function ShopContent({
         data,
         isLoading,
         isFetching,
+        isPlaceholderData,
         error,
         refetch: refetchProducts,
     } = useProducts({
@@ -280,6 +283,26 @@ export function ShopContent({
         facetMode: facetsMode,
     });
     const products = data?.products || [];
+    const listingKey = JSON.stringify(filters);
+    const prevListingKeyRef = useRef(listingKey);
+    const [productsRefreshing, setProductsRefreshing] = useState(false);
+
+    useEffect(() => {
+        if (prevListingKeyRef.current === listingKey) return;
+        prevListingKeyRef.current = listingKey;
+        setProductsRefreshing(true);
+    }, [listingKey]);
+
+    useEffect(() => {
+        if (!productsRefreshing) return;
+        if (isFetching) return;
+        const timer = setTimeout(() => setProductsRefreshing(false), PRODUCTS_REFRESH_MIN_MS);
+        return () => clearTimeout(timer);
+    }, [productsRefreshing, isFetching]);
+
+    const showProductsOverlay =
+        products.length > 0 && (productsRefreshing || isFetching || isPlaceholderData);
+
     const facets = useMemo(() => {
         const fd = facetsData as { facets?: Facets; featuredSpecKeys?: string[] } | undefined;
         return {
@@ -562,9 +585,9 @@ export function ShopContent({
                                         </span>
                                     </p>
                                 )}
-                                {isFetching && !isLoading && (
+                                {showProductsOverlay && !isLoading && (
                                     <div className="inline-flex items-center gap-2 rounded-full border border-[#D12B28]/30 bg-[#D12B28]/10 px-2.5 py-1 text-xs text-[#F4C5C5]">
-                                        <span className="h-2 w-2 animate-pulse rounded-full bg-[#D12B28]" />
+                                        <Loader2 className="h-3 w-3 animate-spin text-[#D12B28]" aria-hidden />
                                         Updating...
                                     </div>
                                 )}
@@ -605,21 +628,8 @@ export function ShopContent({
                     </div>
 
                     {isLoading ? (
-                        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3 xl:grid-cols-4">
-                            {[...Array(8)].map((_, i) => (
-                                <div
-                                    key={i}
-                                    className="overflow-hidden rounded-2xl border border-[#5E5E5E]/25 bg-[#1a1a1a]/80"
-                                >
-                                    <div className="aspect-square animate-pulse bg-gradient-to-br from-zinc-800/80 to-zinc-900/40" />
-                                    <div className="space-y-3 p-4">
-                                        <div className="h-3 w-1/3 animate-pulse rounded-full bg-zinc-800" />
-                                        <div className="h-4 w-full animate-pulse rounded-full bg-zinc-800/80" />
-                                        <div className="h-4 w-2/3 animate-pulse rounded-full bg-zinc-800/80" />
-                                        <div className="h-5 w-1/4 animate-pulse rounded-full bg-zinc-800" />
-                                    </div>
-                                </div>
-                            ))}
+                        <div className="flex min-h-[28rem] items-center justify-center rounded-2xl border border-[#5E5E5E]/25 bg-[#1a1a1a]/40">
+                            <LoadingAnimation size="lg" label="Loading products..." />
                         </div>
                     ) : error ? (
                         <div className="rounded-2xl border border-red-500/20 bg-red-500/[0.06] px-6 py-14 text-center">
@@ -654,13 +664,9 @@ export function ShopContent({
                                         />
                                     ))}
                                 </div>
-                                {isFetching && (
-                                    <div className="pointer-events-none absolute inset-0 z-10 rounded-2xl bg-[#121212]/55 backdrop-blur-[1px]">
-                                        <LoadingAnimation
-                                            size="sm"
-                                            label="Refreshing products..."
-                                            className="h-full"
-                                        />
+                                {showProductsOverlay && (
+                                    <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-2xl bg-[#121212]/70 backdrop-blur-sm">
+                                        <LoadingAnimation size="md" label="Updating products..." />
                                     </div>
                                 )}
                             </div>
