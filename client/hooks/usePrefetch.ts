@@ -21,7 +21,7 @@ export function usePrefetchProduct(slugOrId: string | undefined) {
     const router = useRouter();
     const prefetchedRef = useRef<Set<string>>(new Set());
 
-    const onMouseEnter = useCallback(() => {
+    const prefetch = useCallback((snapshot?: Pick<Product, "categoryIds"> | null) => {
         if (!slugOrId) return;
         if (prefetchedRef.current.has(slugOrId)) return;
         prefetchedRef.current.add(slugOrId);
@@ -46,9 +46,38 @@ export function usePrefetchProduct(slugOrId: string | undefined) {
             },
             staleTime: PRODUCT_DETAIL_STALE_MS,
         });
+        const primaryCategoryId = snapshot?.categoryIds?.[0]?._id;
+        if (primaryCategoryId) {
+            // Match ProductPageClient related-products query key to eliminate its first-load spinner.
+            const relatedQueryOptions = {
+                category: primaryCategoryId,
+                limit: 12,
+                includeFacets: false,
+                enabled: true,
+            } as const;
+            const relatedState = queryClient.getQueryState(["products", relatedQueryOptions]);
+            const isRelatedFresh =
+                relatedState?.dataUpdatedAt != null &&
+                Date.now() - relatedState.dataUpdatedAt < PRODUCT_DETAIL_STALE_MS;
+            if (!isRelatedFresh) {
+                const qs = new URLSearchParams({
+                    category: primaryCategoryId,
+                    limit: "12",
+                    facets: "false",
+                }).toString();
+                void queryClient.prefetchQuery({
+                    queryKey: ["products", relatedQueryOptions],
+                    queryFn: async () => {
+                        const { data } = await api.get(`/products?${qs}`);
+                        return data;
+                    },
+                    staleTime: PRODUCT_DETAIL_STALE_MS,
+                });
+            }
+        }
     }, [slugOrId, queryClient, router]);
 
-    return { onMouseEnter };
+    return { prefetch };
 }
 
 const SHOP_LIST_STALE_MS = 2 * 60 * 1000;

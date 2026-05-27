@@ -27,7 +27,7 @@ export default function ProductCard({
     const { addToCart } = useCart();
     const productSlug = product.slug || product._id;
     const productPath = `/product/${productSlug}`;
-    const { onMouseEnter: prefetchOnHover } = usePrefetchProduct(productSlug);
+    const { prefetch } = usePrefetchProduct(productSlug);
     const whatsappUrl = buildProductWhatsAppUrl({
         productTitle: product.title,
         productPath,
@@ -53,6 +53,7 @@ export default function ProductCard({
     const cartPrice =
         effectiveDiscountAmount != null && effectiveDiscountAmount > 0 ? discountedPrice : product.price;
     const canAddToCart = availability === "in_stock" || availability === "pre_order";
+    const prefetchProductRoute = () => prefetch(product);
 
     // Hard clamp the title to 2 lines so cards in a grid keep a consistent height,
     // even if Tailwind's `line-clamp-*` utilities aren't active for some builds.
@@ -80,7 +81,10 @@ export default function ProductCard({
     return (
         <div
             className="group relative min-w-0 overflow-hidden rounded-2xl border border-[#5E5E5E]/30 bg-[#1a1a1a] transition-[transform,border-color,ring-width,ring-color] duration-500 ease-in-out hover:-translate-y-1.5 hover:border-[#D12B28]/55 hover:ring-1 hover:ring-[#D12B28]/35"
-            onMouseEnter={prefetchOnHover}
+            onMouseEnter={prefetchProductRoute}
+            onFocusCapture={prefetchProductRoute}
+            onTouchStart={prefetchProductRoute}
+            onPointerDown={prefetchProductRoute}
         >
             <div className="relative z-10 aspect-square overflow-hidden bg-[#121212]/80">
                 {effectiveDiscountAmount != null && effectiveDiscountAmount > 0 && (
