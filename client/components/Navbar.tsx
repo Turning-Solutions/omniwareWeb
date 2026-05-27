@@ -17,8 +17,8 @@ const mainNav = [
     { href: "/contact", label: "Contact" },
 ] as const;
 
-const announcementStoreText = "We're an Online Store. Place your orders on our website!";
-const announcementContactText = "Call: +94 74 052 3439  |  Email: support@omniware.lk";
+const announcementStoreText = "We are an online store. Place your orders through our website or contact us on WhatsAp";
+const announcementContactText = "WhatsApp: +94 74 052 3439 | Email: support@omniware.lk";
 
 function linkActive(pathname: string, href: string) {
     if (href === "/shop") return pathname === "/shop" || pathname.startsWith("/shop/");
