@@ -107,10 +107,13 @@ export default function PromotionStripe({ asHero = false, promotions: promotions
 
     const promo    = promotions[safeIndex];
     const hasMulti = promotions.length > 1;
+    const bannerFrameClass = asHero
+        ? "aspect-[5/4] min-h-0 sm:aspect-auto sm:min-h-[540px] lg:min-h-[620px]"
+        : "min-h-[300px] sm:min-h-[340px] lg:min-h-[360px]";
 
     const inner = (
         /* ── Cinematic full-bleed banner — image fills the whole card, text overlays ── */
-        <div className={`relative overflow-hidden rounded-2xl border border-white/[0.06] ${asHero ? "min-h-[440px] sm:min-h-[540px] lg:min-h-[620px]" : "min-h-[300px] sm:min-h-[340px] lg:min-h-[360px]"}`}>
+        <div className={`relative overflow-hidden rounded-2xl border border-white/[0.06] ${bannerFrameClass}`}>
 
             {/* Full-bleed background image — slides in/out */}
             <AnimatePresence custom={direction}>
