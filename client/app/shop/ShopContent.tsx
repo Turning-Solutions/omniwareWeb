@@ -562,6 +562,7 @@ export function ShopContent({
         onNavigateToProduct: rememberCurrentShopState,
     } as const;
     const visibleProducts = products.slice(0, Math.min(visibleProductsCount, products.length));
+    const shouldShowFiltersPanel = showFiltersPanel || isSidebarOpen;
 
     const getPageNumbers = () => {
         if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1);
@@ -642,11 +643,10 @@ export function ShopContent({
                     <button
                         type="button"
                         onClick={() => setIsSidebarOpen(true)}
-                        disabled={!showFiltersPanel}
                         className="inline-flex items-center gap-2 rounded-full border border-[#5E5E5E]/55 bg-[#242424]/80 px-4 py-2.5 text-sm font-medium text-[#F1F1F1] transition-colors hover:border-[#D12B28]/45 hover:bg-[#2a2a2a]"
                     >
                         <SlidersHorizontal className="h-4 w-4 text-[#B0B0B0]" />
-                        {showFiltersPanel ? "Filters" : "Loading filters..."}
+                        Filters
                         {activeFilterCount > 0 && (
                             <span className="min-w-[1.25rem] h-5 px-1.5 rounded-full bg-accent/25 text-accent text-xs font-semibold flex items-center justify-center tabular-nums">
                                 {activeFilterCount}
@@ -656,10 +656,10 @@ export function ShopContent({
                 </div>
 
                 <div
-                    className={`transition-all duration-300 ease-out ${
-                        showFiltersPanel
-                            ? "translate-y-0 opacity-100"
-                            : "pointer-events-none -translate-y-2 opacity-0"
+                    className={`transition-opacity duration-300 ${
+                        shouldShowFiltersPanel
+                            ? "opacity-100"
+                            : "pointer-events-none opacity-0"
                     }`}
                 >
                     <DynamicFilterSidebar
