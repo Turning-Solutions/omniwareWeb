@@ -93,6 +93,7 @@ export function ShopContent({
     const hoverPrefetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const lastHoverPrefetchKeyRef = useRef<string>("");
     const warmedProductRoutesRef = useRef<Set<string>>(new Set());
+    const hasShownFiltersRef = useRef(false);
     const [visibleProductsCount, setVisibleProductsCount] = useState(INITIAL_VISIBLE_PRODUCTS);
     const [showFiltersPanel, setShowFiltersPanel] = useState(false);
 
@@ -379,13 +380,21 @@ export function ShopContent({
     }, [products]);
 
     useEffect(() => {
-        if (isFacetsLoading || (isFacetsFetching && !facetsData)) {
-            setShowFiltersPanel(false);
+        // After first reveal, never hide filters again during refetches.
+        if (hasShownFiltersRef.current) {
+            if (!showFiltersPanel) setShowFiltersPanel(true);
             return;
         }
+        if (isFacetsLoading || (isFacetsFetching && !facetsData)) return;
         const timer = window.setTimeout(() => setShowFiltersPanel(true), FILTERS_REVEAL_DELAY_MS);
-        return () => window.clearTimeout(timer);
-    }, [isFacetsLoading, isFacetsFetching, facetsData]);
+        return () =>
+            window.clearTimeout(timer);
+    }, [isFacetsLoading, isFacetsFetching, facetsData, showFiltersPanel]);
+
+    useEffect(() => {
+        if (!showFiltersPanel) return;
+        hasShownFiltersRef.current = true;
+    }, [showFiltersPanel]);
 
     const facets = useMemo(() => {
         const fd = facetsData as { facets?: Facets; featuredSpecKeys?: string[] } | undefined;
