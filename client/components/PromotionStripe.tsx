@@ -134,7 +134,11 @@ export default function PromotionStripe({ asHero = false, promotions: promotions
                             fill
                             sizes={asHero ? "100vw" : "(max-width: 1024px) 100vw, 80vw"}
                             quality={asHero ? 72 : 68}
-                            className="h-full w-full object-cover object-center"
+                            className={
+                                asHero
+                                    ? "h-full w-full object-contain object-center sm:object-cover"
+                                    : "h-full w-full object-cover object-center"
+                            }
                             priority={safeIndex === 0}
                         />
                     ) : (
