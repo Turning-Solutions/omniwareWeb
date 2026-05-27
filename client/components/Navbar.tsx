@@ -17,6 +17,9 @@ const mainNav = [
     { href: "/contact", label: "Contact" },
 ] as const;
 
+const announcementStoreText = "We're an Online Store. Place your orders on our website!";
+const announcementContactText = "Call: +94 74 052 3439  |  Email: support@omniware.lk";
+
 function linkActive(pathname: string, href: string) {
     if (href === "/shop") return pathname === "/shop" || pathname.startsWith("/shop/");
     return pathname === href || pathname.startsWith(`${href}/`);
@@ -32,6 +35,22 @@ export default function Navbar() {
 
     return (
         <nav className="fixed top-0 z-50 w-full border-b border-white/[0.07] bg-zinc-950/80 shadow-[0_1px_0_0_rgba(255,255,255,0.04)_inset] backdrop-blur-xl">
+            <div className="h-11 w-full overflow-hidden border-b border-white/[0.07]" style={{ backgroundColor: "#200f0f" }}>
+                <div className="flex h-full w-full items-center overflow-hidden">
+                    <div className="flex w-max py-2 brand-marquee-track" aria-label={`${announcementStoreText} ${announcementContactText}`}>
+                        {([0, 1, 2] as const).map((copyIndex) => (
+                            <div
+                                key={copyIndex}
+                                className={`brand-marquee-segment flex shrink-0 items-center gap-16 pr-16 text-sm font-semibold uppercase tracking-wide text-zinc-100 sm:text-base ${copyIndex > 0 ? "brand-marquee-segment-duplicate" : ""}`}
+                                aria-hidden={copyIndex > 0 ? true : undefined}
+                            >
+                                <span className="whitespace-nowrap">{announcementStoreText}</span>
+                                <span className="whitespace-nowrap">{announcementContactText}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
             <div className="mx-auto flex h-14 max-w-[1440px] items-center gap-3 px-4 sm:gap-4 sm:px-6 lg:px-10">
                 <Link
                     href="/"

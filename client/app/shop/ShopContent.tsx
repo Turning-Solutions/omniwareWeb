@@ -25,6 +25,10 @@ const SHOP_RETURN_STATE_PREFIX = "shop:return-state:";
 const SHOP_LIST_STALE_MS = 2 * 60 * 1000;
 const PRODUCT_DETAIL_STALE_MS = 5 * 60 * 1000;
 const SHOP_AUTO_WARM_LIMIT = 8;
+const INITIAL_VISIBLE_PRODUCTS = 8;
+const PRODUCT_REVEAL_BATCH_SIZE = 4;
+const PRODUCT_REVEAL_INTERVAL_MS = 60;
+const FILTERS_REVEAL_DELAY_MS = 120;
 /** Minimum time the grid overlay stays visible after a filter change (covers instant cache hits). */
 const PRODUCTS_REFRESH_MIN_MS = 400;
 
@@ -89,6 +93,8 @@ export function ShopContent({
     const hoverPrefetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const lastHoverPrefetchKeyRef = useRef<string>("");
     const warmedProductRoutesRef = useRef<Set<string>>(new Set());
+    const [visibleProductsCount, setVisibleProductsCount] = useState(INITIAL_VISIBLE_PRODUCTS);
+    const [showFiltersPanel, setShowFiltersPanel] = useState(false);
 
     const rememberCurrentShopState = useCallback(() => {
         if (typeof window === "undefined") return;
@@ -282,7 +288,12 @@ export function ShopContent({
         return rest;
     }, [filters]);
     const facetsMode = hasNarrowingFilters(facetsFilters) ? "full" : "lite";
-    const { data: facetsData, refetch: refetchFacets } = useProductFacets({
+    const {
+        data: facetsData,
+        isLoading: isFacetsLoading,
+        isFetching: isFacetsFetching,
+        refetch: refetchFacets,
+    } = useProductFacets({
         ...facetsFilters,
         facetMode: facetsMode,
     });
@@ -347,6 +358,34 @@ export function ShopContent({
         const timeoutId = globalThis.setTimeout(warmTopProducts, 200);
         return () => globalThis.clearTimeout(timeoutId);
     }, [products, queryClient, router]);
+
+    useEffect(() => {
+        if (products.length === 0) {
+            setVisibleProductsCount(0);
+            return;
+        }
+        const initialCount = Math.min(INITIAL_VISIBLE_PRODUCTS, products.length);
+        setVisibleProductsCount(initialCount);
+        if (products.length <= initialCount) return;
+
+        const timer = window.setInterval(() => {
+            setVisibleProductsCount((prev) => {
+                if (prev >= products.length) return prev;
+                return Math.min(prev + PRODUCT_REVEAL_BATCH_SIZE, products.length);
+            });
+        }, PRODUCT_REVEAL_INTERVAL_MS);
+
+        return () => window.clearInterval(timer);
+    }, [products]);
+
+    useEffect(() => {
+        if (isFacetsLoading || (isFacetsFetching && !facetsData)) {
+            setShowFiltersPanel(false);
+            return;
+        }
+        const timer = window.setTimeout(() => setShowFiltersPanel(true), FILTERS_REVEAL_DELAY_MS);
+        return () => window.clearTimeout(timer);
+    }, [isFacetsLoading, isFacetsFetching, facetsData]);
 
     const facets = useMemo(() => {
         const fd = facetsData as { facets?: Facets; featuredSpecKeys?: string[] } | undefined;
@@ -513,6 +552,7 @@ export function ShopContent({
         showOrderNowButton: true,
         onNavigateToProduct: rememberCurrentShopState,
     } as const;
+    const visibleProducts = products.slice(0, Math.min(visibleProductsCount, products.length));
 
     const getPageNumbers = () => {
         if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1);
@@ -593,10 +633,11 @@ export function ShopContent({
                     <button
                         type="button"
                         onClick={() => setIsSidebarOpen(true)}
+                        disabled={!showFiltersPanel}
                         className="inline-flex items-center gap-2 rounded-full border border-[#5E5E5E]/55 bg-[#242424]/80 px-4 py-2.5 text-sm font-medium text-[#F1F1F1] transition-colors hover:border-[#D12B28]/45 hover:bg-[#2a2a2a]"
                     >
                         <SlidersHorizontal className="h-4 w-4 text-[#B0B0B0]" />
-                        Filters
+                        {showFiltersPanel ? "Filters" : "Loading filters..."}
                         {activeFilterCount > 0 && (
                             <span className="min-w-[1.25rem] h-5 px-1.5 rounded-full bg-accent/25 text-accent text-xs font-semibold flex items-center justify-center tabular-nums">
                                 {activeFilterCount}
@@ -605,20 +646,28 @@ export function ShopContent({
                     </button>
                 </div>
 
-                <DynamicFilterSidebar
-                    facets={facets}
-                    filters={filters}
-                    setFilters={setFilters}
-                    isOpen={isSidebarOpen}
-                    onClose={() => setIsSidebarOpen(false)}
-                    onCategoryPrefetchEnter={prefetchCategoryHover}
-                    onSubcategoryPrefetchEnter={prefetchSubcategoryHover}
-                    onBrandPrefetchEnter={prefetchBrandHover}
-                    onSpecPrefetchEnter={prefetchSpecHover}
-                />
+                <div
+                    className={`transition-all duration-300 ease-out ${
+                        showFiltersPanel
+                            ? "translate-y-0 opacity-100"
+                            : "pointer-events-none -translate-y-2 opacity-0"
+                    }`}
+                >
+                    <DynamicFilterSidebar
+                        facets={facets}
+                        filters={filters}
+                        setFilters={setFilters}
+                        isOpen={isSidebarOpen}
+                        onClose={() => setIsSidebarOpen(false)}
+                        onCategoryPrefetchEnter={prefetchCategoryHover}
+                        onSubcategoryPrefetchEnter={prefetchSubcategoryHover}
+                        onBrandPrefetchEnter={prefetchBrandHover}
+                        onSpecPrefetchEnter={prefetchSpecHover}
+                    />
+                </div>
 
                 <div ref={productsTopRef} className="flex-1 min-w-0 space-y-6">
-                    <div className="sticky top-14 z-20 -mx-1 px-1 py-3 sm:static sm:z-0 sm:mx-0 sm:px-0 sm:py-0 bg-gradient-to-b from-[#121212] via-[#121212] to-transparent sm:bg-none">
+                    <div className="sticky top-[6.25rem] z-20 -mx-1 px-1 py-3 sm:static sm:z-0 sm:mx-0 sm:px-0 sm:py-0 bg-gradient-to-b from-[#121212] via-[#121212] to-transparent sm:bg-none">
                         <div className="flex flex-col gap-3 rounded-2xl border border-[#5E5E5E]/35 bg-[#242424]/55 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5 backdrop-blur-sm">
                             <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                                 {!isLoading && !error && totalProducts != null && (
@@ -673,8 +722,10 @@ export function ShopContent({
                     </div>
 
                     {isLoading ? (
-                        <div className="flex min-h-[28rem] items-center justify-center rounded-2xl border border-[#5E5E5E]/25 bg-[#1a1a1a]/40">
-                            <LoadingAnimation size="lg" label="Loading products..." />
+                        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3 xl:grid-cols-4">
+                            {Array.from({ length: SHOP_PRODUCTS_PER_PAGE }).map((_, i) => (
+                                <ProductCardSkeleton key={`shop-skeleton-${i}`} />
+                            ))}
                         </div>
                     ) : error ? (
                         <div className="rounded-2xl border border-red-500/20 bg-red-500/[0.06] px-6 py-14 text-center">
@@ -701,7 +752,7 @@ export function ShopContent({
                         <>
                             <div className="relative">
                                 <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3 xl:grid-cols-4">
-                                    {products.map((product) => (
+                                    {visibleProducts.map((product) => (
                                         <ProductCard
                                             key={product._id}
                                             product={product}
@@ -820,6 +871,23 @@ export function ShopSkeleton() {
                         </div>
                     </div>
                 ))}
+            </div>
+        </div>
+    );
+}
+
+function ProductCardSkeleton() {
+    return (
+        <div className="overflow-hidden rounded-2xl border border-[#5E5E5E]/30 bg-[#1b1b1b]/70 animate-pulse">
+            <div className="aspect-square bg-[#2a2a2a]" />
+            <div className="space-y-3 p-4">
+                <div className="h-3 w-1/3 rounded-full bg-[#343434]" />
+                <div className="h-4 w-full rounded-full bg-[#343434]" />
+                <div className="h-4 w-2/3 rounded-full bg-[#343434]" />
+                <div className="pt-2 flex items-center justify-between">
+                    <div className="h-5 w-20 rounded-full bg-[#343434]" />
+                    <div className="h-8 w-24 rounded-xl bg-[#343434]" />
+                </div>
             </div>
         </div>
     );
