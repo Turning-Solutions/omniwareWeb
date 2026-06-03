@@ -39,7 +39,7 @@ export default function FlowSectionHeader({
                 </span>
                 <Heading
                     id={titleId}
-                    className="mt-2 text-balance text-xl font-bold leading-snug tracking-tight text-[#F1F1F1] sm:text-3xl sm:leading-tight lg:text-4xl"
+                    className="mt-2 font-sans text-balance text-xl font-bold leading-snug tracking-tight text-[#F1F1F1] sm:text-3xl sm:leading-tight lg:text-4xl"
                 >
                     {title}
                 </Heading>

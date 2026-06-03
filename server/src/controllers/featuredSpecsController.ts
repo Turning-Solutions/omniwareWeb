@@ -59,11 +59,28 @@ export const getFeaturedSpecs = async (req: Request, res: Response, next: any): 
             mode = featuredSpecKeys.length > 0 ? 'restricted' : 'none';
         }
 
-        res.json({
-            categoryKey,
-            featuredSpecKeys,
-            mode
-        });
+        // If there are featured keys, fetch all distinct values in a single aggregation
+        let specValues: Record<string, string[]> = {};
+        if (featuredSpecKeys.length > 0) {
+            const category = await Category.findOne({ slug: categoryKey });
+            if (category) {
+                const pipeline = [
+                    { $match: { categoryIds: category._id } },
+                    SPECS_OBJECT_TO_ARRAY_PROJECT,
+                    { $unwind: '$specs' },
+                    { $match: { 'specs.k': { $in: featuredSpecKeys } } },
+                    { $group: { _id: { k: '$specs.k', v: '$specs.v' } } },
+                    { $sort: { '_id.v': 1 } },
+                    { $group: { _id: '$_id.k', values: { $push: '$_id.v' } } },
+                ];
+                const results = await Product.aggregate(pipeline as any);
+                results.forEach((r: { _id: string; values: string[] }) => {
+                    specValues[r._id] = r.values.filter(Boolean);
+                });
+            }
+        }
+
+        res.json({ categoryKey, featuredSpecKeys, mode, specValues });
     } catch (error) {
         next(error);
     }
@@ -111,6 +128,38 @@ export const updateFeaturedSpecs = async (req: Request, res: Response, next: any
             featuredSpecKeys: config.featuredSpecKeys,
             mode
         });
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const getSpecValues = async (req: Request, res: Response, next: any): Promise<void> => {
+    try {
+        const { categoryKey, specKey } = req.params;
+
+        const category = await Category.findOne({ slug: categoryKey });
+        if (!category) {
+            const err: AppError = new Error('Category not found');
+            err.code = 'CATEGORY_NOT_FOUND';
+            err.status = 404;
+            return next(err);
+        }
+
+        const normalizedKey = normalizeSpecKey(specKey);
+
+        const pipeline = [
+            { $match: { categoryIds: category._id } },
+            SPECS_OBJECT_TO_ARRAY_PROJECT,
+            { $unwind: '$specs' },
+            { $match: { 'specs.k': normalizedKey } },
+            { $group: { _id: '$specs.v' } },
+            { $sort: { _id: 1 } }
+        ];
+
+        const results = await Product.aggregate(pipeline as any);
+        const values = results.map((r: { _id: string }) => r._id).filter(Boolean);
+
+        res.json({ categoryKey, specKey: normalizedKey, values });
     } catch (error) {
         next(error);
     }

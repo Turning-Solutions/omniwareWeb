@@ -169,6 +169,8 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
     const [subCategoryId, setSubCategoryId] = useState("");
     const [featuredSpecKeys, setFeaturedSpecKeys] = useState<string[]>([]);
     const [featuredSpecsLoading, setFeaturedSpecsLoading] = useState(false);
+    const [specSuggestions, setSpecSuggestions] = useState<Record<string, string[]>>({});
+    const [activeSpecKey, setActiveSpecKey] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
     const [initialLoading, setInitialLoading] = useState(true);
     const [imageUploading, setImageUploading] = useState<string | number | null>(null); // 'add' or index when replacing
@@ -360,18 +362,23 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
         const categoryId = effectiveCategoryId;
         if (!categoryId) {
             setFeaturedSpecKeys([]);
+            setSpecSuggestions({});
             return;
         }
         const category = categories.find(c => c._id === categoryId);
         const slug = category?.slug ?? (category as { slug?: string })?.slug;
         if (!slug) {
             setFeaturedSpecKeys([]);
+            setSpecSuggestions({});
             return;
         }
         setFeaturedSpecsLoading(true);
         api.get(`/admin/categories/${encodeURIComponent(slug)}/featured-specs`)
-            .then(({ data }: { data: { featuredSpecKeys?: string[] } }) => setFeaturedSpecKeys(data.featuredSpecKeys || []))
-            .catch(() => setFeaturedSpecKeys([]))
+            .then(({ data }: { data: { featuredSpecKeys?: string[]; specValues?: Record<string, string[]> } }) => {
+                setFeaturedSpecKeys(data.featuredSpecKeys || []);
+                setSpecSuggestions(data.specValues || {});
+            })
+            .catch(() => { setFeaturedSpecKeys([]); setSpecSuggestions({}); })
             .finally(() => setFeaturedSpecsLoading(false));
     }, [effectiveCategoryId, categories]);
 
@@ -1404,6 +1411,11 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                             {featuredSpecKeys.map((specKey) => {
                                 const specValue = getFilterSpecValue(specKey);
                                 const hasValue = specValue.trim().length > 0;
+                                const allSuggestions = specSuggestions[specKey] || [];
+                                const filteredSuggestions = specValue.trim()
+                                    ? allSuggestions.filter((s) => s.toLowerCase().includes(specValue.toLowerCase()))
+                                    : allSuggestions;
+                                const isDropdownOpen = activeSpecKey === specKey && filteredSuggestions.length > 0;
                                 return (
                                     <div
                                         key={specKey}
@@ -1421,13 +1433,33 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                                             )}
                                         </div>
                                         <div className="flex items-center gap-2">
-                                            <input
-                                                type="text"
-                                                placeholder={`Enter ${formatSpecLabel(specKey).toLowerCase()}`}
-                                                className="flex-1 bg-base border border-border-soft rounded-lg px-3 py-2 text-main text-sm focus:outline-none focus:border-accent"
-                                                value={specValue}
-                                                onChange={(e) => updateFilterSpecValue(specKey, e.target.value)}
-                                            />
+                                            <div className="relative flex-1">
+                                                <input
+                                                    type="text"
+                                                    placeholder={`Enter ${formatSpecLabel(specKey).toLowerCase()}`}
+                                                    className="w-full bg-base border border-border-soft rounded-lg px-3 py-2 text-main text-sm focus:outline-none focus:border-accent"
+                                                    value={specValue}
+                                                    onFocus={() => setActiveSpecKey(specKey)}
+                                                    onBlur={() => setTimeout(() => setActiveSpecKey(null), 150)}
+                                                    onChange={(e) => updateFilterSpecValue(specKey, e.target.value)}
+                                                />
+                                                {isDropdownOpen && (
+                                                    <ul className="absolute z-50 left-0 right-0 mt-1 bg-surface border border-border-soft rounded-lg shadow-lg max-h-44 overflow-y-auto">
+                                                        {filteredSuggestions.map((suggestion) => (
+                                                            <li
+                                                                key={suggestion}
+                                                                onMouseDown={() => {
+                                                                    updateFilterSpecValue(specKey, suggestion);
+                                                                    setActiveSpecKey(null);
+                                                                }}
+                                                                className={`px-3 py-2 text-sm cursor-pointer transition-colors ${suggestion === specValue ? "bg-accent/15 text-accent" : "text-main hover:bg-accent/10"}`}
+                                                            >
+                                                                {suggestion}
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                )}
+                                            </div>
                                             <button
                                                 type="button"
                                                 onClick={() => removeFilterSpecByKey(specKey)}
