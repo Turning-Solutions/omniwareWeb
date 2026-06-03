@@ -65,7 +65,7 @@ export const getFeaturedSpecs = async (req: Request, res: Response, next: any): 
             const category = await Category.findOne({ slug: categoryKey });
             if (category) {
                 const pipeline = [
-                    { $match: { categoryIds: category._id } },
+                    { $match: { categoryIds: category._id, isActive: true } },
                     SPECS_OBJECT_TO_ARRAY_PROJECT,
                     { $unwind: '$specs' },
                     { $match: { 'specs.k': { $in: featuredSpecKeys } } },
@@ -148,7 +148,7 @@ export const getSpecValues = async (req: Request, res: Response, next: any): Pro
         const normalizedKey = normalizeSpecKey(specKey);
 
         const pipeline = [
-            { $match: { categoryIds: category._id } },
+            { $match: { categoryIds: category._id, isActive: true } },
             SPECS_OBJECT_TO_ARRAY_PROJECT,
             { $unwind: '$specs' },
             { $match: { 'specs.k': normalizedKey } },
