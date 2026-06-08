@@ -632,7 +632,8 @@ export default function Home() {
                                                         alt=""
                                                         fill
                                                         className="object-contain drop-shadow-[0_14px_34px_rgba(209,43,40,0.36)] transition-transform duration-500 group-hover:scale-105"
-                                                        sizes="120px"
+                                                        sizes="(max-width: 640px) 200px, 280px"
+                                                        quality={92}
                                                     />
                                                 </div>
                                                 <div className="relative z-10 flex w-full items-start justify-between gap-2">
