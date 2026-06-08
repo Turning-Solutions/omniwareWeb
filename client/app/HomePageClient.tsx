@@ -345,25 +345,25 @@ export default function Home() {
         {
             label: "RAM",
             slug: "ram",
-            imageSrc: "https://res.cloudinary.com/dwuxumj4x/image/upload/v1771681365/omniware/products/mfwwjba89hx1srcm0rwm.webp",
+            imageSrc: "https://res.cloudinary.com/dwuxumj4x/image/upload/v1780935432/RAM_ctehfc.png",
             imageClassName: "h-[8.3rem] w-[8.3rem] right-[0.65rem] top-[53%] -translate-y-1/2 rotate-[8deg] group-hover:right-[-0.6rem] group-hover:-translate-y-[62%] group-hover:scale-[1.2]",
         },
         {
             label: "Mouse",
             slug: "mouse",
-            imageSrc: "https://res.cloudinary.com/dwuxumj4x/image/upload/v1772860506/omniware/products/okciyxxgkgdws5xwffrx.webp",
+            imageSrc: "https://res.cloudinary.com/dwuxumj4x/image/upload/v1780935432/mouse_daykjh.png",
             imageClassName: "h-[6rem] w-[6rem] right-[0.7rem] top-[53%] -translate-y-1/2 -rotate-[6deg] group-hover:right-[-0.55rem] group-hover:-translate-y-[62%] group-hover:scale-[1.2]",
         },
         {
             label: "Storage",
             slug: "storage",
-            imageSrc: "https://res.cloudinary.com/dwuxumj4x/image/upload/v1775709758/omniware/products/hvcmuuucawggzlvjv1qu.webp",
+            imageSrc: "https://res.cloudinary.com/dwuxumj4x/image/upload/v1780935437/ssd_wzn40f.png",
             imageClassName: "h-[6.1rem] w-[6.1rem] right-[0.65rem] top-[53%] -translate-y-1/2 rotate-[3deg] group-hover:right-[-0.6rem] group-hover:-translate-y-[62%] group-hover:scale-[1.2]",
         },
         {
             label: "Headset",
             slug: "headset",
-            imageSrc: "https://res.cloudinary.com/dwuxumj4x/image/upload/v1774285372/omniware/products/mgkajml10ain7io3dvjg.webp",
+            imageSrc: "https://res.cloudinary.com/dwuxumj4x/image/upload/v1780935433/head_ttd2l2.png",
             imageClassName: "h-[6.15rem] w-[6.15rem] right-[0.65rem] top-[53%] -translate-y-1/2 -rotate-[9deg] group-hover:right-[-0.6rem] group-hover:-translate-y-[62%] group-hover:scale-[1.2]",
         },
     ];
