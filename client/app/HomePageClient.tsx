@@ -592,15 +592,15 @@ export default function Home() {
                                         Parts
                                     </p>
                                     <div
-                                        className="pointer-events-none absolute inset-0 z-[2] flex items-center justify-center p-3"
+                                        className="pointer-events-none absolute inset-0 z-[2]"
                                         aria-hidden
                                     >
-                                        <div className="relative h-72 w-full max-w-[42rem] sm:h-80 lg:h-96">
+                                        <div className="relative h-full w-full">
                                             <Image
-                                                src={withLogoCacheBust("/logos/pc.png")}
+                                                src="https://res.cloudinary.com/dwuxumj4x/image/upload/v1780939707/tower_vjy6rl.jpg"
                                                 alt=""
                                                 fill
-                                                className="object-contain object-center drop-shadow-[0_8px_32px_rgba(209,43,40,0.18)]"
+                                                className="object-cover object-[center_20%] scale-105"
                                                 sizes="(min-width: 1024px) 42rem, 0"
                                                 priority
                                             />
