@@ -108,7 +108,7 @@ export default function PromotionStripe({ asHero = false, promotions: promotions
     const promo    = promotions[safeIndex];
     const hasMulti = promotions.length > 1;
     const bannerFrameClass = asHero
-        ? "aspect-[5/4] min-h-0 sm:aspect-auto sm:min-h-[540px] lg:min-h-[620px]"
+        ? "aspect-[2/1] min-h-0 sm:aspect-auto sm:min-h-[540px] lg:min-h-[620px]"
         : "min-h-[300px] sm:min-h-[340px] lg:min-h-[360px]";
 
     const inner = (
@@ -334,7 +334,7 @@ export default function PromotionStripe({ asHero = false, promotions: promotions
 
     return (
         <section
-            className={`relative overflow-hidden bg-[#080808] ${asHero ? "pb-5 pt-4 sm:pb-10 sm:pt-8 lg:pb-12 lg:pt-10" : "border-y border-[#D12B28]/20 py-10 sm:py-14"}`}
+            className={`relative overflow-hidden bg-[#080808] ${asHero ? "pb-0 pt-0 sm:pb-10 sm:pt-8 lg:pb-12 lg:pt-10" : "border-y border-[#D12B28]/20 py-10 sm:py-14"}`}
         >
             {/* ambient red glow — gives the section its own visual identity */}
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_90%_60%_at_50%_50%,rgba(209,43,40,0.09),transparent)]" />
@@ -349,7 +349,7 @@ export default function PromotionStripe({ asHero = false, promotions: promotions
                 </div>
             )}
 
-            <div className={`relative mx-auto max-w-7xl sm:px-6 lg:px-8 ${asHero ? "px-3" : "px-4"}`}>
+            <div className={`relative mx-auto max-w-7xl sm:px-6 lg:px-8 ${asHero ? "px-0" : "px-4"}`}>
                 <div
                     role="button"
                     tabIndex={0}

@@ -890,9 +890,9 @@ export default function Home() {
                             titleId="top-brands-heading"
                             watermark="PARTNERS"
                             watermarkAlign="right"
-                            eyebrow="Brands"
-                            title="Names you already trust"
-                            description="GPUs, CPUs, memory, storage, and boards from vendors builders recognize on sight."
+                            eyebrow="BRANDS"
+                            title="Hardware From Brands Builders Know"
+                            description="Carefully selected products from brands trusted for performance, reliability, and innovation."
                         />
                     </div>
 
