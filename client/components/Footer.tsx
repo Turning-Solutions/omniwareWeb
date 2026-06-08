@@ -160,7 +160,7 @@ export default function Footer() {
                     <div className="order-1 flex items-center gap-3 md:order-2">
                         <span className="text-[10px] uppercase tracking-widest text-gray-500">Created By</span>
                         <a
-                            href="#"
+                            href="https://www.turingsolutions.lk/"
                             target="_blank"
                             rel="noopener noreferrer"
                             className="group flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 transition-all duration-300 hover:border-white/20 hover:bg-white/10"
