@@ -569,7 +569,7 @@ export default function Home() {
                                             Hot:
                                         </span>
                                         <div className="flex min-w-0 flex-1 gap-2 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                                            {["1TB NVMe", "DDR5 Ram", "Wireless Mouse"].map((term) => (
+                                            {["Power Supply", "Keyboard", "Combo"].map((term) => (
                                                 <button
                                                     key={term}
                                                     type="button"
