@@ -188,12 +188,12 @@ export default function ProductCard({
                                     href={whatsappUrl}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    aria-label={`Inquiry now on WhatsApp about ${product.title}`}
+                                    aria-label={`Inquire now on WhatsApp about ${product.title}`}
                                     className={shopPreOrderButtonClass}
                                 >
                                     <WhatsAppLogo size={14} />
                                     <span className="group-hover:hidden">Pre-order</span>
-                                    <span className="hidden group-hover:inline">Inquiry now</span>
+                                    <span className="hidden group-hover:inline">Inquire now</span>
                                 </a>
                             ) : (
                                 <Link
@@ -214,12 +214,12 @@ export default function ProductCard({
                                 href={whatsappUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                aria-label={`Inquiry now on WhatsApp about ${product.title}`}
-                                title="Inquiry now"
+                                aria-label={`Inquire now on WhatsApp about ${product.title}`}
+                                title="Inquire now"
                                 className="relative z-10 inline-flex w-full min-w-0 justify-center items-center gap-1.5 rounded-full border border-yellow-500/50 bg-yellow-400 px-3 py-2 text-xs font-semibold text-black transition-colors hover:bg-yellow-300"
                             >
                                 <WhatsAppLogo size={16} />
-                                <span>Inquiry now</span>
+                                <span>Inquire now</span>
                             </a>
                         ) : null}
                     </div>
