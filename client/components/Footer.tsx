@@ -102,7 +102,7 @@ export default function Footer() {
                         <h3 className="text-sm font-semibold text-gray-300 tracking-wider uppercase">Support</h3>
                         <ul className="mt-4 space-y-4">
                             <li>
-                                <Link href="#" className="text-base text-gray-400 hover:text-white">
+                                <Link href="/contact" className="text-base text-gray-400 hover:text-white">
                                     Contact Us
                                 </Link>
                             </li>
