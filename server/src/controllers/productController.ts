@@ -142,20 +142,17 @@ function withDiscountInfo(product: any): any {
     };
 }
 
-const hasFilters = (req: Request): boolean => {
-    const { search, minPrice, maxPrice, brand, category, availability, inStock, isFeatured } = req.query;
-    if (search || minPrice || maxPrice || brand || category || availability || inStock || isFeatured) return true;
-    const keys = Object.keys(req.query).filter((k) => k.startsWith('spec['));
-    return keys.length > 0;
-};
+/**
+ * Listing responses are identical for every visitor, so let Vercel's CDN cache
+ * them per unique URL (query string included). Filtered/long-tail combos just
+ * have lower hit rates; that's fine. `stale-while-revalidate` keeps responses
+ * instant while the CDN refreshes in the background, hiding cold starts.
+ */
+const PUBLIC_LISTING_CACHE_CONTROL = 'public, s-maxage=60, stale-while-revalidate=300';
 
 export const getProducts = async (req: Request, res: Response) => {
     try {
-        if (hasFilters(req)) {
-            res.set('Cache-Control', 'private, no-store, must-revalidate');
-        } else {
-            res.set('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=120');
-        }
+        res.set('Cache-Control', PUBLIC_LISTING_CACHE_CONTROL);
 
         const { search, minPrice, maxPrice, brand, category, sort, page = 1, limit = 20, facets = 'true' } = req.query;
         const includeFacets = String(facets).toLowerCase() !== 'false';
@@ -314,11 +311,7 @@ export const getProducts = async (req: Request, res: Response) => {
 
 export const getProductFacets = async (req: Request, res: Response) => {
     try {
-        if (hasFilters(req)) {
-            res.set('Cache-Control', 'private, no-store, must-revalidate');
-        } else {
-            res.set('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=120');
-        }
+        res.set('Cache-Control', PUBLIC_LISTING_CACHE_CONTROL);
 
         const { search, minPrice, maxPrice, brand, category, ...dynamicFilters } = req.query;
 

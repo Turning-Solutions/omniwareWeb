@@ -7,29 +7,29 @@ const api = axios.create({
     },
 });
 
+/**
+ * Public product listing/facet GETs are CDN-cached (Cache-Control: public, s-maxage).
+ * Sending an Authorization header would make shared caches skip them, so logged-in
+ * users would lose the cache benefit on endpoints that never read the token anyway.
+ * Note: admin endpoints live under /admin/products and do NOT match this pattern.
+ */
+const isPublicProductsUrl = (url: string): boolean => /^\/?products(\/|\?|$)/.test(url);
+
 // Attach Bearer token from localStorage when present (for admin and authenticated requests)
 api.interceptors.request.use((config) => {
     if (typeof window === 'undefined') return config;
-    // Avoid cached 304 responses on product listing/facets (browser may send If-None-Match; empty JSON breaks the shop grid).
     const method = config.method?.toLowerCase();
     const url = typeof config.url === 'string' ? config.url : '';
-    if (method === 'get' && url.includes('products')) {
-        const h = config.headers;
-        if (typeof (h as { set?: (k: string, v: string) => void }).set === 'function') {
-            (h as { set: (k: string, v: string) => void }).set('Cache-Control', 'no-cache');
-            (h as { set: (k: string, v: string) => void }).set('Pragma', 'no-cache');
-        } else {
-            (h as Record<string, string>)['Cache-Control'] = 'no-cache';
-            (h as Record<string, string>)['Pragma'] = 'no-cache';
+    const skipAuth = method === 'get' && isPublicProductsUrl(url);
+    if (!skipAuth) {
+        try {
+            const raw = localStorage.getItem('userInfo');
+            const data = raw ? JSON.parse(raw) : {};
+            const token = data?.token;
+            if (token) config.headers.Authorization = `Bearer ${token}`;
+        } catch {
+            // ignore
         }
-    }
-    try {
-        const raw = localStorage.getItem('userInfo');
-        const data = raw ? JSON.parse(raw) : {};
-        const token = data?.token;
-        if (token) config.headers.Authorization = `Bearer ${token}`;
-    } catch {
-        // ignore
     }
     // When sending FormData (e.g. file upload), do not set Content-Type so the browser sets multipart/form-data with boundary
     if (config.data && typeof FormData !== 'undefined' && config.data instanceof FormData) {
