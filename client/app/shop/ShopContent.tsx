@@ -429,8 +429,12 @@ export function ShopContent({
         const next = serializeShopListingUrl(filtersRef.current, window.location.href);
         const cur = `${window.location.pathname}${window.location.search}`;
         if (shopListingUrlsEquivalent(cur, next)) return;
-        router.replace(next, { scroll: false });
-    }, [filters, router]);
+        // Shallow URL sync (supported by Next 14.1+): updates the address bar and
+        // useSearchParams without an App Router navigation. router.replace() here
+        // re-rendered the dynamic page on the server for every filter click, which
+        // re-triggered the Suspense fallback and made the filter sidebar vanish.
+        window.history.replaceState(window.history.state, "", next);
+    }, [filters]);
 
     useEffect(() => {
         const nonPageFilters = { ...filters };
