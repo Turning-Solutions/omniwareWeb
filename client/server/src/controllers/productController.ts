@@ -200,16 +200,17 @@ const hasFilters = (req: Request): boolean => {
 // are now imported from '../utils/discountHelpers' (shared with server-component data fetchers).
 
 
+/**
+ * Listing responses are identical for every visitor, so let Vercel's CDN cache
+ * them per unique URL (query string included). Filtered/long-tail combos just
+ * have lower hit rates. `stale-while-revalidate` keeps responses instant while
+ * the CDN refreshes in the background, hiding serverless cold starts.
+ */
+const PUBLIC_LISTING_CACHE_CONTROL = 'public, s-maxage=60, stale-while-revalidate=300';
+
 export const getProducts = async (req: Request, res: Response) => {
     try {
-        // Filtered listings must not be publicly cached: intermediaries/browsers may answer 304
-        // with no body, which breaks JSON clients (empty product lists).
-        if (hasFilters(req)) {
-            res.set('Cache-Control', 'private, no-store, must-revalidate');
-        } else {
-            // Cache product listing responses at the CDN edge in production.
-            res.set('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=120');
-        }
+        res.set('Cache-Control', PUBLIC_LISTING_CACHE_CONTROL);
 
         const { search, minPrice, maxPrice, brand, category, sort, page = 1, limit = 20, facets = 'true', ...dynamicFilters } = req.query;
         const includeFacets = String(facets).toLowerCase() !== 'false';
@@ -289,7 +290,6 @@ export const getProducts = async (req: Request, res: Response) => {
                 ]),
                 Product.countDocuments({ isActive: true }),
             ]);
-            res.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=120');
 
             const productsWithDiscount = products
                 .map(stripAdminOnlyProductFields)
@@ -478,11 +478,7 @@ export const getProducts = async (req: Request, res: Response) => {
 
 export const getProductFacets = async (req: Request, res: Response) => {
     try {
-        if (hasFilters(req)) {
-            res.set('Cache-Control', 'private, no-store, must-revalidate');
-        } else {
-            res.set('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=120');
-        }
+        res.set('Cache-Control', PUBLIC_LISTING_CACHE_CONTROL);
 
         // Almost identical logic to getProducts, but we can omit the 'products' fetch if performance is critical,
         // or just return the facets.

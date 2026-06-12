@@ -51,6 +51,13 @@ function createApp() {
 
     app.use(ensureDbMiddleware);
 
+    // Keep-warm target (see vercel.json cron): placed after ensureDbMiddleware so each
+    // ping warms both the serverless instance and the MongoDB connection.
+    app.get('/api/v1/health', (_req, res) => {
+        res.set('Cache-Control', 'no-store');
+        res.json({ ok: true, ts: Date.now() });
+    });
+
     app.use('/api/v1/auth', authRoutes);
     app.use('/api/v1/products', productRoutes);
     app.use('/api/v1/orders', orderRoutes);

@@ -93,6 +93,12 @@ async function connectDB(): Promise<typeof mongoose> {
 
 export async function ensureDb(): Promise<void> {
     await connectDB();
+    // Index creation only needs to happen once per database, not on every serverless
+    // cold start — it adds seconds to the first request of each new instance.
+    // Set ENSURE_DB_INDEXES=true (or run locally in dev) after schema changes to (re)create them.
+    if (process.env.NODE_ENV === 'production' && process.env.ENSURE_DB_INDEXES !== 'true') {
+        return;
+    }
     if (!reviewIndexesPromise) {
         reviewIndexesPromise = Promise.all([
             import('../models/Review').then(({ ensureReviewIndexes }) => ensureReviewIndexes()),
