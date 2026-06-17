@@ -130,7 +130,8 @@ export default function Home() {
         .filter((product) => (product.effectiveDiscountPercent ?? 0) > 0)
         .slice(0, DISCOUNTED_ROW_LIMIT);
     const baseFeaturedCount = featuredProducts.length;
-    const featuredLoopedProducts = baseFeaturedCount > 1
+    const isFeaturedSlider = baseFeaturedCount > 1;
+    const featuredLoopedProducts = isFeaturedSlider
         ? Array.from({ length: FEATURED_LOOP_COPIES }, (_, copyIdx) =>
             featuredProducts.map((product) => ({ product, copyIdx }))
         ).flat()
@@ -140,6 +141,8 @@ export default function Home() {
     const featuredIndexRef = useRef(0);
     const [featuredOffset, setFeaturedOffset] = useState(0);
     const [featuredAnimate, setFeaturedAnimate] = useState(false);
+    const displayFeaturedOffset = isFeaturedSlider ? featuredOffset : 0;
+    const displayFeaturedAnimate = isFeaturedSlider && featuredAnimate;
 
     const readOffset = useCallback((index: number): number => {
         const track = featuredTrackRef.current;
@@ -150,12 +153,14 @@ export default function Home() {
 
     const jumpTo = useCallback((index: number) => {
         featuredIndexRef.current = index;
-        setFeaturedAnimate(false);
         requestAnimationFrame(() => {
-            setFeaturedOffset(readOffset(index));
-            // Re-enable transitions on the following frame so recentering never animates backward.
+            setFeaturedAnimate(false);
             requestAnimationFrame(() => {
-                setFeaturedAnimate(true);
+                setFeaturedOffset(readOffset(index));
+                // Re-enable transitions on the following frame so recentering never animates backward.
+                requestAnimationFrame(() => {
+                    setFeaturedAnimate(true);
+                });
             });
         });
     }, [readOffset]);
@@ -169,14 +174,12 @@ export default function Home() {
 
     // On load: jump silently to the first item of the center copy.
     useEffect(() => {
-        if (baseFeaturedCount <= 1) {
-            featuredIndexRef.current = 0;
-            setFeaturedOffset(0);
-            setFeaturedAnimate(false);
-            return;
-        }
-        jumpTo(baseFeaturedCount * 2);
-    }, [baseFeaturedCount, jumpTo]);
+        if (!isFeaturedSlider) return;
+        const frameId = requestAnimationFrame(() => {
+            jumpTo(baseFeaturedCount * 2);
+        });
+        return () => cancelAnimationFrame(frameId);
+    }, [baseFeaturedCount, isFeaturedSlider, jumpTo]);
 
     // Re-measure on resize so offsets stay accurate.
     useEffect(() => {
@@ -218,7 +221,8 @@ export default function Home() {
     }, [baseFeaturedCount, slideTo]);
 
     const baseDiscountedCount = discountedProducts.length;
-    const discountedLoopedProducts = baseDiscountedCount > 1
+    const isDiscountedSlider = baseDiscountedCount > 1;
+    const discountedLoopedProducts = isDiscountedSlider
         ? Array.from({ length: FEATURED_LOOP_COPIES }, (_, copyIdx) =>
             discountedProducts.map((product) => ({ product, copyIdx }))
         ).flat()
@@ -228,6 +232,8 @@ export default function Home() {
     const discountedIndexRef = useRef(0);
     const [discountedOffset, setDiscountedOffset] = useState(0);
     const [discountedAnimate, setDiscountedAnimate] = useState(false);
+    const displayDiscountedOffset = isDiscountedSlider ? discountedOffset : 0;
+    const displayDiscountedAnimate = isDiscountedSlider && discountedAnimate;
 
     const readDiscountedOffset = useCallback((index: number): number => {
         const track = discountedTrackRef.current;
@@ -238,11 +244,13 @@ export default function Home() {
 
     const jumpDiscountedTo = useCallback((index: number) => {
         discountedIndexRef.current = index;
-        setDiscountedAnimate(false);
         requestAnimationFrame(() => {
-            setDiscountedOffset(readDiscountedOffset(index));
+            setDiscountedAnimate(false);
             requestAnimationFrame(() => {
-                setDiscountedAnimate(true);
+                setDiscountedOffset(readDiscountedOffset(index));
+                requestAnimationFrame(() => {
+                    setDiscountedAnimate(true);
+                });
             });
         });
     }, [readDiscountedOffset]);
@@ -255,14 +263,12 @@ export default function Home() {
     }, [readDiscountedOffset]);
 
     useEffect(() => {
-        if (baseDiscountedCount <= 1) {
-            discountedIndexRef.current = 0;
-            setDiscountedOffset(0);
-            setDiscountedAnimate(false);
-            return;
-        }
-        jumpDiscountedTo(baseDiscountedCount * 2);
-    }, [baseDiscountedCount, jumpDiscountedTo]);
+        if (!isDiscountedSlider) return;
+        const frameId = requestAnimationFrame(() => {
+            jumpDiscountedTo(baseDiscountedCount * 2);
+        });
+        return () => cancelAnimationFrame(frameId);
+    }, [baseDiscountedCount, isDiscountedSlider, jumpDiscountedTo]);
 
     useEffect(() => {
         if (typeof window === "undefined") return;
@@ -718,8 +724,8 @@ export default function Home() {
                                             onTransitionEnd={handleFeaturedTransitionEnd}
                                             className="flex gap-4 lg:gap-6"
                                             style={{
-                                                transform: `translate3d(${-featuredOffset}px, 0, 0)`,
-                                                transition: featuredAnimate
+                                                transform: `translate3d(${-displayFeaturedOffset}px, 0, 0)`,
+                                                transition: displayFeaturedAnimate
                                                     ? `transform ${FEATURED_SLIDE_TRANSITION_MS}ms cubic-bezier(0.22, 1, 0.36, 1)`
                                                     : "none",
                                                 willChange: "transform",
@@ -810,8 +816,8 @@ export default function Home() {
                                                 onTransitionEnd={handleDiscountedTransitionEnd}
                                                 className="flex gap-4 lg:gap-6"
                                                 style={{
-                                                    transform: `translate3d(${-discountedOffset}px, 0, 0)`,
-                                                    transition: discountedAnimate
+                                                    transform: `translate3d(${-displayDiscountedOffset}px, 0, 0)`,
+                                                    transition: displayDiscountedAnimate
                                                         ? `transform ${FEATURED_SLIDE_TRANSITION_MS}ms cubic-bezier(0.22, 1, 0.36, 1)`
                                                         : "none",
                                                     willChange: "transform",
