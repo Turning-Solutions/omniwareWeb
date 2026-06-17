@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "test:e2e": "playwright test",
-    "scrape:maps-reviews": "node scripts/scrape-google-maps-reviews.mjs"
+    "scrape:maps-reviews": "node scripts/scrape-google-maps-reviews.mjs",
+    "backfill:product-slugs": "npx tsx scripts/backfill-product-slugs.ts"
   },
   "dependencies": {
     "@sparticuz/chromium": "^143.0.4",

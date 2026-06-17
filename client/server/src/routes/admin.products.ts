@@ -8,6 +8,11 @@ import { adminRateLimit } from '../middleware/adminRateLimit';
 import { createAuditLog } from '../utils/audit';
 import { clearFeaturedSpecsCache, invalidateFacetCaches } from '../controllers/productController';
 import { triggerRevalidation } from '../utils/revalidate';
+import {
+    backfillProductSlugs,
+    createUniqueProductSlug,
+    getProductSlug,
+} from '../utils/productSlug';
 
 const router = express.Router();
 
@@ -20,36 +25,6 @@ function normalizeCategorySlugInput(value: unknown): string {
         .replace(/\bm[\s._-]*2\b/g, 'm2')
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/(^-|-$)/g, '');
-}
-
-function normalizeProductSlugInput(value: unknown): string {
-    return String(value ?? "")
-        .trim()
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/(^-|-$)/g, "");
-}
-
-function getProductSlug(value: unknown): string {
-    if (!value || typeof value !== "object" || !("slug" in value)) return "";
-    const slug = (value as { slug?: unknown }).slug;
-    return typeof slug === "string" ? slug.trim() : "";
-}
-
-async function createUniqueProductSlug(value: unknown, excludeId?: string): Promise<string> {
-    const baseSlug = normalizeProductSlugInput(value) || "product";
-    let candidate = baseSlug;
-    let suffix = 2;
-
-    while (await Product.exists({
-        slug: candidate,
-        ...(excludeId ? { _id: { $ne: excludeId } } : {}),
-    })) {
-        candidate = `${baseSlug}-${suffix}`;
-        suffix += 1;
-    }
-
-    return candidate;
 }
 
 async function hasProductsInCategory(categoryId: string): Promise<boolean> {
@@ -112,6 +87,30 @@ router.get('/', async (req: Request, res: Response) => {
             pages: Math.ceil(total / limitNum),
         },
     });
+});
+
+// POST /api/v1/admin/products/backfill-slugs
+router.post('/backfill-slugs', async (req: Request, res: Response) => {
+    try {
+        const dryRun = req.body?.dryRun === true;
+        const activeOnly = req.body?.activeOnly === true;
+        const result = await backfillProductSlugs({ dryRun, activeOnly });
+
+        if (!dryRun && result.updated > 0) {
+            invalidateFacetCaches();
+            triggerRevalidation(['/', '/shop', '/sitemap.xml']);
+        }
+
+        await createAuditLog(req, {
+            action: 'BACKFILL_PRODUCT_SLUGS',
+            entityType: 'Product',
+            after: result,
+        });
+
+        res.json(result);
+    } catch (error) {
+        res.status(500).json({ message: (error as Error).message });
+    }
 });
 
 // GET /api/v1/admin/products/:id

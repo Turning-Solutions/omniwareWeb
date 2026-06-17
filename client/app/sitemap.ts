@@ -3,6 +3,7 @@ import { ensureDb } from "@/server/src/config/db";
 import Product from "@/server/src/models/Product";
 import Category from "@/server/src/models/Category";
 import { absoluteUrl, getProductPath, getSiteUrl } from "@/lib/seo/productSeo";
+import { getProductSlug, isObjectIdString } from "@/server/src/utils/productSlug";
 
 // Always read live product/category URLs from MongoDB instead of a stale build snapshot.
 export const dynamic = "force-dynamic";
@@ -68,7 +69,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         );
 
         const productRoutes: MetadataRoute.Sitemap = products.flatMap((product) => {
-            const path = getProductPath(product);
+            const slug = getProductSlug(product);
+            if (!slug || isObjectIdString(slug)) return [];
+
+            const path = getProductPath({ slug });
             if (!path) return [];
 
             return [{
