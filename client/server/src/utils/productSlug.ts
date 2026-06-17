@@ -49,24 +49,29 @@ export type ProductSlugBackfillResult = {
     scanned: number;
     updated: number;
     skipped: number;
+    activeUpdated: number;
+    inactiveUpdated: number;
     errors: Array<{ id: string; title: string; message: string }>;
-    samples: Array<{ id: string; from: string; to: string }>;
+    samples: Array<{ id: string; from: string; to: string; isActive: boolean }>;
 };
 
 export async function backfillProductSlugs(options?: {
     dryRun?: boolean;
+    /** When true, only active products are updated. Default updates active and inactive. */
     activeOnly?: boolean;
 }): Promise<ProductSlugBackfillResult> {
     const dryRun = options?.dryRun ?? false;
     const match: Record<string, unknown> = options?.activeOnly ? { isActive: true } : {};
 
     const products = await Product.find(match)
-        .select("title slug _id")
+        .select("title slug _id isActive")
         .sort({ updatedAt: -1 })
         .lean();
 
     let updated = 0;
     let skipped = 0;
+    let activeUpdated = 0;
+    let inactiveUpdated = 0;
     const errors: ProductSlugBackfillResult["errors"] = [];
     const samples: ProductSlugBackfillResult["samples"] = [];
 
@@ -79,6 +84,7 @@ export async function backfillProductSlugs(options?: {
         const id = String(product._id);
         const from = getProductSlug(product) || id;
         const title = typeof product.title === "string" ? product.title : "product";
+        const isActive = product.isActive === true;
 
         try {
             const nextSlug = await createUniqueProductSlug(title, id);
@@ -86,8 +92,13 @@ export async function backfillProductSlugs(options?: {
                 await Product.updateOne({ _id: product._id }, { $set: { slug: nextSlug } });
             }
             updated += 1;
+            if (isActive) {
+                activeUpdated += 1;
+            } else {
+                inactiveUpdated += 1;
+            }
             if (samples.length < 25) {
-                samples.push({ id, from, to: nextSlug });
+                samples.push({ id, from, to: nextSlug, isActive });
             }
         } catch (error) {
             errors.push({
@@ -103,6 +114,8 @@ export async function backfillProductSlugs(options?: {
         scanned: products.length,
         updated,
         skipped,
+        activeUpdated,
+        inactiveUpdated,
         errors,
         samples,
     };

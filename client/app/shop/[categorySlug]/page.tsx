@@ -2,6 +2,7 @@ import { dehydrate, HydrationBoundary, QueryClient } from "@tanstack/react-query
 import type { Metadata } from "next";
 import CategoryShopPageClient from "./CategoryShopPageClient";
 import {
+    fetchShopSearchResultTotal,
     prefetchShopProductsList,
     shopProductsListQueryOptionsForHydration,
 } from "@/lib/shopInitialProductsFetch";
@@ -12,6 +13,12 @@ import {
     DEFAULT_OG_IMAGE_WIDTH,
     SITE_NAME,
 } from "@/lib/seo/productSeo";
+import {
+    ensureSearchHasResults,
+    getSearchQueryFromParams,
+    withSearchPageRobots,
+    type SearchParamsRecord,
+} from "@/lib/seo/searchPageSeo";
 import { parseShopFiltersFromRouter } from "@/lib/shopUrlFilters";
 import { ensureDb } from "@/server/src/config/db";
 import Category from "@/server/src/models/Category";
@@ -53,8 +60,9 @@ async function fetchCategorySeoBySlug(slug: string): Promise<CategorySeoDocument
     return category as CategorySeoDocument | null;
 }
 
-export async function generateMetadata({ params }: CategoryShopPageProps): Promise<Metadata> {
+export async function generateMetadata({ params, searchParams }: CategoryShopPageProps): Promise<Metadata> {
     const { categorySlug } = await params;
+    const sp = searchParams ? await searchParams : {};
     const normalizedSlug = normalizeCategorySlug(categorySlug);
     const category = await fetchCategorySeoBySlug(normalizedSlug);
     const categoryName = category?.name?.trim() || titleFromSlug(normalizedSlug) || "PC Components";
@@ -65,7 +73,7 @@ export async function generateMetadata({ params }: CategoryShopPageProps): Promi
         `Buy ${categoryName} in Sri Lanka from Omniware. Compare latest PC components, prices, availability, and local warranty options.`;
     const imageUrl = absoluteUrl(DEFAULT_OG_IMAGE);
 
-    return {
+    const metadata: Metadata = {
         title,
         description,
         keywords: [
@@ -99,6 +107,12 @@ export async function generateMetadata({ params }: CategoryShopPageProps): Promi
             images: [imageUrl],
         },
     };
+
+    if (getSearchQueryFromParams(sp)) {
+        return withSearchPageRobots(metadata);
+    }
+
+    return metadata;
 }
 
 export async function generateStaticParams() {
@@ -121,6 +135,12 @@ export default async function CategoryShopPage({ params, searchParams }: Categor
     const sp = searchParams ? await searchParams : {};
     const pathname = `/shop/${encodeURIComponent(normalizedSlug)}`;
     const parsed = parseShopFiltersFromRouter(pathname, sp);
+    const searchQuery = getSearchQueryFromParams(sp);
+
+    if (searchQuery) {
+        const total = await fetchShopSearchResultTotal(shopProductsListQueryOptionsForHydration(parsed));
+        await ensureSearchHasResults(searchQuery, total);
+    }
 
     const queryClient = new QueryClient();
     const listOptions = shopProductsListQueryOptionsForHydration(parsed);

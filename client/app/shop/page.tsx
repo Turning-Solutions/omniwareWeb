@@ -1,7 +1,11 @@
 import { dehydrate, HydrationBoundary, QueryClient } from "@tanstack/react-query";
 import type { Metadata } from "next";
 import ShopPageClient from "./ShopPageClient";
-import { prefetchShopProductsList, shopProductsListQueryOptionsForHydration } from "@/lib/shopInitialProductsFetch";
+import {
+    fetchShopSearchResultTotal,
+    prefetchShopProductsList,
+    shopProductsListQueryOptionsForHydration,
+} from "@/lib/shopInitialProductsFetch";
 import { parseShopFiltersFromRouter } from "@/lib/shopUrlFilters";
 import {
     absoluteUrl,
@@ -10,6 +14,12 @@ import {
     DEFAULT_OG_IMAGE_WIDTH,
     SITE_NAME,
 } from "@/lib/seo/productSeo";
+import {
+    ensureSearchHasResults,
+    getSearchQueryFromParams,
+    withSearchPageRobots,
+    type SearchParamsRecord,
+} from "@/lib/seo/searchPageSeo";
 
 // Register models so populate() works if the API handler runs in this context.
 import "@/server/src/models/Brand";
@@ -28,7 +38,7 @@ const shopDescription =
 const shopUrl = absoluteUrl("/shop");
 const shopImageUrl = absoluteUrl(DEFAULT_OG_IMAGE);
 
-export const metadata: Metadata = {
+const baseShopMetadata: Metadata = {
     title: shopTitle,
     description: shopDescription,
     keywords: [
@@ -64,12 +74,26 @@ export const metadata: Metadata = {
 };
 
 interface ShopPageProps {
-    searchParams?: Promise<Record<string, string | string[] | undefined>>;
+    searchParams?: Promise<SearchParamsRecord>;
+}
+
+export async function generateMetadata({ searchParams }: ShopPageProps): Promise<Metadata> {
+    const sp = searchParams ? await searchParams : {};
+    if (getSearchQueryFromParams(sp)) {
+        return withSearchPageRobots(baseShopMetadata);
+    }
+    return baseShopMetadata;
 }
 
 export default async function ShopPage({ searchParams }: ShopPageProps) {
     const sp = searchParams ? await searchParams : {};
     const parsed = parseShopFiltersFromRouter("/shop", sp);
+    const searchQuery = getSearchQueryFromParams(sp);
+
+    if (searchQuery) {
+        const total = await fetchShopSearchResultTotal(shopProductsListQueryOptionsForHydration(parsed));
+        await ensureSearchHasResults(searchQuery, total);
+    }
 
     const queryClient = new QueryClient();
     const listOptions = shopProductsListQueryOptionsForHydration(parsed);

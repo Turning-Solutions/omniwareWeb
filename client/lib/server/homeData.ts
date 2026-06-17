@@ -212,6 +212,19 @@ export async function fetchProductsDirect(options: ProductFetchOptions): Promise
     });
 }
 
+export async function countActiveProductsBySearchDirect(search: string): Promise<number> {
+    await ensureDb();
+
+    const term = search.trim();
+    if (!term) return 0;
+
+    const safe = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return Product.countDocuments({
+        isActive: true,
+        title: { $regex: safe, $options: "i" },
+    });
+}
+
 // ────────────────────────────────────────────
 // Single Product (for product detail page SSR)
 // ────────────────────────────────────────────

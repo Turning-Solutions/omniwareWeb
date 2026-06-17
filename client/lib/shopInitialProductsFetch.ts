@@ -46,6 +46,23 @@ export async function fetchShopProductsJson(options: UseProductsOptions): Promis
     return res.json() as Promise<ProductsResponse>;
 }
 
+export function readProductsTotal(
+    data: ProductsResponse & { pagination?: { total?: number } }
+): number {
+    if (typeof data.total === "number") return data.total;
+    return data.pagination?.total ?? 0;
+}
+
+export async function fetchShopSearchResultTotal(options: UseProductsOptions): Promise<number> {
+    const data = await fetchShopProductsJson({
+        ...options,
+        limit: 1,
+        page: 1,
+        includeFacets: false,
+    });
+    return readProductsTotal(data);
+}
+
 export async function prefetchShopProductsList(queryClient: QueryClient, options: UseProductsOptions) {
     await queryClient.prefetchQuery({
         ...getProductsQueryOptions(options),

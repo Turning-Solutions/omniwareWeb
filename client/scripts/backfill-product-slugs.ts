@@ -35,13 +35,13 @@ function printUsage() {
         "  npm run backfill:product-slugs -- --dry-run",
         "  npm run backfill:product-slugs -- --active-only",
         "",
-        "Regenerates slugs for products that are missing one or still use a MongoDB id URL.",
+        "Updates slugs for active and inactive products missing one or still using a MongoDB id.",
+        "Inactive products are not added to the sitemap.",
     ].join("\n"));
 }
 
 async function main() {
-    const args = new Set(process.argv.slice(2));
-    if (args.has("--help") || args.has("-h")) {
+    if (process.argv.includes("--help") || process.argv.includes("-h")) {
         printUsage();
         return;
     }
@@ -53,8 +53,8 @@ async function main() {
         throw new Error("MONGODB_URI is not set. Add it to .env or your shell environment.");
     }
 
-    const dryRun = args.has("--dry-run");
-    const activeOnly = args.has("--active-only");
+    const dryRun = process.argv.includes("--dry-run");
+    const activeOnly = process.argv.includes("--active-only");
 
     await connectDB();
     const result = await backfillProductSlugs({ dryRun, activeOnly });
@@ -64,8 +64,10 @@ async function main() {
     if (dryRun) {
         console.log("\nDry run only. Re-run without --dry-run to write slugs.");
     } else if (result.updated > 0) {
-        console.log(`\nUpdated ${result.updated} product slug(s).`);
-        console.log("Redeploy or revalidate /sitemap.xml so Google picks up the new URLs.");
+        console.log(`\nUpdated ${result.updated} product slug(s) (${result.activeUpdated} active, ${result.inactiveUpdated} inactive).`);
+        if (result.activeUpdated > 0) {
+            console.log("Revalidate /sitemap.xml if active product URLs changed.");
+        }
     }
 
     await mongoose.disconnect();

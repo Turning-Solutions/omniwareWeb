@@ -41,6 +41,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         await ensureDb();
 
         const [products, categories] = await Promise.all([
+            // Only active, indexable products belong in the sitemap.
+            // Inactive products still get SEO slugs via backfill for clean admin URLs.
             Product.find({
                 isActive: true,
                 "seo.noIndex": { $ne: true },

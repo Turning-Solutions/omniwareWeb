@@ -95,7 +95,7 @@ export function parseShopFiltersFromLocation(pathname: string, sp: URLSearchPara
         out.subcategories = sub.trim().toLowerCase();
     }
 
-    const search = sp.get("search") ?? sp.get("q");
+    const search = sp.get("search") ?? sp.get("q") ?? sp.get("s");
     if (search?.trim()) {
         out.search = search.trim();
     }

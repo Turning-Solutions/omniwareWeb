@@ -1,7 +1,9 @@
 import { dehydrate, HydrationBoundary, QueryClient } from "@tanstack/react-query";
 import type { Metadata } from "next";
+import { notFound, redirect } from "next/navigation";
 import HomePageClient from "./HomePageClient";
 import {
+    countActiveProductsBySearchDirect,
     fetchPromotionsDirect,
     fetchPartnersDirect,
     fetchHomeSettingsDirect,
@@ -20,6 +22,12 @@ import {
     SITE_NAME,
     getSiteUrl,
 } from "@/lib/seo/productSeo";
+import {
+    getSearchQueryFromParams,
+    hasLegacySearchParam,
+    withSearchPageRobots,
+    type SearchParamsRecord,
+} from "@/lib/seo/searchPageSeo";
 
 /**
  * ISR: serve a cached static page and revalidate in the background at most
@@ -33,7 +41,7 @@ const homeDescription =
 const homeUrl = absoluteUrl("/");
 const homeImageUrl = absoluteUrl(DEFAULT_OG_IMAGE);
 
-export const metadata: Metadata = {
+const baseHomeMetadata: Metadata = {
     title: homeTitle,
     description: homeDescription,
     keywords: [
@@ -68,6 +76,18 @@ export const metadata: Metadata = {
     },
 };
 
+interface HomePageProps {
+    searchParams?: Promise<SearchParamsRecord>;
+}
+
+export async function generateMetadata({ searchParams }: HomePageProps): Promise<Metadata> {
+    const sp = searchParams ? await searchParams : {};
+    if (hasLegacySearchParam(sp)) {
+        return withSearchPageRobots(baseHomeMetadata);
+    }
+    return baseHomeMetadata;
+}
+
 function buildHomeStructuredData() {
     const siteUrl = getSiteUrl();
     const logoUrl = absoluteUrl(DEFAULT_OG_IMAGE);
@@ -101,7 +121,18 @@ function buildHomeStructuredData() {
     ];
 }
 
-export default async function HomePage() {
+export default async function HomePage({ searchParams }: HomePageProps) {
+    const sp = searchParams ? await searchParams : {};
+    if (hasLegacySearchParam(sp)) {
+        const query = getSearchQueryFromParams(sp);
+        if (!query) notFound();
+
+        const total = await countActiveProductsBySearchDirect(query);
+        if (total === 0) notFound();
+
+        redirect(`/shop?search=${encodeURIComponent(query)}`);
+    }
+
     const queryClient = new QueryClient();
 
     // All 5 queries run in parallel — direct MongoDB, no HTTP loopback.

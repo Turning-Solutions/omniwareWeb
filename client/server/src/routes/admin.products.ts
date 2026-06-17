@@ -90,6 +90,7 @@ router.get('/', async (req: Request, res: Response) => {
 });
 
 // POST /api/v1/admin/products/backfill-slugs
+// Updates slugs for active and inactive products. Only active products appear in sitemap.xml.
 router.post('/backfill-slugs', async (req: Request, res: Response) => {
     try {
         const dryRun = req.body?.dryRun === true;
