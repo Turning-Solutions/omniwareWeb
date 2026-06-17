@@ -49,6 +49,14 @@ export const productSchema = z.object({
     })).optional(),
     warranty: z.string().optional(),
     availability: z.enum(['in_stock', 'out_of_stock', 'pre_order', 'coming_soon']).optional(),
+    seo: z.object({
+        title: z.string().max(70).optional(),
+        description: z.string().max(160).optional(),
+        keywords: z.array(z.string()).optional(),
+        image: z.string().optional(),
+        imageAlt: z.string().max(180).optional(),
+        noIndex: z.boolean().optional(),
+    }).optional(),
     isFeatured: z.boolean().optional(),
     isActive: z.boolean().optional()
 });

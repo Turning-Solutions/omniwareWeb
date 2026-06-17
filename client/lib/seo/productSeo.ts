@@ -1,0 +1,249 @@
+import type { Metadata } from "next";
+
+const DEFAULT_SITE_URL = "https://omniware.lk";
+export const SITE_NAME = "Omniware";
+export const DEFAULT_OG_IMAGE = "/logo.svg";
+export const DEFAULT_OG_IMAGE_WIDTH = 1200;
+export const DEFAULT_OG_IMAGE_HEIGHT = 630;
+
+type NamedEntity = {
+    name?: string;
+    slug?: string;
+};
+
+type ProductSeoOverrides = {
+    title?: string;
+    description?: string;
+    keywords?: string[];
+    image?: string;
+    imageAlt?: string;
+    noIndex?: boolean;
+};
+
+export type SeoProduct = {
+    _id?: string;
+    slug?: string;
+    title: string;
+    description?: string;
+    sku?: string;
+    price: number;
+    discountedPrice?: number | null;
+    images?: string[];
+    availability?: "in_stock" | "out_of_stock" | "pre_order" | "coming_soon";
+    stock?: { qty?: number };
+    warranty?: string;
+    brand?: string | NamedEntity;
+    brandId?: string | NamedEntity;
+    categoryIds?: NamedEntity[];
+    seo?: ProductSeoOverrides;
+};
+
+function clean(value: unknown): string {
+    return typeof value === "string" ? value.replace(/\s+/g, " ").trim() : "";
+}
+
+function truncate(value: string, maxLength: number): string {
+    if (value.length <= maxLength) return value;
+    const shortened = value.slice(0, maxLength - 1);
+    const lastSpace = shortened.lastIndexOf(" ");
+    return `${shortened.slice(0, lastSpace > maxLength * 0.65 ? lastSpace : -1).trim()}…`;
+}
+
+function getBrandName(product: SeoProduct): string {
+    if (typeof product.brand === "string") return clean(product.brand);
+    if (product.brand?.name) return clean(product.brand.name);
+    if (typeof product.brandId !== "string" && product.brandId?.name) return clean(product.brandId.name);
+    return "";
+}
+
+function getCategory(product: SeoProduct): NamedEntity | undefined {
+    return product.categoryIds?.find((category) => clean(category.name));
+}
+
+function getProductPath(product: SeoProduct): string {
+    return `/product/${encodeURIComponent(clean(product.slug) || clean(product._id))}`;
+}
+
+export function absoluteUrl(pathOrUrl: string): string {
+    if (/^https?:\/\//i.test(pathOrUrl)) return pathOrUrl;
+    return new URL(pathOrUrl.startsWith("/") ? pathOrUrl : `/${pathOrUrl}`, getSiteUrl()).toString();
+}
+
+function formatLkr(value: number): string {
+    return `LKR ${Math.round(value).toLocaleString("en-LK")}`;
+}
+
+function getEffectivePrice(product: SeoProduct): number {
+    return typeof product.discountedPrice === "number" ? product.discountedPrice : product.price;
+}
+
+function availabilityLabel(product: SeoProduct): string {
+    const availability =
+        product.availability ?? ((product.stock?.qty ?? 0) > 0 ? "in_stock" : "out_of_stock");
+
+    if (availability === "in_stock") return "in stock";
+    if (availability === "pre_order") return "available for pre-order";
+    if (availability === "coming_soon") return "coming soon";
+    return "currently out of stock";
+}
+
+function schemaAvailability(product: SeoProduct): string {
+    const availability =
+        product.availability ?? ((product.stock?.qty ?? 0) > 0 ? "in_stock" : "out_of_stock");
+
+    if (availability === "in_stock") return "https://schema.org/InStock";
+    if (availability === "out_of_stock") return "https://schema.org/OutOfStock";
+    return "https://schema.org/PreOrder";
+}
+
+function buildGeneratedTitle(product: SeoProduct): string {
+    const productName = clean(product.title);
+    const brand = getBrandName(product);
+    const nameWithBrand =
+        brand && !productName.toLowerCase().includes(brand.toLowerCase())
+            ? `${brand} ${productName}`
+            : productName;
+    const suffix = " Price in Sri Lanka | Omniware";
+    const maxNameLength = Math.max(25, 65 - suffix.length);
+    return `${truncate(nameWithBrand, maxNameLength)}${suffix}`;
+}
+
+function buildGeneratedDescription(product: SeoProduct): string {
+    const price = formatLkr(getEffectivePrice(product));
+    const warranty = clean(product.warranty);
+    const warrantyText = warranty ? `, ${warranty} warranty` : "";
+    const description =
+        `Buy ${clean(product.title)} in Sri Lanka for ${price}. ` +
+        `${availabilityLabel(product)}${warrantyText}. View specifications and islandwide delivery options from Omniware.`;
+    return truncate(description, 160);
+}
+
+export function getSiteUrl(): string {
+    const configured = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+    try {
+        return new URL(configured || DEFAULT_SITE_URL).toString().replace(/\/+$/, "");
+    } catch {
+        return DEFAULT_SITE_URL;
+    }
+}
+
+export function buildProductSeo(product: SeoProduct) {
+    const overrides = product.seo ?? {};
+    const title = clean(overrides.title) || buildGeneratedTitle(product);
+    const description = clean(overrides.description) || buildGeneratedDescription(product);
+    const productPath = getProductPath(product);
+    const canonicalUrl = absoluteUrl(productPath);
+    const image = clean(overrides.image) || clean(product.images?.[0]) || DEFAULT_OG_IMAGE;
+    const imageUrl = absoluteUrl(image);
+    const imageAlt = clean(overrides.imageAlt) || `${clean(product.title)} available in Sri Lanka`;
+    const brand = getBrandName(product);
+    const category = getCategory(product);
+    const generatedKeywords = [
+        clean(product.title),
+        brand,
+        category?.name ? `${clean(category.name)} Sri Lanka` : "",
+        `${clean(product.title)} price in Sri Lanka`,
+        `buy ${clean(product.title)} Sri Lanka`,
+    ].filter(Boolean);
+    const overrideKeywords = overrides.keywords?.map(clean).filter(Boolean) ?? [];
+    const keywords = overrideKeywords.length > 0 ? overrideKeywords : generatedKeywords;
+
+    return {
+        title,
+        description,
+        canonicalUrl,
+        productPath,
+        imageUrl,
+        imageAlt,
+        brand,
+        category,
+        keywords: Array.from(new Set(keywords)),
+        noIndex: overrides.noIndex === true,
+    };
+}
+
+export function buildProductMetadata(product: SeoProduct): Metadata {
+    const seo = buildProductSeo(product);
+    const openGraph = {
+        type: "product",
+        locale: "en_LK",
+        siteName: SITE_NAME,
+        title: seo.title,
+        description: seo.description,
+        url: seo.canonicalUrl,
+        images: [{
+            url: seo.imageUrl,
+            alt: seo.imageAlt,
+            width: DEFAULT_OG_IMAGE_WIDTH,
+            height: DEFAULT_OG_IMAGE_HEIGHT,
+        }],
+    } as unknown as Metadata["openGraph"];
+
+    return {
+        title: seo.title,
+        description: seo.description,
+        keywords: seo.keywords,
+        alternates: {
+            canonical: seo.canonicalUrl,
+        },
+        robots: seo.noIndex
+            ? { index: false, follow: false }
+            : { index: true, follow: true },
+        openGraph,
+        twitter: {
+            card: "summary_large_image",
+            title: seo.title,
+            description: seo.description,
+            images: [seo.imageUrl],
+        },
+    };
+}
+
+export function buildProductStructuredData(product: SeoProduct) {
+    const seo = buildProductSeo(product);
+    const categoryUrl = seo.category?.slug
+        ? absoluteUrl(`/shop/${encodeURIComponent(seo.category.slug)}`)
+        : absoluteUrl("/shop");
+    const breadcrumbs = [
+        { name: "Home", url: getSiteUrl() },
+        { name: seo.category?.name || "Shop", url: categoryUrl },
+        { name: clean(product.title), url: seo.canonicalUrl },
+    ];
+
+    return {
+        product: {
+            "@context": "https://schema.org",
+            "@type": "Product",
+            name: clean(product.title),
+            description: clean(product.description) || seo.description,
+            image: (product.images?.length ? product.images : [seo.imageUrl]).map(absoluteUrl),
+            url: seo.canonicalUrl,
+            ...(clean(product.sku) ? { sku: clean(product.sku), mpn: clean(product.sku) } : {}),
+            ...(seo.brand ? { brand: { "@type": "Brand", name: seo.brand } } : {}),
+            ...(seo.category?.name ? { category: clean(seo.category.name) } : {}),
+            offers: {
+                "@type": "Offer",
+                url: seo.canonicalUrl,
+                priceCurrency: "LKR",
+                price: getEffectivePrice(product).toFixed(2),
+                availability: schemaAvailability(product),
+                itemCondition: "https://schema.org/NewCondition",
+                seller: {
+                    "@type": "Organization",
+                    name: SITE_NAME,
+                    url: getSiteUrl(),
+                },
+            },
+        },
+        breadcrumbs: {
+            "@context": "https://schema.org",
+            "@type": "BreadcrumbList",
+            itemListElement: breadcrumbs.map((item, index) => ({
+                "@type": "ListItem",
+                position: index + 1,
+                name: item.name,
+                item: item.url,
+            })),
+        },
+    };
+}

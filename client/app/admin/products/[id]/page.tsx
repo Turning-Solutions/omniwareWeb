@@ -7,6 +7,7 @@ import { Save, ArrowLeft, Trash2, Edit2, Plus, ChevronUp, ChevronDown, ImagePlus
 import Link from "next/link";
 import api from "@/lib/api";
 import toast from "react-hot-toast";
+import { buildProductSeo, type SeoProduct } from "@/lib/seo/productSeo";
 
 interface Brand {
     _id: string;
@@ -159,6 +160,14 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
         filterSpecs: [] as FilterSpec[],
         colorVariants: [] as ColorVariant[],
         images: [] as string[],
+        seo: {
+            title: "",
+            description: "",
+            keywords: "",
+            image: "",
+            imageAlt: "",
+            noIndex: false,
+        },
         availability: "pre_order" as "in_stock" | "out_of_stock" | "pre_order" | "coming_soon",
         isActive: true
     });
@@ -192,6 +201,56 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                 .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" })),
         [formData.attributeGroups]
     );
+    const seoPreview = useMemo(() => {
+        const selectedBrand = brands.find((brand) => brand._id === formData.brandId);
+        const selectedCategory =
+            categories.find((category) => category._id === subCategoryId) ||
+            categories.find((category) => category._id === mainCategoryId);
+        const price = Number(formData.price);
+        const discountAmount = Number(formData.discountPercent);
+        const discountedPrice =
+            Number.isFinite(price) && Number.isFinite(discountAmount) && discountAmount > 0
+                ? Math.max(0, price - discountAmount)
+                : undefined;
+        const previewProduct: SeoProduct = {
+            _id: isNew ? "new-product" : id,
+            slug: formData.slug || undefined,
+            title: formData.title || "New product",
+            description: formData.description || undefined,
+            sku: formData.sku || undefined,
+            price: Number.isFinite(price) ? price : 0,
+            discountedPrice,
+            images: formData.images,
+            availability: formData.availability,
+            stock: { qty: Number(formData.stock) || 0 },
+            warranty: formData.warranty || undefined,
+            brandId: selectedBrand ? { name: selectedBrand.name } : undefined,
+            categoryIds: selectedCategory
+                ? [{ name: selectedCategory.name, slug: selectedCategory.slug }]
+                : undefined,
+            seo: {
+                title: formData.seo.title || undefined,
+                description: formData.seo.description || undefined,
+                keywords: formData.seo.keywords
+                    .split(",")
+                    .map((keyword) => keyword.trim())
+                    .filter(Boolean),
+                image: formData.seo.image || undefined,
+                imageAlt: formData.seo.imageAlt || undefined,
+                noIndex: formData.seo.noIndex,
+            },
+        };
+
+        return buildProductSeo(previewProduct);
+    }, [
+        brands,
+        categories,
+        formData,
+        id,
+        isNew,
+        mainCategoryId,
+        subCategoryId,
+    ]);
 
     const notifyProductsListUpdated = (productId: string) => {
         if (typeof window === "undefined") return;
@@ -251,12 +310,18 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                     : [];
                 const attributeGroups: AttributeGroup[] =
                     rawGroups && Array.isArray(rawGroups) && rawGroups.length > 0
-                        ? rawGroups.map((g: any) => ({
+                        ? rawGroups.map((g: { category?: string; attributes?: Array<{ name?: string; value?: string }> }) => ({
                             category: g.category || 'General',
-                            attributes: (g.attributes || []).map((a: any) => ({ name: a.name || '', value: a.value || '' }))
+                            attributes: (g.attributes || []).map((a) => ({ name: a.name || '', value: a.value || '' }))
                         }))
                         : (data.attributes && Array.isArray(data.attributes) && data.attributes.length > 0)
-                            ? [{ category: 'General', attributes: data.attributes.map((a: any) => ({ name: a.name || '', value: a.value || '' })) }]
+                            ? [{
+                                category: 'General',
+                                attributes: data.attributes.map((a: { name?: string; value?: string }) => ({
+                                    name: a.name || '',
+                                    value: a.value || '',
+                                })),
+                            }]
                             : [];
 
                 const productDiscountPercent = data.discountPercent != null ? String(data.discountPercent) : "";
@@ -346,6 +411,14 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                     filterSpecs,
                     colorVariants,
                     images: Array.isArray(data.images) ? data.images : [],
+                    seo: {
+                        title: data.seo?.title ?? "",
+                        description: data.seo?.description ?? "",
+                        keywords: Array.isArray(data.seo?.keywords) ? data.seo.keywords.join(", ") : "",
+                        image: data.seo?.image ?? "",
+                        imageAlt: data.seo?.imageAlt ?? "",
+                        noIndex: data.seo?.noIndex === true,
+                    },
                     availability: data.availability || "pre_order",
                     isActive: typeof data.isActive === "boolean" ? data.isActive : true,
                 });
@@ -501,6 +574,17 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                             .filter((attribute) => attribute.value.trim())
                             .map((attribute) => ({ name: attribute.name.trim(), value: attribute.value.trim() }))
                     })),
+                seo: {
+                    title: formData.seo.title.trim() || undefined,
+                    description: formData.seo.description.trim() || undefined,
+                    keywords: formData.seo.keywords
+                        .split(",")
+                        .map((keyword) => keyword.trim())
+                        .filter(Boolean),
+                    image: formData.seo.image.trim() || undefined,
+                    imageAlt: formData.seo.imageAlt.trim() || undefined,
+                    noIndex: formData.seo.noIndex,
+                },
             };
 
             if (isNew) {
@@ -1226,6 +1310,135 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                 </section>
 
                 <section className="border-t border-border-soft pt-6">
+                    <div className="mb-5">
+                        <h2 className="text-xl font-bold text-main">Search engine optimization</h2>
+                        <p className="mt-1 text-sm text-sub">
+                            Blank fields stay automatic and update whenever the product changes. Add an override only when needed.
+                        </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.8fr)]">
+                        <div className="grid grid-cols-1 gap-5">
+                            <div className="space-y-2">
+                                <label className="flex items-center justify-between gap-3 text-sm text-sub">
+                                    <span>SEO title override</span>
+                                    <span className="text-xs">{formData.seo.title.length}/70</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    maxLength={70}
+                                    className="w-full rounded-lg border border-border-soft bg-base px-4 py-2 text-main focus:outline-none focus:border-accent"
+                                    value={formData.seo.title}
+                                    onChange={(e) => setFormData({
+                                        ...formData,
+                                        seo: { ...formData.seo, title: e.target.value },
+                                    })}
+                                    placeholder={seoPreview.title}
+                                />
+                                <p className="text-xs text-sub">
+                                    {formData.seo.title.trim() ? "Manual override active." : "Automatic title active."}
+                                </p>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="flex items-center justify-between gap-3 text-sm text-sub">
+                                    <span>Meta description override</span>
+                                    <span className="text-xs">{formData.seo.description.length}/160</span>
+                                </label>
+                                <textarea
+                                    maxLength={160}
+                                    className="h-28 w-full rounded-lg border border-border-soft bg-base px-4 py-2 text-main focus:outline-none focus:border-accent"
+                                    value={formData.seo.description}
+                                    onChange={(e) => setFormData({
+                                        ...formData,
+                                        seo: { ...formData.seo, description: e.target.value },
+                                    })}
+                                    placeholder={seoPreview.description}
+                                />
+                                <p className="text-xs text-sub">
+                                    {formData.seo.description.trim() ? "Manual override active." : "Automatic description active."}
+                                </p>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-sm text-sub">Keywords (comma separated)</label>
+                                <input
+                                    type="text"
+                                    className="w-full rounded-lg border border-border-soft bg-base px-4 py-2 text-main focus:outline-none focus:border-accent"
+                                    value={formData.seo.keywords}
+                                    onChange={(e) => setFormData({
+                                        ...formData,
+                                        seo: { ...formData.seo, keywords: e.target.value },
+                                    })}
+                                    placeholder={seoPreview.keywords.join(", ")}
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                                <div className="space-y-2">
+                                    <label className="text-sm text-sub">Social image override</label>
+                                    <input
+                                        type="url"
+                                        className="w-full rounded-lg border border-border-soft bg-base px-4 py-2 text-main focus:outline-none focus:border-accent"
+                                        value={formData.seo.image}
+                                        onChange={(e) => setFormData({
+                                            ...formData,
+                                            seo: { ...formData.seo, image: e.target.value },
+                                        })}
+                                        placeholder={seoPreview.imageUrl}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-sm text-sub">Image alt text override</label>
+                                    <input
+                                        type="text"
+                                        maxLength={180}
+                                        className="w-full rounded-lg border border-border-soft bg-base px-4 py-2 text-main focus:outline-none focus:border-accent"
+                                        value={formData.seo.imageAlt}
+                                        onChange={(e) => setFormData({
+                                            ...formData,
+                                            seo: { ...formData.seo, imageAlt: e.target.value },
+                                        })}
+                                        placeholder={seoPreview.imageAlt}
+                                    />
+                                </div>
+                            </div>
+
+                            <label className="flex items-start gap-3 rounded-lg border border-border-soft bg-base/60 p-4">
+                                <input
+                                    type="checkbox"
+                                    className="mt-1 h-4 w-4 accent-red-600"
+                                    checked={formData.seo.noIndex}
+                                    onChange={(e) => setFormData({
+                                        ...formData,
+                                        seo: { ...formData.seo, noIndex: e.target.checked },
+                                    })}
+                                />
+                                <span>
+                                    <span className="block text-sm font-semibold text-main">Hide from search engines</span>
+                                    <span className="mt-1 block text-xs text-sub">
+                                        Use only for products that should remain accessible by link but must not appear in Google.
+                                    </span>
+                                </span>
+                            </label>
+                        </div>
+
+                        <div className="h-fit rounded-xl border border-border-soft bg-white p-5 text-[#202124] shadow-sm">
+                            <p className="mb-4 text-xs font-semibold uppercase tracking-[0.14em] text-[#5f6368]">
+                                Google preview
+                            </p>
+                            <p className="truncate text-sm text-[#202124]">{seoPreview.canonicalUrl}</p>
+                            <p className="mt-1 text-xl leading-7 text-[#1a0dab]">{seoPreview.title}</p>
+                            <p className="mt-1 text-sm leading-6 text-[#4d5156]">{seoPreview.description}</p>
+                            <div className="mt-5 border-t border-[#dadce0] pt-4 text-xs text-[#5f6368]">
+                                <p>{formData.seo.noIndex ? "Not eligible for indexing" : "Eligible for indexing"}</p>
+                                <p className="mt-1">Canonical: {seoPreview.canonicalUrl}</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section className="border-t border-border-soft pt-6">
                     <div className="flex items-center justify-between mb-4">
                         <div>
                             <h2 className="text-xl font-bold text-main">Color variants</h2>
@@ -1379,7 +1592,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                     <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
                         <div>
                             <h2 className="text-xl font-bold text-main">Featured specs</h2>
-                            <p className="text-sub text-sm mt-0.5">Set values for this category's featured specs to surface richer shop filters.</p>
+                            <p className="text-sub text-sm mt-0.5">Set values for this category&apos;s featured specs to surface richer shop filters.</p>
                         </div>
                         {featuredSpecKeys.length > 0 && (
                             <div className="flex flex-wrap items-center gap-2">

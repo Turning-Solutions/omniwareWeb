@@ -22,6 +22,36 @@ function normalizeCategorySlugInput(value: unknown): string {
         .replace(/(^-|-$)/g, '');
 }
 
+function normalizeProductSlugInput(value: unknown): string {
+    return String(value ?? "")
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/(^-|-$)/g, "");
+}
+
+function getProductSlug(value: unknown): string {
+    if (!value || typeof value !== "object" || !("slug" in value)) return "";
+    const slug = (value as { slug?: unknown }).slug;
+    return typeof slug === "string" ? slug.trim() : "";
+}
+
+async function createUniqueProductSlug(value: unknown, excludeId?: string): Promise<string> {
+    const baseSlug = normalizeProductSlugInput(value) || "product";
+    let candidate = baseSlug;
+    let suffix = 2;
+
+    while (await Product.exists({
+        slug: candidate,
+        ...(excludeId ? { _id: { $ne: excludeId } } : {}),
+    })) {
+        candidate = `${baseSlug}-${suffix}`;
+        suffix += 1;
+    }
+
+    return candidate;
+}
+
 async function hasProductsInCategory(categoryId: string): Promise<boolean> {
     const linkedProduct = await Product.exists({ categoryIds: categoryId });
     return Boolean(linkedProduct);
@@ -103,17 +133,14 @@ function normalizeProductBody(body: Record<string, unknown>): Record<string, unk
     return b;
 }
 
-function buildProductUpdate(body: Record<string, unknown>): Record<string, unknown> {
+function buildProductUpdate(body: Record<string, unknown>, slug: string): Record<string, unknown> {
     const normalized = normalizeProductBody(body);
+    normalized.slug = slug;
     const unset: Record<string, 1> = {};
 
     if (body.sku === '' || (typeof body.sku === 'string' && !body.sku.trim())) {
         unset.sku = 1;
     }
-    if (body.slug === '' || (typeof body.slug === 'string' && !body.slug.trim())) {
-        unset.slug = 1;
-    }
-
     if (Object.keys(unset).length === 0) {
         return normalized;
     }
@@ -127,9 +154,11 @@ function buildProductUpdate(body: Record<string, unknown>): Record<string, unkno
 // POST /api/v1/admin/products
 router.post('/', async (req: Request, res: Response) => {
     try {
-        const product = await Product.create(normalizeProductBody(req.body));
+        const normalizedBody = normalizeProductBody(req.body);
+        normalizedBody.slug = await createUniqueProductSlug(normalizedBody.slug || normalizedBody.title);
+        const product = await Product.create(normalizedBody);
         invalidateFacetCaches();
-        triggerRevalidation(['/', '/shop']);
+        triggerRevalidation(['/', '/shop', '/sitemap.xml']);
 
         await createAuditLog(req, {
             action: 'CREATE_PRODUCT',
@@ -150,13 +179,32 @@ router.patch('/:id', async (req: Request, res: Response) => {
     if (!before) return res.status(404).json({ message: 'Product not found' });
 
     try {
-        const updated = await Product.findByIdAndUpdate(req.params.id, buildProductUpdate(req.body), {
+        const normalizedBody = normalizeProductBody(req.body);
+        const requestedSlug =
+            normalizedBody.slug ||
+            (typeof normalizedBody.title === "string" ? normalizedBody.title : before.title);
+        const productSlugForUpdate =
+            normalizedBody.slug || !getProductSlug(before)
+                ? await createUniqueProductSlug(requestedSlug, String(req.params.id))
+                : getProductSlug(before);
+        const updated = await Product.findByIdAndUpdate(
+            req.params.id,
+            buildProductUpdate(req.body, productSlugForUpdate),
+            {
             returnDocument: 'after',
             runValidators: true,
-        }).lean();
+            }
+        ).lean();
         invalidateFacetCaches();
-        const productSlug = (updated as any)?.slug;
-        triggerRevalidation(['/', '/shop', ...(productSlug ? [`/product/${productSlug}`] : [])]);
+        const productSlug = getProductSlug(updated);
+        const previousSlug = getProductSlug(before);
+        triggerRevalidation([
+            '/',
+            '/shop',
+            '/sitemap.xml',
+            ...(previousSlug ? [`/product/${previousSlug}`] : []),
+            ...(productSlug ? [`/product/${productSlug}`] : []),
+        ]);
 
         await createAuditLog(req, {
             action: 'UPDATE_PRODUCT',
@@ -179,8 +227,8 @@ router.delete('/:id', async (req: Request, res: Response) => {
 
     await Product.findByIdAndDelete(req.params.id);
     invalidateFacetCaches();
-    const productSlug = (before as any)?.slug;
-    triggerRevalidation(['/', '/shop', ...(productSlug ? [`/product/${productSlug}`] : [])]);
+    const productSlug = getProductSlug(before);
+    triggerRevalidation(['/', '/shop', '/sitemap.xml', ...(productSlug ? [`/product/${productSlug}`] : [])]);
 
     await createAuditLog(req, {
         action: 'DELETE_PRODUCT',
@@ -347,4 +395,3 @@ router.put('/categories/:id/discount', async (req: Request, res: Response) => {
 });
 
 export default router;
-

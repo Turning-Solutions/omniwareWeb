@@ -43,7 +43,7 @@ export interface Product {
     discountPercent?: number | null;
     images: string[];
     category: string;
-    categoryIds?: { _id: string; name: string }[];
+    categoryIds?: { _id: string; name: string; slug?: string }[];
     brand: string | { name: string; _id: string }; // Can be string or populated object
     brandId?: { _id: string; name: string } | string;
     countInStock: number;
@@ -66,6 +66,14 @@ export interface Product {
         stock?: { qty?: number };
     }[];
     warranty?: string;
+    seo?: {
+        title?: string;
+        description?: string;
+        keywords?: string[];
+        image?: string;
+        imageAlt?: string;
+        noIndex?: boolean;
+    };
     isFeatured?: boolean;
     specs?: Record<string, string>;
     attributes?: { name?: string; value: string }[];

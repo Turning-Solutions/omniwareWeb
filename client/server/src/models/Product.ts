@@ -54,6 +54,14 @@ const productSchema = new mongoose.Schema({
     }],
     warranty: { type: String, required: false },
     description: { type: String },
+    seo: {
+        title: { type: String, required: false, trim: true, maxlength: 70 },
+        description: { type: String, required: false, trim: true, maxlength: 160 },
+        keywords: [{ type: String, trim: true }],
+        image: { type: String, required: false, trim: true },
+        imageAlt: { type: String, required: false, trim: true, maxlength: 180 },
+        noIndex: { type: Boolean, default: false }
+    },
     isFeatured: { type: Boolean, default: false },
     isActive: { type: Boolean, default: true }
 }, {

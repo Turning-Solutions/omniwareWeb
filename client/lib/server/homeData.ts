@@ -11,6 +11,7 @@
  */
 import 'server-only';
 
+import { cache } from 'react';
 import { ensureDb } from '@/server/src/config/db';
 import type { HomePromotion } from '@/lib/homePromotionsQuery';
 import type { PartnerBrand } from '@/lib/homePartnersQuery';
@@ -70,7 +71,7 @@ export async function fetchPromotionsDirect(): Promise<HomePromotion[]> {
         .lean();
 
     const MAX_PROMOTIONS = 10;
-    const promotions: any[] = [];
+    const promotions: unknown[] = [];
 
     for (const promotion of candidates) {
         const start = new Date(promotion.validFrom);
@@ -215,21 +216,7 @@ export async function fetchProductsDirect(options: ProductFetchOptions): Promise
 // Single Product (for product detail page SSR)
 // ────────────────────────────────────────────
 
-type ProductRuntimeCacheEntry = {
-    expiresAt: number;
-    value: unknown | null;
-};
-
-const productBySlugRuntimeCache = new Map<string, ProductRuntimeCacheEntry>();
-const PRODUCT_RUNTIME_CACHE_TTL_MS = 2 * 60 * 1000;
-
-export async function fetchProductBySlugDirect(slug: string) {
-    const key = slug.trim().toLowerCase();
-    const hit = productBySlugRuntimeCache.get(key);
-    if (hit && hit.expiresAt > Date.now()) {
-        return hit.value;
-    }
-
+export const fetchProductBySlugDirect = cache(async (slug: string) => {
     await ensureDb();
 
     const isObjectId = /^[a-fA-F0-9]{24}$/.test(slug);
@@ -242,20 +229,11 @@ export async function fetchProductBySlugDirect(slug: string) {
         .populate('categoryIds', 'name slug discountPercent');
 
     if (!product) {
-        productBySlugRuntimeCache.set(key, {
-            expiresAt: Date.now() + PRODUCT_RUNTIME_CACHE_TTL_MS,
-            value: null,
-        });
         return null;
     }
 
     // Same post-processing chain as getProductBySlug in productController
     const normalized = normalizeProductAttributeGroups(product);
     const sanitized = stripAdminOnlyProductFields(normalized);
-    const result = serialize(withDiscountInfo(sanitized));
-    productBySlugRuntimeCache.set(key, {
-        expiresAt: Date.now() + PRODUCT_RUNTIME_CACHE_TTL_MS,
-        value: result,
-    });
-    return result;
-}
+    return serialize(withDiscountInfo(sanitized));
+});
