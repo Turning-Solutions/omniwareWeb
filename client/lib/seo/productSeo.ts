@@ -164,20 +164,6 @@ export function buildProductSeo(product: SeoProduct) {
 
 export function buildProductMetadata(product: SeoProduct): Metadata {
     const seo = buildProductSeo(product);
-    const openGraph = {
-        type: "product",
-        locale: "en_LK",
-        siteName: SITE_NAME,
-        title: seo.title,
-        description: seo.description,
-        url: seo.canonicalUrl,
-        images: [{
-            url: seo.imageUrl,
-            alt: seo.imageAlt,
-            width: DEFAULT_OG_IMAGE_WIDTH,
-            height: DEFAULT_OG_IMAGE_HEIGHT,
-        }],
-    } as unknown as Metadata["openGraph"];
 
     return {
         title: seo.title,
@@ -189,7 +175,20 @@ export function buildProductMetadata(product: SeoProduct): Metadata {
         robots: seo.noIndex
             ? { index: false, follow: false }
             : { index: true, follow: true },
-        openGraph,
+        openGraph: {
+            type: "website",
+            locale: "en_LK",
+            siteName: SITE_NAME,
+            title: seo.title,
+            description: seo.description,
+            url: seo.canonicalUrl,
+            images: [{
+                url: seo.imageUrl,
+                alt: seo.imageAlt,
+                width: DEFAULT_OG_IMAGE_WIDTH,
+                height: DEFAULT_OG_IMAGE_HEIGHT,
+            }],
+        },
         twitter: {
             card: "summary_large_image",
             title: seo.title,
