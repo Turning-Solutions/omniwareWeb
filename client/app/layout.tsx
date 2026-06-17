@@ -45,8 +45,12 @@ export const metadata: Metadata = {
         images: [defaultOgImage],
     },
     icons: {
-        icon: "/logo.svg",
-        apple: "/logo.svg",
+        icon: [
+            { url: "/favicon.png", sizes: "32x32", type: "image/png" },
+            { url: "/site-brand-icon.png", sizes: "512x512", type: "image/png" },
+        ],
+        apple: "/apple-touch-icon.png",
+        shortcut: "/favicon.png",
     },
 };
 

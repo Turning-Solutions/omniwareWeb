@@ -21,6 +21,7 @@ import {
     DEFAULT_OG_IMAGE_WIDTH,
     SITE_NAME,
     getSiteUrl,
+    SITE_BRAND_ICON,
 } from "@/lib/seo/productSeo";
 import {
     getSearchQueryFromParams,
@@ -90,7 +91,7 @@ export async function generateMetadata({ searchParams }: HomePageProps): Promise
 
 function buildHomeStructuredData() {
     const siteUrl = getSiteUrl();
-    const logoUrl = absoluteUrl(DEFAULT_OG_IMAGE);
+    const logoUrl = absoluteUrl(SITE_BRAND_ICON);
 
     return [
         {
