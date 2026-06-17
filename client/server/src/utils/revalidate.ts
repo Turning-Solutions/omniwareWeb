@@ -4,6 +4,8 @@
  * Sends a POST to /api/internal/revalidate with the given paths and tags.
  * Runs fire-and-forget so it never blocks the admin response.
  */
+import { getSiteUrl } from "../../../lib/seo/productSeo";
+
 export function triggerRevalidation(paths: string[] = ['/'], tags: string[] = []): void {
     const secret = process.env.REVALIDATION_SECRET;
     if (!secret) {
@@ -12,8 +14,8 @@ export function triggerRevalidation(paths: string[] = ['/'], tags: string[] = []
     }
 
     const baseUrl =
-        process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
-        (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '');
+        (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "") ||
+        getSiteUrl();
 
     if (!baseUrl) return;
 

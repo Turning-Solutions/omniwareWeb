@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-const DEFAULT_SITE_URL = "https://omniware.lk";
+const DEFAULT_SITE_URL = "https://www.omniware.lk";
 export const SITE_NAME = "Omniware";
 export const DEFAULT_OG_IMAGE = "/logo.svg";
 export const DEFAULT_OG_IMAGE_WIDTH = 1200;
@@ -60,8 +60,22 @@ function getCategory(product: SeoProduct): NamedEntity | undefined {
     return product.categoryIds?.find((category) => clean(category.name));
 }
 
-function getProductPath(product: SeoProduct): string {
-    return `/product/${encodeURIComponent(clean(product.slug) || clean(product._id))}`;
+function productIdString(value: unknown): string {
+    if (typeof value === "string") {
+        const id = value.trim();
+        return /^[a-fA-F0-9]{24}$/.test(id) ? id : "";
+    }
+    if (value != null && typeof value === "object" && "toString" in value) {
+        const id = String(value);
+        return /^[a-fA-F0-9]{24}$/.test(id) ? id : "";
+    }
+    return "";
+}
+
+export function getProductPath(product: { slug?: string; _id?: unknown }): string | null {
+    const segment = clean(product.slug) || productIdString(product._id);
+    if (!segment) return null;
+    return `/product/${encodeURIComponent(segment)}`;
 }
 
 export function absoluteUrl(pathOrUrl: string): string {
@@ -118,20 +132,44 @@ function buildGeneratedDescription(product: SeoProduct): string {
     return truncate(description, 160);
 }
 
-export function getSiteUrl(): string {
-    const configured = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+function normalizeSiteUrl(candidate: string): string | null {
     try {
-        return new URL(configured || DEFAULT_SITE_URL).toString().replace(/\/+$/, "");
+        const url = new URL(candidate);
+        const host = url.hostname.toLowerCase();
+
+        if (host.endsWith(".vercel.app") || host === "localhost" || host.startsWith("127.")) {
+            return null;
+        }
+
+        if (host === "omniware.lk") {
+            url.hostname = "www.omniware.lk";
+        }
+
+        return url.toString().replace(/\/+$/, "");
     } catch {
-        return DEFAULT_SITE_URL;
+        return null;
     }
+}
+
+export function getSiteUrl(): string {
+    const candidates = [
+        process.env.SITE_URL?.trim(),
+        process.env.NEXT_PUBLIC_SITE_URL?.trim(),
+    ].filter(Boolean) as string[];
+
+    for (const candidate of candidates) {
+        const normalized = normalizeSiteUrl(candidate);
+        if (normalized) return normalized;
+    }
+
+    return DEFAULT_SITE_URL;
 }
 
 export function buildProductSeo(product: SeoProduct) {
     const overrides = product.seo ?? {};
     const title = clean(overrides.title) || buildGeneratedTitle(product);
     const description = clean(overrides.description) || buildGeneratedDescription(product);
-    const productPath = getProductPath(product);
+    const productPath = getProductPath(product) ?? `/product/${encodeURIComponent(clean(product._id))}`;
     const canonicalUrl = absoluteUrl(productPath);
     const image = clean(overrides.image) || clean(product.images?.[0]) || DEFAULT_OG_IMAGE;
     const imageUrl = absoluteUrl(image);
