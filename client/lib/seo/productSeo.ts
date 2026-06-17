@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 
 const DEFAULT_SITE_URL = "https://www.omniware.lk";
 export const SITE_NAME = "Omniware";
-export const DEFAULT_OG_IMAGE = "/logo.svg";
+export const DEFAULT_OG_IMAGE = "/og-default.png";
 export const SITE_BRAND_ICON = "/site-brand-icon.png";
+export const SITE_FAVICON = "/brand-icon.png";
 export const DEFAULT_OG_IMAGE_WIDTH = 1200;
 export const DEFAULT_OG_IMAGE_HEIGHT = 630;
 

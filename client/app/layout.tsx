@@ -9,6 +9,7 @@ import {
     DEFAULT_OG_IMAGE_HEIGHT,
     DEFAULT_OG_IMAGE_WIDTH,
     getSiteUrl,
+    SITE_FAVICON,
     SITE_NAME,
 } from "@/lib/seo/productSeo";
 
@@ -46,11 +47,10 @@ export const metadata: Metadata = {
     },
     icons: {
         icon: [
-            { url: "/favicon.png", sizes: "32x32", type: "image/png" },
-            { url: "/site-brand-icon.png", sizes: "512x512", type: "image/png" },
+            { url: SITE_FAVICON, sizes: "48x48", type: "image/png" },
         ],
         apple: "/apple-touch-icon.png",
-        shortcut: "/favicon.png",
+        shortcut: SITE_FAVICON,
     },
 };
 
