@@ -141,6 +141,10 @@ function buildProductUpdate(body: Record<string, unknown>, slug: string): Record
     if (body.sku === '' || (typeof body.sku === 'string' && !body.sku.trim())) {
         unset.sku = 1;
     }
+    if (body.warranty === '' || (typeof body.warranty === 'string' && !body.warranty.trim())) {
+        delete normalized.warranty;
+        unset.warranty = 1;
+    }
     if (Object.keys(unset).length === 0) {
         return normalized;
     }

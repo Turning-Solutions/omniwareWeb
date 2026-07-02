@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { PDFDocument, StandardFonts, rgb, type PDFPage, type PDFFont } from 'pdf-lib';
+import { PDFDocument, StandardFonts, rgb, type PDFPage, type PDFFont, type PDFImage } from 'pdf-lib';
 
 export type QuotationPdfItem = {
     title: string;
@@ -51,16 +51,12 @@ function wrapTitle(title: string, maxLen: number, maxLines: number): string[] {
     return lines;
 }
 
-function resolveTemplatePath(): string | null {
-    const fromEnv = process.env.QUOTATION_PDF_TEMPLATE_PATH?.trim();
+function resolveHeaderImagePath(): string | null {
+    const fromEnv = process.env.QUOTATION_PDF_HEADER_IMAGE_PATH?.trim();
     if (fromEnv && fs.existsSync(fromEnv)) return fromEnv;
-    const pub = path.join(process.cwd(), 'public', 'QUOTATION-OMNI.pdf');
+    const pub = path.join(process.cwd(), 'public', 'QUOTATION header .png');
     if (fs.existsSync(pub)) return pub;
     return null;
-}
-
-function yFromTop(pageHeight: number, fromTopPt: number): number {
-    return pageHeight - fromTopPt;
 }
 
 function textWidth(font: PDFFont, text: string, size: number): number {
@@ -81,9 +77,153 @@ function drawTextRight(
     page.drawText(safe, { x: rightX - w, y, size, font, color });
 }
 
+function buildQuotationNumber(id: string, date: Date): string {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    const shortId = String(id).slice(-6).toUpperCase();
+    return `QTN-${y}${m}${d}-${shortId}`;
+}
+
+const PAGE_WIDTH = 595.28;
+const PAGE_HEIGHT = 841.89;
+const MARGIN_X = 50;
+const RIGHT_EDGE = PAGE_WIDTH - MARGIN_X;
+const ROW_LINE_HEIGHT = 15;
+const FOOTER_RESERVED = 50; // room for the "Page x of y" footer on every page
+const TOTALS_BLOCK_HEIGHT = 132; // total line + disclaimer paragraph, reserved on the last page
+
+const SIZES = {
+    metaLabel: 9,
+    metaValue: 13,
+    th: 10.5,
+    td: 10,
+    tdBold: 10,
+    total: 15,
+    disc: 9,
+    pageNum: 8.5,
+};
+
+const INK = rgb(0.06, 0.06, 0.06);
+const META_COLOR = rgb(0.4, 0.4, 0.4);
+const LINE_COLOR = rgb(0.72, 0.72, 0.72);
+const MUTED = rgb(0.4, 0.4, 0.4);
+const HEADER_FILL = rgb(0.94, 0.94, 0.94);
+
+const COL = {
+    numLeft: MARGIN_X,
+    descLeft: MARGIN_X + 26,
+    qtyRight: RIGHT_EDGE - 232,
+    unitRight: RIGHT_EDGE - 118,
+    lineRight: RIGHT_EDGE,
+};
+
+type Row = {
+    serial: number;
+    titleLines: string[];
+    blockH: number;
+    qty: number;
+    unitPrice: number;
+    lineTotal: number;
+};
+
+function buildRows(items: QuotationPdfItem[]): Row[] {
+    return items.map((item, index) => {
+        const titleLines = wrapTitle(item.title, 34, 6);
+        const blockH = Math.max(titleLines.length * ROW_LINE_HEIGHT, ROW_LINE_HEIGHT);
+        return {
+            serial: index + 1,
+            titleLines,
+            blockH,
+            qty: item.qty,
+            unitPrice: item.unitPrice,
+            lineTotal: item.unitPrice * item.qty,
+        };
+    });
+}
+
+/** Draws the header artwork, quotation meta bar, and table column header on a page. Returns the y cursor for the first row. */
+function drawPageHeader(
+    page: PDFPage,
+    headerImg: PDFImage | null,
+    font: PDFFont,
+    fontBold: PDFFont,
+    quotationNumber: string,
+    dateShort: string,
+): number {
+    let headerBottomY = PAGE_HEIGHT;
+
+    if (headerImg) {
+        const imgH = PAGE_WIDTH * (headerImg.height / headerImg.width);
+        page.drawImage(headerImg, {
+            x: 0,
+            y: PAGE_HEIGHT - imgH,
+            width: PAGE_WIDTH,
+            height: imgH,
+        });
+        headerBottomY = PAGE_HEIGHT - imgH;
+    } else {
+        page.drawText('QUOTATION', { x: MARGIN_X, y: PAGE_HEIGHT - 60, size: 26, font: fontBold, color: INK });
+        headerBottomY = PAGE_HEIGHT - 90;
+    }
+
+    const metaLabelY = headerBottomY - 26;
+    const metaValueY = metaLabelY - 17;
+
+    page.drawText('QUOTATION NO.', { x: MARGIN_X, y: metaLabelY, size: SIZES.metaLabel, font, color: META_COLOR });
+    page.drawText(sanitizePdfText(quotationNumber), {
+        x: MARGIN_X,
+        y: metaValueY,
+        size: SIZES.metaValue,
+        font: fontBold,
+        color: INK,
+    });
+
+    drawTextRight(page, 'DATE', RIGHT_EDGE, metaLabelY, SIZES.metaLabel, font, META_COLOR);
+    drawTextRight(page, dateShort, RIGHT_EDGE, metaValueY, SIZES.metaValue, fontBold, INK);
+
+    const ruleY = metaValueY - 14;
+    page.drawLine({
+        start: { x: MARGIN_X, y: ruleY },
+        end: { x: RIGHT_EDGE, y: ruleY },
+        thickness: 1,
+        color: rgb(0.15, 0.15, 0.15),
+    });
+
+    const headerRowTop = ruleY - 22;
+    page.drawRectangle({
+        x: MARGIN_X - 6,
+        y: headerRowTop - 6,
+        width: RIGHT_EDGE - MARGIN_X + 12,
+        height: 22,
+        color: HEADER_FILL,
+    });
+    page.drawText('#', { x: COL.numLeft, y: headerRowTop, size: SIZES.th, font: fontBold, color: INK });
+    page.drawText('Item / description', { x: COL.descLeft, y: headerRowTop, size: SIZES.th, font: fontBold, color: INK });
+    drawTextRight(page, 'Qty', COL.qtyRight, headerRowTop, SIZES.th, fontBold, INK);
+    drawTextRight(page, 'Unit price', COL.unitRight, headerRowTop, SIZES.th, fontBold, INK);
+    drawTextRight(page, 'Line total', COL.lineRight, headerRowTop, SIZES.th, fontBold, INK);
+
+    return headerRowTop - 20;
+}
+
+function drawFooter(page: PDFPage, font: PDFFont, pageIndex: number, pageCount: number) {
+    const label = `Page ${pageIndex} of ${pageCount}`;
+    const w = textWidth(font, label, SIZES.pageNum);
+    page.drawText(label, {
+        x: (PAGE_WIDTH - w) / 2,
+        y: 24,
+        size: SIZES.pageNum,
+        font,
+        color: MUTED,
+    });
+}
+
 /**
- * Builds a quotation PDF on QUOTATION-OMNI.pdf (if present) or a blank A4 page.
- * Draw order: background panel & rules first, then all text on top (appears above template artwork).
+ * Builds a multi-page quotation PDF. Page 1 (and every subsequent page) starts with the
+ * "QUOTATION header .png" artwork, a quotation-number/date meta bar, and a table header row;
+ * line items flow across as many pages as needed and the grand total + disclaimer are pinned
+ * to the bottom of the last page (spilling to a fresh page if there isn't room).
  */
 export async function buildQuotationPdfBuffer(input: {
     items: QuotationPdfItem[];
@@ -91,223 +231,138 @@ export async function buildQuotationPdfBuffer(input: {
     quotationId: string;
     quotationDate: Date;
 }): Promise<Buffer> {
-    const templatePath = resolveTemplatePath();
-    let pdfDoc: PDFDocument;
-
-    if (templatePath) {
-        try {
-            const bytes = fs.readFileSync(templatePath);
-            pdfDoc = await PDFDocument.load(bytes);
-        } catch {
-            pdfDoc = await PDFDocument.create();
-            pdfDoc.addPage([595.28, 841.89]);
-        }
-    } else {
-        pdfDoc = await PDFDocument.create();
-        pdfDoc.addPage([595.28, 841.89]);
-    }
-
-    const pages = pdfDoc.getPages();
-    if (pages.length === 0) {
-        pdfDoc.addPage([595.28, 841.89]);
-    }
-    const page: PDFPage = pdfDoc.getPages()[0];
-    const { width, height } = page.getSize();
-
+    const pdfDoc = await PDFDocument.create();
     const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
     const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
-    /** Push table + body content down into the template’s main box (tune via env if needed). */
-    const tableTopFromTop = Number.parseInt(process.env.QUOTATION_PDF_TABLE_TOP_OFFSET ?? '330', 10) || 330;
-    const dateFromTop = Number.parseInt(process.env.QUOTATION_PDF_DATE_TOP_OFFSET ?? '138', 10) || 138;
-    const marginX = Number.parseInt(process.env.QUOTATION_PDF_MARGIN_X ?? '52', 10) || 52;
+    let headerImg: PDFImage | null = null;
+    const headerImagePath = resolveHeaderImagePath();
+    if (headerImagePath) {
+        try {
+            const bytes = fs.readFileSync(headerImagePath);
+            headerImg = await pdfDoc.embedPng(bytes);
+        } catch {
+            headerImg = null;
+        }
+    }
 
-    const quoteDateLong = input.quotationDate.toLocaleDateString('en-GB', {
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-    });
-    const quoteDateShort = input.quotationDate.toLocaleDateString('en-GB', {
+    const quotationNumber = buildQuotationNumber(input.quotationId, input.quotationDate);
+    const dateShort = input.quotationDate.toLocaleDateString('en-GB', {
         year: 'numeric',
         month: 'short',
         day: 'numeric',
     });
 
-    const idShort = String(input.quotationId).slice(-8).toUpperCase();
-    const ink = rgb(0.06, 0.06, 0.06);
-    const metaColor = rgb(0.32, 0.32, 0.32);
-    const lineColor = rgb(0.72, 0.72, 0.72);
-    const muted = rgb(0.38, 0.38, 0.38);
+    const rows = buildRows(input.items);
 
-    const reservedBottom = Math.min(Math.max(height * 0.11, 64), height * 0.26);
-    /** Y anchor (pt from bottom) for disclaimer text; do not redeclare elsewhere */
-    const footBase = 56;
-    const rightEdge = width - marginX;
+    // —— Pass 1: paginate rows (no drawing) so we know the final page count up front for "Page x of y" footers.
+    type PageLayout = { rows: Row[]; hasTotals: boolean };
+    const pageLayouts: PageLayout[] = [];
+    {
+        let idx = 0;
+        let current: Row[] = [];
+        // y cursor mirrors drawPageHeader's returned first-row y for a page WITH the header drawn.
+        const firstRowY = simulateHeaderBottom();
+        let y = firstRowY;
 
-    /** Vertical step between manually wrapped title lines (no maxWidth on drawText — avoids double-wrap overlap). */
-    const rowLineHeight = 15;
-    const sizes = {
-        metaLabel: 10,
-        metaDate: 14,
-        metaRef: 11,
-        th: 11,
-        td: 10,
-        tdBold: 10,
-        total: 15,
-        disc: 10,
-    };
+        const flush = (hasTotals: boolean) => {
+            pageLayouts.push({ rows: current, hasTotals });
+            current = [];
+            y = firstRowY;
+        };
 
-    let y = yFromTop(height, tableTopFromTop);
-    const tableHeaderY = y;
-
-    /** Full-width content panel — uses `footBase` above; opaque so overlay text wins vs template. */
-    const panelBottom = footBase - 4;
-    const panelTop = tableHeaderY + 22;
-    const panelHeight = Math.max(0, panelTop - panelBottom);
-    if (panelHeight > 8) {
-        page.drawRectangle({
-            x: marginX - 6,
-            y: panelBottom,
-            width: width - (marginX - 6) * 2,
-            height: panelHeight,
-            color: rgb(1, 1, 1),
-            opacity: 1,
-            borderColor: rgb(0.78, 0.78, 0.78),
-            borderWidth: 0.85,
-        });
+        while (idx < rows.length) {
+            const row = rows[idx];
+            const isLastRow = idx === rows.length - 1;
+            const bottomReserve = isLastRow ? TOTALS_BLOCK_HEIGHT : FOOTER_RESERVED;
+            if (y - row.blockH < bottomReserve) {
+                flush(false);
+                continue;
+            }
+            current.push(row);
+            y -= row.blockH + 10;
+            idx += 1;
+        }
+        // Trailing rows (or, for a zero-item quotation, an empty page) still need the totals block.
+        flush(true);
     }
 
-    /** Column layout — numeric columns right-aligned for clean edges */
-    const col = {
-        descLeft: marginX,
-        descMax: rightEdge - marginX - 278,
-        qtyRight: rightEdge - 228,
-        unitRight: rightEdge - 118,
-        lineRight: rightEdge,
-    };
+    const pageCount = pageLayouts.length;
 
-    // —— Horizontal rules (under panel, before text — text drawn after will still paint on top in stream order;
-    //    redraw rules after text would cover them — so draw lines AFTER all text for table separators only)
-    //    Here we draw thin rules first, then text on top so lines sit slightly under text baselines — OK.
-    const lineY1 = tableHeaderY - 8;
-    page.drawLine({
-        start: { x: marginX, y: lineY1 },
-        end: { x: rightEdge, y: lineY1 },
-        thickness: 0.85,
-        color: lineColor,
-    });
+    // —— Pass 2: actually draw.
+    for (let p = 0; p < pageLayouts.length; p++) {
+        const page = pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
+        let y = drawPageHeader(page, headerImg, font, fontBold, quotationNumber, dateShort);
 
-    y -= 16;
+        for (const row of pageLayouts[p].rows) {
+            let ty = y;
+            for (const line of row.titleLines) {
+                page.drawText(line, { x: COL.descLeft, y: ty, size: SIZES.td, font, color: INK });
+                ty -= ROW_LINE_HEIGHT;
+            }
+            const midY = y - ((row.titleLines.length - 1) * ROW_LINE_HEIGHT) / 2;
+            page.drawText(String(row.serial), { x: COL.numLeft, y: midY, size: SIZES.td, font, color: MUTED });
+            drawTextRight(page, String(row.qty), COL.qtyRight, midY, SIZES.td, font, INK);
+            drawTextRight(page, formatLkr(row.unitPrice), COL.unitRight, midY, SIZES.td, font, INK);
+            drawTextRight(page, formatLkr(row.lineTotal), COL.lineRight, midY, SIZES.tdBold, fontBold, INK);
 
-    let shown = 0;
-    for (const item of input.items) {
-        const lineTotal = item.unitPrice * item.qty;
-        const titleLines = wrapTitle(item.title, 36, 6);
-        const blockH = Math.max(titleLines.length * rowLineHeight, rowLineHeight);
+            y -= row.blockH + 10;
+        }
 
-        if (y - blockH < reservedBottom) {
-            const omitted = input.items.length - shown;
-            const note =
-                shown === 0
-                    ? 'Line items could not be fully listed in the space above; the quoted total below includes every item in this quotation.'
-                    : `...and ${omitted} more line item(s). Quoted total includes all items.`;
-            page.drawText(note, {
-                x: col.descLeft,
-                y: y - 4,
-                size: 9,
+        page.drawLine({
+            start: { x: MARGIN_X, y: y - 2 },
+            end: { x: RIGHT_EDGE, y: y - 2 },
+            thickness: 0.6,
+            color: LINE_COLOR,
+        });
+        y -= 26;
+
+        if (pageLayouts[p].hasTotals) {
+            const totalLabel = `Quoted total: ${formatLkr(input.subtotal)}`;
+            drawTextRight(page, totalLabel, COL.lineRight, y, SIZES.total, fontBold, INK);
+            y -= 30;
+
+            const discW = RIGHT_EDGE - MARGIN_X;
+            page.drawText(
+                'Important: The final invoice total may differ from this quoted amount (taxes, shipping, promotions, or price changes may apply).',
+                { x: MARGIN_X, y, size: SIZES.disc, font, color: MUTED, maxWidth: discW, lineHeight: 12 },
+            );
+            y -= 26;
+            page.drawText(`This quotation is valid only for ${dateShort} (the date this quotation was issued).`, {
+                x: MARGIN_X,
+                y,
+                size: SIZES.disc,
                 font: fontBold,
-                color: ink,
-                maxWidth: rightEdge - marginX,
+                color: INK,
+                maxWidth: discW,
                 lineHeight: 12,
             });
-            break;
-        }
-
-        let ty = y;
-        for (const line of titleLines) {
-            // One baseline per string — do not pass maxWidth here; wrapTitle already splits lines.
-            // pdf-lib would re-wrap each chunk and draw extra lines while we only stepped `ty` once → overlap.
-            page.drawText(line, {
-                x: col.descLeft,
-                y: ty,
-                size: sizes.td,
+        } else {
+            const note = `...continued on next page. Quoted total includes every item in this quotation.`;
+            page.drawText(sanitizePdfText(note), {
+                x: MARGIN_X,
+                y,
+                size: SIZES.disc,
                 font,
-                color: ink,
+                color: MUTED,
+                maxWidth: RIGHT_EDGE - MARGIN_X,
             });
-            ty -= rowLineHeight;
         }
 
-        // Align Qty / prices to the vertical center of the description block (midpoint between first & last baselines).
-        // Using blockH/2 was wrong for n>1 (counted an extra half-row), which made single- vs multi-line rows look inconsistent.
-        const midY = y - ((titleLines.length - 1) * rowLineHeight) / 2;
-        drawTextRight(page, String(item.qty), col.qtyRight, midY, sizes.td, font, ink);
-        drawTextRight(page, formatLkr(item.unitPrice), col.unitRight, midY, sizes.td, font, ink);
-        drawTextRight(page, formatLkr(lineTotal), col.lineRight, midY, sizes.tdBold, fontBold, ink);
-
-        y -= blockH + 10;
-        shown += 1;
+        drawFooter(page, font, p + 1, pageCount);
     }
-
-    const lineY2 = y - 2;
-    page.drawLine({
-        start: { x: marginX, y: lineY2 },
-        end: { x: rightEdge, y: lineY2 },
-        thickness: 0.55,
-        color: lineColor,
-    });
-    y -= 24;
-
-    const totalLabel = `Quoted total: ${formatLkr(input.subtotal)}`;
-    drawTextRight(page, totalLabel, col.lineRight, y, sizes.total, fontBold, ink);
-
-    const discW = rightEdge - marginX;
-    const discTopY = footBase + 44;
-    page.drawText(
-        'Important: The final invoice total may differ from this quoted amount (taxes, shipping, promotions, or price changes may apply).',
-        {
-            x: marginX,
-            y: discTopY,
-            size: sizes.disc,
-            font,
-            color: muted,
-            maxWidth: discW,
-            lineHeight: 12,
-        },
-    );
-    page.drawText(`This quotation is valid only for ${quoteDateShort} (the date this quotation was issued).`, {
-        x: marginX,
-        y: footBase + 14,
-        size: sizes.disc,
-        font: fontBold,
-        color: ink,
-        maxWidth: discW,
-        lineHeight: 12,
-    });
-
-    // —— Text on top: meta + table header + column headers (drawn last so they sit above template & panel edges)
-    const metaLabel = 'Quotation date';
-    drawTextRight(page, metaLabel, rightEdge, yFromTop(height, dateFromTop), sizes.metaLabel, font, metaColor);
-
-    const dateStr = sanitizePdfText(quoteDateLong);
-    const dateY = yFromTop(height, dateFromTop) - 16;
-    drawTextRight(page, dateStr, rightEdge, dateY, sizes.metaDate, fontBold, ink);
-
-    const refStr = `Reference: ${idShort}`;
-    const refY = dateY - 20;
-    drawTextRight(page, refStr, rightEdge, refY, sizes.metaRef, font, metaColor);
-
-    page.drawText('Item / description', {
-        x: col.descLeft,
-        y: tableHeaderY,
-        size: sizes.th,
-        font: fontBold,
-        color: ink,
-    });
-    drawTextRight(page, 'Qty', col.qtyRight, tableHeaderY, sizes.th, fontBold, ink);
-    drawTextRight(page, 'Unit price', col.unitRight, tableHeaderY, sizes.th, fontBold, ink);
-    drawTextRight(page, 'Line total', col.lineRight, tableHeaderY, sizes.th, fontBold, ink);
 
     const bytesOut = await pdfDoc.save();
     return Buffer.from(bytesOut);
+
+    /** Mirrors drawPageHeader's geometry (without needing a live page/image) to get the first-row y for pagination math. */
+    function simulateHeaderBottom(): number {
+        const imgH = headerImg ? PAGE_WIDTH * (headerImg.height / headerImg.width) : 90;
+        const headerBottomY = headerImg ? PAGE_HEIGHT - imgH : PAGE_HEIGHT - 90;
+        const metaLabelY = headerBottomY - 26;
+        const metaValueY = metaLabelY - 17;
+        const ruleY = metaValueY - 14;
+        const headerRowTop = ruleY - 22;
+        return headerRowTop - 20;
+    }
 }

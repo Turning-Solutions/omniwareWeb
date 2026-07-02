@@ -556,7 +556,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                 price: parsedPrice,
                 stock: { qty: parsedStockQty },
                 availability: formData.availability,
-                warranty: formData.warranty?.trim() || undefined,
+                warranty: formData.warranty.trim(),
                 specs: Object.keys(specsRecord).length ? specsRecord : undefined,
                 colorVariants: formData.colorVariants
                     .filter((variant) => variant.name.trim())
@@ -1044,7 +1044,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                 </span>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-8">
+            <form onSubmit={handleSubmit} className="space-y-8 pb-28 sm:pb-24">
                 <section className="pb-2">
                     <div className="mb-5">
                         <h2 className="text-lg font-semibold text-main">Basic information</h2>
@@ -1898,26 +1898,26 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                     </div>
                 </section>
 
-                <section className="border-t border-border-soft pt-6">
-                    <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg bg-base/20 p-3 sm:p-4">
-                    <label htmlFor="isActive" className="flex items-center gap-2 text-main">
-                        <input
-                            type="checkbox"
-                            id="isActive"
-                            checked={formData.isActive}
-                            onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
-                            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                        />
-                        Active Product
-                    </label>
-                    <button
-                        type="submit"
-                        disabled={loading}
-                        className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-accent px-6 py-2 text-white transition-colors hover:bg-accent/90 disabled:opacity-50 sm:w-auto"
-                    >
-                        <Save className="h-5 w-5" />
-                        {loading ? 'Saving...' : 'Save Product'}
-                    </button>
+                <section className="fixed inset-x-0 bottom-0 z-50 border-t border-border-soft bg-surface/95 px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] shadow-[0_-12px_30px_rgba(0,0,0,0.35)] backdrop-blur lg:left-64 sm:px-6">
+                    <div className="mx-auto flex w-full max-w-[1500px] flex-wrap items-center justify-between gap-4 rounded-lg bg-base/20 p-3 sm:p-4">
+                        <label htmlFor="isActive" className="flex items-center gap-2 text-main">
+                            <input
+                                type="checkbox"
+                                id="isActive"
+                                checked={formData.isActive}
+                                onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
+                                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            />
+                            Active Product
+                        </label>
+                        <button
+                            type="submit"
+                            disabled={loading}
+                            className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-accent px-6 py-2 text-white transition-colors hover:bg-accent/90 disabled:opacity-50 sm:w-auto"
+                        >
+                            <Save className="h-5 w-5" />
+                            {loading ? 'Saving...' : 'Save Product'}
+                        </button>
                     </div>
                 </section>
             </form>
