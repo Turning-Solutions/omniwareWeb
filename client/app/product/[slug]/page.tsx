@@ -10,6 +10,7 @@ import {
     buildProductStructuredData,
     type SeoProduct,
 } from "@/lib/seo/productSeo";
+import { fetchProductReviewSummary } from "@/lib/server/productReviewSummary";
 
 /**
  * ISR: product pages are statically cached and revalidated every 2 minutes,
@@ -73,7 +74,8 @@ export default async function ProductPage({ params }: ProductPageProps) {
 
     const queryClient = new QueryClient();
     queryClient.setQueryData(["product", slug], product);
-    const structuredData = buildProductStructuredData(product as SeoProduct);
+    const reviewSummary = await fetchProductReviewSummary(String(product._id ?? ""));
+    const structuredData = buildProductStructuredData(product as SeoProduct, reviewSummary);
     const jsonLd = JSON.stringify([structuredData.product, structuredData.breadcrumbs]).replace(/</g, "\\u003c");
 
     return (

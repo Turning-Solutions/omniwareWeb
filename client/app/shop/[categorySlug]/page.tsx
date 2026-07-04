@@ -8,6 +8,7 @@ import {
 } from "@/lib/shopInitialProductsFetch";
 import {
     absoluteUrl,
+    buildItemListStructuredData,
     DEFAULT_OG_IMAGE,
     DEFAULT_OG_IMAGE_HEIGHT,
     DEFAULT_OG_IMAGE_WIDTH,
@@ -144,11 +145,30 @@ export default async function CategoryShopPage({ params, searchParams }: Categor
 
     const queryClient = new QueryClient();
     const listOptions = shopProductsListQueryOptionsForHydration(parsed);
-    await prefetchShopProductsList(queryClient, listOptions);
+    const listData = await prefetchShopProductsList(queryClient, listOptions);
+
+    const categoryName = titleFromSlug(normalizedSlug) || "PC Components";
+    const itemList = listData?.products?.length
+        ? buildItemListStructuredData({
+            name: `${categoryName} Price in Sri Lanka | Omniware`,
+            url: absoluteUrl(pathname),
+            products: listData.products,
+        })
+        : null;
 
     return (
-        <HydrationBoundary state={dehydrate(queryClient)}>
-            <CategoryShopPageClient normalizedSlug={normalizedSlug} initialFilters={parsed} />
-        </HydrationBoundary>
+        <>
+            {itemList && (
+                <script
+                    type="application/ld+json"
+                    dangerouslySetInnerHTML={{
+                        __html: JSON.stringify(itemList).replace(/</g, "\\u003c"),
+                    }}
+                />
+            )}
+            <HydrationBoundary state={dehydrate(queryClient)}>
+                <CategoryShopPageClient normalizedSlug={normalizedSlug} initialFilters={parsed} />
+            </HydrationBoundary>
+        </>
     );
 }

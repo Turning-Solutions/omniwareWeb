@@ -9,6 +9,7 @@ import {
 import { parseShopFiltersFromRouter } from "@/lib/shopUrlFilters";
 import {
     absoluteUrl,
+    buildItemListStructuredData,
     DEFAULT_OG_IMAGE,
     DEFAULT_OG_IMAGE_HEIGHT,
     DEFAULT_OG_IMAGE_WIDTH,
@@ -99,11 +100,29 @@ export default async function ShopPage({ searchParams }: ShopPageProps) {
     const listOptions = shopProductsListQueryOptionsForHydration(parsed);
     // Keep initial SSR focused on the first product page only.
     // Facets are fetched client-side in the background by `ShopContent`.
-    await prefetchShopProductsList(queryClient, listOptions);
+    const listData = await prefetchShopProductsList(queryClient, listOptions);
+
+    const itemList = listData?.products?.length
+        ? buildItemListStructuredData({
+            name: shopTitle,
+            url: shopUrl,
+            products: listData.products,
+        })
+        : null;
 
     return (
-        <HydrationBoundary state={dehydrate(queryClient)}>
-            <ShopPageClient initialFilters={parsed} />
-        </HydrationBoundary>
+        <>
+            {itemList && (
+                <script
+                    type="application/ld+json"
+                    dangerouslySetInnerHTML={{
+                        __html: JSON.stringify(itemList).replace(/</g, "\\u003c"),
+                    }}
+                />
+            )}
+            <HydrationBoundary state={dehydrate(queryClient)}>
+                <ShopPageClient initialFilters={parsed} />
+            </HydrationBoundary>
+        </>
     );
 }

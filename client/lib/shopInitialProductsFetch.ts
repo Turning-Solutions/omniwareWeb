@@ -1,7 +1,6 @@
 import { headers } from "next/headers";
 import { QueryClient } from "@tanstack/react-query";
 import {
-    buildProductsQueryString,
     getProductFacetsQueryOptions,
     getProductsQueryOptions,
     normalizeCategoryForApi,
@@ -10,6 +9,7 @@ import {
     type UseProductsOptions,
 } from "@/hooks/useProducts";
 import { SHOP_PRODUCTS_PER_PAGE } from "@/lib/shopConstants";
+import { fetchShopProductsDirect } from "@/lib/server/shopProductsDirect";
 
 const PRODUCTS_REVALIDATE_SECONDS = 60;
 
@@ -33,17 +33,10 @@ export async function resolveServerApiBaseUrl(): Promise<string> {
 }
 
 export async function fetchShopProductsJson(options: UseProductsOptions): Promise<ProductsResponse> {
-    const base = await resolveServerApiBaseUrl();
-    const query = buildProductsQueryString(options);
-    const url = `${base}/api/v1/products?${query}`;
-    const res = await fetch(url, {
-        next: { revalidate: PRODUCTS_REVALIDATE_SECONDS },
-        headers: { Accept: "application/json" },
-    });
-    if (!res.ok) {
-        throw new Error(`GET products failed: ${res.status}`);
-    }
-    return res.json() as Promise<ProductsResponse>;
+    // In-process controller call — no HTTP loopback. Fetching our own public URL
+    // during SSR was slow/unreliable on the production host and left shop pages
+    // without server-rendered product links (bad for crawling/indexing).
+    return fetchShopProductsDirect(options);
 }
 
 export function readProductsTotal(
@@ -63,12 +56,22 @@ export async function fetchShopSearchResultTotal(options: UseProductsOptions): P
     return readProductsTotal(data);
 }
 
-export async function prefetchShopProductsList(queryClient: QueryClient, options: UseProductsOptions) {
-    await queryClient.prefetchQuery({
-        ...getProductsQueryOptions(options),
-        queryFn: () => fetchShopProductsJson(options),
-        staleTime: 2 * 60 * 1000,
-    });
+export async function prefetchShopProductsList(
+    queryClient: QueryClient,
+    options: UseProductsOptions
+): Promise<ProductsResponse | null> {
+    try {
+        return await queryClient.fetchQuery({
+            ...getProductsQueryOptions(options),
+            queryFn: () => fetchShopProductsJson(options),
+            staleTime: 2 * 60 * 1000,
+        });
+    } catch (error) {
+        // Keep listing pages rendering even if the initial product fetch fails;
+        // the client grid refetches on mount.
+        console.error("[shop] SSR product list prefetch failed:", error);
+        return null;
+    }
 }
 
 export async function fetchShopFacetsJson(options: UseProductsOptions): Promise<{ facets: Facets }> {
