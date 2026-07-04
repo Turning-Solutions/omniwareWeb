@@ -1,7 +1,7 @@
 "use client";
 
 import { Star } from "lucide-react";
-import type { Review } from "@/hooks/useReviews";
+import { useShopReviewsForMarquee, type Review } from "@/hooks/useReviews";
 import googleReviewsJson from "@/data/shop-google-reviews.json";
 
 type JsonReview = {
@@ -115,7 +115,13 @@ function marqueeSlotsForSegment(
  * Infinite horizontal shop reviews. Default: full viewport width strip (matches partners marquee).
  */
 export default function ShopReviewsStrip({ fullWidthStrip = true }: ShopReviewsStripProps) {
-    const displayReviews = JSON_SHOP_REVIEWS;
+    // Live = admin-approved site reviews interleaved with Google reviews.
+    // Fall back to the static snapshot only while that's loading or empty,
+    // so the marquee is never blank and a customer review shows up the
+    // moment an admin approves it (next homepage load refetches /reviews/shop).
+    const { data: liveReviews } = useShopReviewsForMarquee();
+    const displayReviews: MarqueeReview[] =
+        liveReviews && liveReviews.length > 0 ? liveReviews : JSON_SHOP_REVIEWS;
     const hasReviews = displayReviews.length > 0;
     const segmentSlots = hasReviews ? marqueeSlotsForSegment(displayReviews) : [];
     const marqueeDurationSec =
