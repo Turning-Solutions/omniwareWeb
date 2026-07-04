@@ -8,6 +8,9 @@ export default function robots(): MetadataRoute.Robots {
         rules: {
             userAgent: "*",
             allow: "/",
+            // NOTE: ?s= spam URLs are intentionally NOT disallowed here.
+            // The proxy serves them a 410, and Google must be able to crawl
+            // them to see it — blocking them would keep them indexed forever.
             disallow: [
                 "/admin/",
                 "/account/",
@@ -16,8 +19,6 @@ export default function robots(): MetadataRoute.Robots {
                 "/checkout",
                 "/login",
                 "/register",
-                "/?s=",
-                "/*?s=",
             ],
         },
         sitemap: `${siteUrl}/sitemap.xml`,
