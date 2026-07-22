@@ -1,6 +1,7 @@
 "use client";
 
 import type { CSSProperties, MouseEvent } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { ShoppingCart, ShieldCheck } from "lucide-react";
@@ -55,6 +56,42 @@ export default function ProductCard({
     const canAddToCart = availability === "in_stock" || availability === "pre_order";
     const prefetchProductRoute = () => prefetch(product);
 
+    const mainImage = product.images?.[0] || "/placeholder.svg";
+    const hoverImages = Array.from(
+        new Set(
+            [mainImage, ...colorVariants.map((variant) => variant.image).filter((img): img is string => Boolean(img))]
+        )
+    );
+    const hasHoverImages = hoverImages.length > 1;
+    const [activeImageIndex, setActiveImageIndex] = useState(0);
+    const hoverIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+    useEffect(() => {
+        return () => {
+            if (hoverIntervalRef.current) clearInterval(hoverIntervalRef.current);
+        };
+    }, []);
+
+    const startImageCycle = () => {
+        if (!hasHoverImages || hoverIntervalRef.current) return;
+        // Index 0 is the default image, index 1 is the first color (often a duplicate of
+        // the default photo) — skip straight to index 2 so the initial hover shows a
+        // visibly different image; the first color still appears later in the loop.
+        const initialSkip = hoverImages.length > 2 ? 2 : 1;
+        setActiveImageIndex((prev) => (prev + initialSkip) % hoverImages.length);
+        hoverIntervalRef.current = setInterval(() => {
+            setActiveImageIndex((prev) => (prev + 1) % hoverImages.length);
+        }, 1100);
+    };
+
+    const stopImageCycle = () => {
+        if (hoverIntervalRef.current) {
+            clearInterval(hoverIntervalRef.current);
+            hoverIntervalRef.current = null;
+        }
+        setActiveImageIndex(0);
+    };
+
     // Hard clamp the title to 2 lines so cards in a grid keep a consistent height,
     // even if Tailwind's `line-clamp-*` utilities aren't active for some builds.
     const titleClampStyle = {
@@ -81,7 +118,11 @@ export default function ProductCard({
     return (
         <div
             className="group relative min-w-0 overflow-hidden rounded-2xl border border-[#5E5E5E]/30 bg-[#1a1a1a] transition-[transform,border-color,ring-width,ring-color] duration-500 ease-in-out hover:-translate-y-1.5 hover:border-[#D12B28]/55 hover:ring-1 hover:ring-[#D12B28]/35"
-            onMouseEnter={prefetchProductRoute}
+            onMouseEnter={() => {
+                prefetchProductRoute();
+                startImageCycle();
+            }}
+            onMouseLeave={stopImageCycle}
             onFocusCapture={prefetchProductRoute}
             onTouchStart={prefetchProductRoute}
             onPointerDown={prefetchProductRoute}
@@ -105,14 +146,30 @@ export default function ProductCard({
                         </div>
                     </div>
                 ) : null}
-                <Image
-                    src={product.images?.[0] || "/placeholder.svg"}
-                    alt={product.title}
-                    fill
-                    sizes="(max-width: 640px) 100vw, (max-width: 1280px) 33vw, 20rem"
-                    quality={72}
-                    className="h-full w-full object-cover transition-transform duration-500 ease-out will-change-transform group-hover:scale-[1.09] group-hover:brightness-[1.06]"
-                />
+                {hasHoverImages ? (
+                    hoverImages.map((img, index) => (
+                        <Image
+                            key={img}
+                            src={img}
+                            alt={product.title}
+                            fill
+                            sizes="(max-width: 640px) 100vw, (max-width: 1280px) 33vw, 20rem"
+                            quality={72}
+                            className={`h-full w-full object-cover transition-[opacity,transform] duration-500 ease-out will-change-transform group-hover:scale-[1.09] group-hover:brightness-[1.06] ${
+                                index === activeImageIndex ? "opacity-100" : "opacity-0"
+                            }`}
+                        />
+                    ))
+                ) : (
+                    <Image
+                        src={mainImage}
+                        alt={product.title}
+                        fill
+                        sizes="(max-width: 640px) 100vw, (max-width: 1280px) 33vw, 20rem"
+                        quality={72}
+                        className="h-full w-full object-cover transition-transform duration-500 ease-out will-change-transform group-hover:scale-[1.09] group-hover:brightness-[1.06]"
+                    />
+                )}
                 <div
                     className="pointer-events-none absolute inset-0 z-[1] bg-gradient-to-t from-black/35 via-black/10 to-black/20 transition-all duration-500 ease-in-out group-hover:from-black/10 group-hover:via-transparent group-hover:to-transparent"
                     aria-hidden
