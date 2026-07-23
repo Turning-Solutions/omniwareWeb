@@ -44,7 +44,7 @@ interface ColorVariant {
     image?: string;
 }
 
-const DEFAULT_ATTRIBUTE_GROUP_NAME = "Specifications";
+const DEFAULT_ATTRIBUTE_GROUP_NAME = "Specification";
 const WARRANTY_OPTIONS = [
     "6 Months",
     "1 Year",
