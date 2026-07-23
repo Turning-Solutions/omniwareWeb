@@ -65,7 +65,7 @@ export default function Footer() {
                     <div>
                         <span className="text-xl font-bold text-white">OMNIWARE TECHNOLOGIES</span>
                         <p className="mt-2 text-sm text-gray-400">
-                            Sri Lanka's one Stop online store for computer hardware and technologies.
+                            Sri Lanka's one stop online store for computer hardware and technologies.
                         </p>
                     </div>
                     <div>
