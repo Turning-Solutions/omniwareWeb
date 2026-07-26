@@ -116,12 +116,13 @@ function marqueeSlotsForSegment(
  */
 export default function ShopReviewsStrip({ fullWidthStrip = true }: ShopReviewsStripProps) {
     // Live = admin-approved site reviews interleaved with Google reviews.
-    // Fall back to the static snapshot only while that's loading or empty,
-    // so the marquee is never blank and a customer review shows up the
-    // moment an admin approves it (next homepage load refetches /reviews/shop).
-    const { data: liveReviews } = useShopReviewsForMarquee();
+    // The static Google snapshot backs the Google portion whenever the live
+    // Google feed is empty (e.g. not yet synced), so the full Google list still
+    // shows even alongside a single approved site review — and a customer review
+    // appears the moment an admin approves it (next homepage load refetches /reviews/shop).
+    const { data: liveReviews } = useShopReviewsForMarquee(JSON_SHOP_REVIEWS);
     const displayReviews: MarqueeReview[] =
-        liveReviews && liveReviews.length > 0 ? liveReviews : JSON_SHOP_REVIEWS;
+        liveReviews && liveReviews.length > 0 ? (liveReviews as MarqueeReview[]) : JSON_SHOP_REVIEWS;
     const hasReviews = displayReviews.length > 0;
     const segmentSlots = hasReviews ? marqueeSlotsForSegment(displayReviews) : [];
     const marqueeDurationSec =

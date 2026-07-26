@@ -9,6 +9,8 @@ export type GoogleReviewForClient = {
     authorName: string;
     comment: string;
     createdAt: string;
+    /** Human relative label from Google (e.g. "3 months ago"); preferred over createdAt in the UI. */
+    dateText?: string;
     source: 'google';
 };
 
@@ -70,11 +72,13 @@ function mapStoredReview(r: {
     authorName?: string;
     rating?: number;
     comment?: string;
+    dateText?: string;
     createdAt?: Date | string;
 }): GoogleReviewForClient {
     const createdAt = safeDate(r.createdAt).toISOString();
     const authorName = trimText(r.authorName, 'Google user', 100);
     const comment = trimText(r.comment, 'Rated on Google.', 4000);
+    const dateText = trimText(r.dateText, '', 120);
     const rating = clampRating(r.rating);
     return {
         _id: `google-${reviewHash(String(r.externalId ?? ''), authorName, comment, createdAt)}`,
@@ -84,6 +88,7 @@ function mapStoredReview(r: {
         authorName,
         comment,
         createdAt,
+        ...(dateText ? { dateText } : {}),
         source: 'google',
     };
 }
@@ -95,6 +100,7 @@ export async function loadGoogleBusinessReviewsForApi(): Promise<GoogleReviewFor
         authorName?: string;
         rating?: number;
         comment?: string;
+        dateText?: string;
         createdAt?: Date | string;
     }> = Array.isArray(feed?.reviews) ? feed.reviews : [];
     return reviews

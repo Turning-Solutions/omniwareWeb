@@ -10,7 +10,8 @@
     "migrate:storage": "ts-node src/scripts/migrateStorageCategories.ts",
     "migrate:storage:safe": "npm run dump:db && npm run migrate:storage",
     "migrate:filter-layout": "ts-node src/scripts/migrateFilterLayoutCategories.ts",
-    "migrate:filter-layout:safe": "npm run dump:db && npm run migrate:filter-layout"
+    "migrate:filter-layout:safe": "npm run dump:db && npm run migrate:filter-layout",
+    "seed:google-reviews": "ts-node src/scripts/seedGoogleReviews.ts"
   },
   "keywords": [],
   "author": "",

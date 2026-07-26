@@ -11,6 +11,8 @@ export type Review = {
     comment: string;
     createdAt: string;
     status?: "pending" | "approved" | "rejected";
+    /** Human relative label from Google (e.g. "3 months ago"); shown instead of createdAt when present. */
+    dateText?: string;
     /** Present when loaded from Google Business (Places API). */
     source?: "google";
 };
@@ -39,8 +41,13 @@ function interleaveReviews(google: Review[], site: Review[]): Review[] {
 
 /**
  * Approved site shop reviews plus Google Business reviews (when API is configured), interleaved for the marquee.
+ *
+ * `fallbackGoogleReviews` (the static snapshot bundled with the app) is used for the
+ * Google portion whenever the live feed is empty — e.g. before the Google feed has been
+ * synced. Without this, a single approved site review would suppress the whole static
+ * Google list and the marquee would repeat one card.
  */
-export function useShopReviewsForMarquee(limit = 24) {
+export function useShopReviewsForMarquee(fallbackGoogleReviews: Review[] = [], limit = 24) {
     const shopQuery = useShopReviews(limit);
     const googleQuery = useQuery({
         queryKey: ["reviews", "google"],
@@ -56,10 +63,11 @@ export function useShopReviewsForMarquee(limit = 24) {
         retry: 1,
     });
 
-    const data = useMemo(
-        () => interleaveReviews(googleQuery.data ?? [], shopQuery.data ?? []),
-        [googleQuery.data, shopQuery.data]
-    );
+    const data = useMemo(() => {
+        const liveGoogle = googleQuery.data ?? [];
+        const google = liveGoogle.length > 0 ? liveGoogle : fallbackGoogleReviews;
+        return interleaveReviews(google, shopQuery.data ?? []);
+    }, [googleQuery.data, shopQuery.data, fallbackGoogleReviews]);
 
     return {
         data,
