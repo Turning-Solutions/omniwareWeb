@@ -56,7 +56,12 @@ router.get('/', async (req: Request, res: Response) => {
         match.brandId = String(brand).trim();
     }
     if (category && String(category).trim()) {
-        match.categoryIds = String(category).trim();
+        const categoryId = String(category).trim();
+        // Selecting a main category should include products tagged with any of its subcategories.
+        const subCategoryIds = await Category.find({ parentId: categoryId }).distinct('_id');
+        match.categoryIds = subCategoryIds.length
+            ? { $in: [categoryId, ...subCategoryIds.map((id) => String(id))] }
+            : categoryId;
     }
 
     const [items, total] = await Promise.all([
