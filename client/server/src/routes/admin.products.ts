@@ -130,6 +130,18 @@ function normalizeProductBody(body: Record<string, unknown>): Record<string, unk
     if (b.slug === '' || (typeof b.slug === 'string' && !b.slug.trim())) {
         delete b.slug;
     }
+    if (b.extendedWarranty && typeof b.extendedWarranty === 'object') {
+        const ew = b.extendedWarranty as Record<string, unknown>;
+        const duration = typeof ew.duration === 'string' ? ew.duration.trim() : '';
+        if (!duration) {
+            delete b.extendedWarranty;
+        } else {
+            b.extendedWarranty = {
+                duration,
+                description: typeof ew.description === 'string' ? ew.description.trim() : '',
+            };
+        }
+    }
     return b;
 }
 
@@ -144,6 +156,13 @@ function buildProductUpdate(body: Record<string, unknown>, slug: string): Record
     if (body.warranty === '' || (typeof body.warranty === 'string' && !body.warranty.trim())) {
         delete normalized.warranty;
         unset.warranty = 1;
+    }
+    const extendedWarrantyBody = body.extendedWarranty as Record<string, unknown> | undefined;
+    const extendedWarrantyDuration =
+        typeof extendedWarrantyBody?.duration === 'string' ? extendedWarrantyBody.duration.trim() : '';
+    if (!extendedWarrantyDuration) {
+        delete normalized.extendedWarranty;
+        unset.extendedWarranty = 1;
     }
     if (Object.keys(unset).length === 0) {
         return normalized;

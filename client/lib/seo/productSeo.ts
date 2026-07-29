@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { getCombinedWarrantyLabel } from "@/lib/warranty";
 
 const DEFAULT_SITE_URL = "https://www.omniware.lk";
 export const SITE_NAME = "Omniware";
@@ -34,6 +35,7 @@ export type SeoProduct = {
     availability?: "in_stock" | "out_of_stock" | "pre_order" | "coming_soon";
     stock?: { qty?: number };
     warranty?: string;
+    extendedWarranty?: { duration?: string; description?: string };
     brand?: string | NamedEntity;
     brandId?: string | NamedEntity;
     categoryIds?: NamedEntity[];
@@ -135,7 +137,7 @@ function buildGeneratedTitle(product: SeoProduct): string {
 
 function buildGeneratedDescription(product: SeoProduct): string {
     const price = formatLkr(getEffectivePrice(product));
-    const warranty = clean(product.warranty);
+    const warranty = clean(getCombinedWarrantyLabel(product.warranty, product.extendedWarranty) || product.warranty);
     const warrantyText = warranty ? `, ${warranty} warranty` : "";
     const description =
         `Buy ${clean(product.title)} in Sri Lanka for ${price}. ` +

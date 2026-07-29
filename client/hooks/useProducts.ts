@@ -66,6 +66,11 @@ export interface Product {
         stock?: { qty?: number };
     }[];
     warranty?: string;
+    /** Additional coverage on top of `warranty` (e.g. company-provided extended warranty). */
+    extendedWarranty?: {
+        duration?: string;
+        description?: string;
+    };
     seo?: {
         title?: string;
         description?: string;

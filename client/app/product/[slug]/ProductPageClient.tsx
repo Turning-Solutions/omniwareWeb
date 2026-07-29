@@ -10,6 +10,7 @@ import { useRouter } from "next/navigation";
 import ProductCard from "@/components/ProductCard";
 import { useProduct, useProducts } from "@/hooks/useProducts";
 import { buildProductWhatsAppUrl } from "@/lib/whatsapp";
+import { getCombinedWarrantyLabel, getWarrantyBreakdownLabel, hasExtendedWarranty } from "@/lib/warranty";
 import LoadingAnimation from "@/components/LoadingAnimation";
 import WhatsAppLogo from "@/components/WhatsAppLogo";
 import FlowSectionHeader from "@/components/FlowSectionHeader";
@@ -379,9 +380,23 @@ function ProductPageInner({ slug }: { slug: string }) {
                         </div>
                     )}
 
-                    {product.warranty && (
-                        <div className="mb-6 inline-flex items-center rounded-2xl border border-emerald-500/25 bg-emerald-500/[0.08] px-4 py-2.5 text-sm font-medium text-emerald-200/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-                            Warranty: {product.warranty}
+                    {(product.warranty || hasExtendedWarranty(product.extendedWarranty)) && (
+                        <div className="mb-6 rounded-2xl border border-emerald-500/25 bg-emerald-500/[0.08] px-4 py-3 text-sm font-medium text-emerald-200/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                            <div>
+                                Warranty:{" "}
+                                {getCombinedWarrantyLabel(product.warranty, product.extendedWarranty) || product.warranty}
+                                {hasExtendedWarranty(product.extendedWarranty) && (
+                                    <span className="font-normal text-emerald-200/75">
+                                        {" "}
+                                        ({getWarrantyBreakdownLabel(product.warranty, product.extendedWarranty)})
+                                    </span>
+                                )}
+                            </div>
+                            {product.extendedWarranty?.description && (
+                                <p className="mt-1.5 text-xs font-normal text-emerald-200/70">
+                                    {product.extendedWarranty.description}
+                                </p>
+                            )}
                         </div>
                     )}
 

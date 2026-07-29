@@ -48,6 +48,10 @@ export const productSchema = z.object({
         stock: z.object({ qty: z.number().min(0) }).optional(),
     })).optional(),
     warranty: z.string().optional(),
+    extendedWarranty: z.object({
+        duration: z.string().optional(),
+        description: z.string().optional(),
+    }).optional(),
     availability: z.enum(['in_stock', 'out_of_stock', 'pre_order', 'coming_soon']).optional(),
     seo: z.object({
         title: z.string().max(70).optional(),

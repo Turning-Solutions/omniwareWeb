@@ -152,6 +152,10 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
         stock: "",
         description: "",
         warranty: "",
+        extendedWarranty: {
+            duration: "",
+            description: "",
+        },
         brandId: "",
         categoryIds: [] as string[],
         /** Category-wide discount amount for the currently selected category (empty => no category discount). */
@@ -224,6 +228,9 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
             availability: formData.availability,
             stock: { qty: Number(formData.stock) || 0 },
             warranty: formData.warranty || undefined,
+            extendedWarranty: formData.extendedWarranty.duration
+                ? { duration: formData.extendedWarranty.duration, description: formData.extendedWarranty.description }
+                : undefined,
             brandId: selectedBrand ? { name: selectedBrand.name } : undefined,
             categoryIds: selectedCategory
                 ? [{ name: selectedCategory.name, slug: selectedCategory.slug }]
@@ -404,6 +411,10 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                     stock: data.stock?.qty != null ? String(data.stock.qty) : "",
                     description: data.description ?? "",
                     warranty: data.warranty ?? "",
+                    extendedWarranty: {
+                        duration: data.extendedWarranty?.duration ?? "",
+                        description: data.extendedWarranty?.description ?? "",
+                    },
                     brandId: data.brandId?._id || data.brandId || "",
                     categoryIds: nextCategoryIds,
                     categoryDiscountPercent,
@@ -557,6 +568,10 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                 stock: { qty: parsedStockQty },
                 availability: formData.availability,
                 warranty: formData.warranty.trim(),
+                extendedWarranty: {
+                    duration: formData.extendedWarranty.duration.trim(),
+                    description: formData.extendedWarranty.description.trim(),
+                },
                 specs: Object.keys(specsRecord).length ? specsRecord : undefined,
                 colorVariants: formData.colorVariants
                     .filter((variant) => variant.name.trim())
@@ -1026,6 +1041,9 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
 
     const sectionClass = "rounded-xl border border-border-soft bg-base/30 p-4 sm:p-6";
     const warrantyValueExists = WARRANTY_OPTIONS.includes(formData.warranty as (typeof WARRANTY_OPTIONS)[number]);
+    const extendedWarrantyValueExists = WARRANTY_OPTIONS.includes(
+        formData.extendedWarranty.duration as (typeof WARRANTY_OPTIONS)[number]
+    );
 
     return (
         <div className="mx-auto w-full max-w-[1500px] px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
@@ -1132,6 +1150,53 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                                 ))}
                             </select>
                         </div>
+
+                        <div className="space-y-2">
+                            <label className="text-sub text-sm">Extended Warranty (Optional)</label>
+                            <select
+                                className="w-full bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent"
+                                value={formData.extendedWarranty.duration}
+                                onChange={(e) =>
+                                    setFormData({
+                                        ...formData,
+                                        extendedWarranty: { ...formData.extendedWarranty, duration: e.target.value },
+                                    })
+                                }
+                            >
+                                <option value="">No extended warranty</option>
+                                {!extendedWarrantyValueExists && formData.extendedWarranty.duration ? (
+                                    <option value={formData.extendedWarranty.duration}>
+                                        {formData.extendedWarranty.duration}
+                                    </option>
+                                ) : null}
+                                {WARRANTY_OPTIONS.map((option) => (
+                                    <option key={option} value={option}>
+                                        {option}
+                                    </option>
+                                ))}
+                            </select>
+                            <p className="text-xs text-sub">
+                                Coverage added on top of the standard warranty, e.g. a company-provided extension.
+                            </p>
+                        </div>
+
+                        {formData.extendedWarranty.duration ? (
+                            <div className="space-y-2 md:col-span-2">
+                                <label className="text-sub text-sm">Extended Warranty Description (Optional)</label>
+                                <textarea
+                                    rows={2}
+                                    className="w-full bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent"
+                                    value={formData.extendedWarranty.description}
+                                    onChange={(e) =>
+                                        setFormData({
+                                            ...formData,
+                                            extendedWarranty: { ...formData.extendedWarranty, description: e.target.value },
+                                        })
+                                    }
+                                    placeholder="e.g. Additional 2-year coverage provided directly by the manufacturer, covering parts and labor."
+                                />
+                            </div>
+                        ) : null}
 
                         <div className="space-y-2">
                             <label className="text-sub text-sm">Availability Status</label>

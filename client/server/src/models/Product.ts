@@ -53,6 +53,10 @@ const productSchema = new mongoose.Schema({
         stock: { qty: { type: Number, default: 0 } }
     }],
     warranty: { type: String, required: false },
+    extendedWarranty: {
+        duration: { type: String, required: false },
+        description: { type: String, required: false }
+    },
     description: { type: String },
     seo: {
         title: { type: String, required: false, trim: true, maxlength: 70 },

@@ -11,6 +11,7 @@ import { useCart } from "@/context/CartContext";
 import { buildProductWhatsAppUrl } from "@/lib/whatsapp";
 import WhatsAppLogo from "@/components/WhatsAppLogo";
 import { usePrefetchProduct } from "@/hooks/usePrefetch";
+import { getCombinedWarrantyLabel, getWarrantyBreakdownLabel } from "@/lib/warranty";
 
 type ProductCardProps = {
     product: Product;
@@ -55,6 +56,9 @@ export default function ProductCard({
         effectiveDiscountAmount != null && effectiveDiscountAmount > 0 ? discountedPrice : product.price;
     const canAddToCart = availability === "in_stock" || availability === "pre_order";
     const prefetchProductRoute = () => prefetch(product);
+
+    const combinedWarrantyLabel = getCombinedWarrantyLabel(product.warranty, product.extendedWarranty) || product.warranty;
+    const warrantyBreakdownLabel = getWarrantyBreakdownLabel(product.warranty, product.extendedWarranty);
 
     const mainImage = product.images?.[0] || "/placeholder.svg";
     const hoverImages = Array.from(
@@ -133,15 +137,15 @@ export default function ProductCard({
                         Save LKR {Math.round(effectiveDiscountAmount).toLocaleString()}
                     </div>
                 )}
-                {product.warranty ? (
+                {combinedWarrantyLabel ? (
                     <div
                         className="pointer-events-none absolute left-0 top-0 z-10 h-24 w-24 overflow-hidden sm:h-[6.5rem] sm:w-[6.5rem]"
-                        title={`Warranty: ${product.warranty}`}
+                        title={`Warranty: ${warrantyBreakdownLabel}`}
                     >
                         <div className="absolute left-[-2.85rem] top-[1.35rem] flex w-[11rem] -rotate-45 items-center justify-center gap-1 border-y border-[#D12B28]/30 bg-gradient-to-r from-black/70 via-[#D12B28]/22 to-black/70 py-1.5 shadow-[0_2px_10px_rgba(0,0,0,0.45)] backdrop-blur-[2px]">
                             <ShieldCheck className="h-3 w-3 shrink-0 text-[#E8A8A4]" strokeWidth={2.25} aria-hidden />
                             <span className="max-w-[9rem] truncate text-center text-[9px] font-semibold uppercase tracking-wide text-[#ececec] sm:text-[10px]">
-                                {product.warranty}
+                                {combinedWarrantyLabel}
                             </span>
                         </div>
                     </div>
