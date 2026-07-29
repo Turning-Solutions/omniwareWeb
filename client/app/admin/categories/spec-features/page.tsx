@@ -18,7 +18,6 @@ const sortByName = <T extends { name: string }>(items: T[]) =>
 export default function FeaturedSpecsAdmin() {
     const [categories, setCategories] = useState<Category[]>([]);
     const [selectedCategory, setSelectedCategory] = useState("");
-    const [productCategoryIds, setProductCategoryIds] = useState<Set<string>>(new Set());
 
     const [availableSpecKeys, setAvailableSpecKeys] = useState<string[]>([]);
     /** Featured specs in display order; selected are shown first and can be edited */
@@ -35,46 +34,9 @@ export default function FeaturedSpecsAdmin() {
         () => new Map(categories.map((category) => [String(category._id), category])),
         [categories]
     );
-    const childrenByParentId = useMemo(() => {
-        const children = new Map<string, string[]>();
-        categories.forEach((category) => {
-            if (!category.parentId) return;
-            const parentId = String(category.parentId);
-            const current = children.get(parentId) || [];
-            current.push(String(category._id));
-            children.set(parentId, current);
-        });
-        return children;
-    }, [categories]);
+    /** Main categories and their direct subcategories are selectable; this UI doesn't support deeper nesting. */
     const selectableCategories = useMemo(
         () => {
-            const memo = new Map<string, boolean>();
-
-            const hasProductsInSelfOrDescendants = (categoryId: string, visiting = new Set<string>()): boolean => {
-                if (memo.has(categoryId)) return Boolean(memo.get(categoryId));
-                if (visiting.has(categoryId)) return false;
-                visiting.add(categoryId);
-
-                if (productCategoryIds.has(categoryId)) {
-                    memo.set(categoryId, true);
-                    visiting.delete(categoryId);
-                    return true;
-                }
-
-                const childIds = childrenByParentId.get(categoryId) || [];
-                for (const childId of childIds) {
-                    if (hasProductsInSelfOrDescendants(childId, visiting)) {
-                        memo.set(categoryId, true);
-                        visiting.delete(categoryId);
-                        return true;
-                    }
-                }
-
-                memo.set(categoryId, false);
-                visiting.delete(categoryId);
-                return false;
-            };
-
             const getCategoryDepth = (category: Category): number => {
                 let depth = 0;
                 let parentId = category.parentId ? String(category.parentId) : "";
@@ -89,57 +51,27 @@ export default function FeaturedSpecsAdmin() {
                 return depth;
             };
 
-            return sortedCategories.filter((category) =>
-                getCategoryDepth(category) <= 1 &&
-                hasProductsInSelfOrDescendants(String(category._id))
-            );
+            return sortedCategories.filter((category) => getCategoryDepth(category) <= 1);
         },
-        [sortedCategories, productCategoryIds, childrenByParentId, categoryById]
+        [sortedCategories, categoryById]
     );
 
     useEffect(() => {
-        const fetchCategoriesAndAvailability = async () => {
+        const fetchCategories = async () => {
             try {
                 const categoriesRes = await api.get("/products/categories");
                 setCategories(categoriesRes.data || []);
-
-                const usedCategoryIds = new Set<string>();
-                let page = 1;
-                let totalPages = 1;
-
-                while (page <= totalPages) {
-                    const { data } = await api.get(`/admin/products?page=${page}&limit=100`);
-                    const products = Array.isArray(data?.data) ? data.data : [];
-                    totalPages = Math.max(Number(data?.pagination?.pages ?? 1), 1);
-
-                    products.forEach((product: { categoryIds?: Array<string | { _id?: string }> }) => {
-                        const productCategories = Array.isArray(product?.categoryIds) ? product.categoryIds : [];
-                        productCategories.forEach((category) => {
-                            const categoryId =
-                                typeof category === "string"
-                                    ? category
-                                    : typeof category?._id === "string"
-                                        ? category._id
-                                        : "";
-                            if (categoryId) usedCategoryIds.add(String(categoryId));
-                        });
-                    });
-
-                    page += 1;
-                }
-
-                setProductCategoryIds(usedCategoryIds);
             } catch (err) {
                 console.error("Failed to fetch categories", err);
             }
         };
 
-        void fetchCategoriesAndAvailability();
+        void fetchCategories();
     }, []);
 
     useEffect(() => {
         if (!selectedCategory) return;
-        const stillSelectable = selectableCategories.some((category) => category.slug === selectedCategory);
+        const stillSelectable = selectableCategories.some((category) => String(category._id) === selectedCategory);
         if (!stillSelectable) {
             setSelectedCategory("");
             setAvailableSpecKeys([]);
@@ -264,9 +196,14 @@ export default function FeaturedSpecsAdmin() {
                     onChange={(e) => setSelectedCategory(e.target.value)}
                 >
                     <option value="">-- Choose Category --</option>
-                    {selectableCategories.map(c => (
-                        <option key={c._id} value={c.slug}>{c.name}</option>
-                    ))}
+                    {selectableCategories.map(c => {
+                        const parentName = c.parentId ? categoryById.get(String(c.parentId))?.name : null;
+                        return (
+                            <option key={c._id} value={c._id}>
+                                {parentName ? `${c.name} (under ${parentName})` : c.name}
+                            </option>
+                        );
+                    })}
                 </select>
             </div>
 

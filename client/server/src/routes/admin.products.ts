@@ -13,19 +13,11 @@ import {
     createUniqueProductSlug,
     getProductSlug,
 } from '../utils/productSlug';
+import { createUniqueCategorySlug } from '../utils/categorySlug';
 
 const router = express.Router();
 
 router.use(requireAuth, requireAdmin, adminRateLimit);
-
-function normalizeCategorySlugInput(value: unknown): string {
-    return String(value ?? '')
-        .trim()
-        .toLowerCase()
-        .replace(/\bm[\s._-]*2\b/g, 'm2')
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/(^-|-$)/g, '');
-}
 
 async function hasProductsInCategory(categoryId: string): Promise<boolean> {
     const linkedProduct = await Product.exists({ categoryIds: categoryId });
@@ -289,7 +281,7 @@ router.post('/categories', async (req: Request, res: Response) => {
     try {
         const { name, slug, parentId } = req.body;
         const normalizedName = typeof name === 'string' ? name.trim() : '';
-        const normalizedSlug = normalizeCategorySlugInput(slug || normalizedName);
+        const normalizedSlug = await createUniqueCategorySlug(slug || normalizedName);
         const category = await Category.create({
             name: normalizedName,
             slug: normalizedSlug,
@@ -313,8 +305,9 @@ router.put('/categories/:id', async (req: Request, res: Response) => {
         const update: Record<string, unknown> = { ...req.body };
         if (typeof update.name === 'string') update.name = update.name.trim();
         if ('slug' in update || typeof update.name === 'string') {
-            update.slug = normalizeCategorySlugInput(
-                (typeof update.slug === 'string' && update.slug.trim()) ? update.slug : update.name
+            update.slug = await createUniqueCategorySlug(
+                (typeof update.slug === 'string' && update.slug.trim()) ? update.slug : update.name,
+                categoryId
             );
         }
         if ('parentId' in update) {
