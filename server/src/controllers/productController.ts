@@ -48,14 +48,24 @@ function buildOrderedSpecsFacet(
     return out;
 }
 
+/**
+ * Rolls matched products up to every ancestor category (so e.g. a product tagged
+ * only with a leaf category still counts toward its parent's facet entry).
+ *
+ * Groups to distinct leaf categories BEFORE walking the ancestor tree, so
+ * `$graphLookup` runs once per distinct category present in the result set
+ * instead of once per matched product — the product count only affects the
+ * initial `$group`, not the (expensive) tree walk.
+ */
 function categoryFacetWithAncestors(categoryMatchStage: Record<string, unknown>) {
     return [
         { $match: categoryMatchStage },
         { $unwind: '$categoryIds' },
+        { $group: { _id: '$categoryIds', count: { $sum: 1 } } },
         {
             $lookup: {
                 from: 'categories',
-                localField: 'categoryIds',
+                localField: '_id',
                 foreignField: '_id',
                 as: '_leafCat',
             },
@@ -75,14 +85,14 @@ function categoryFacetWithAncestors(categoryMatchStage: Record<string, unknown>)
             $addFields: {
                 _rollupIds: {
                     $setUnion: [
-                        ['$categoryIds'],
+                        ['$_id'],
                         { $map: { input: { $ifNull: ['$_ancCats', []] }, as: 'd', in: '$$d._id' } },
                     ],
                 },
             },
         },
         { $unwind: '$_rollupIds' },
-        { $group: { _id: '$_rollupIds', count: { $sum: 1 } } },
+        { $group: { _id: '$_rollupIds', count: { $sum: '$count' } } },
         { $lookup: { from: 'categories', localField: '_id', foreignField: '_id', as: 'category' } },
         { $unwind: '$category' },
         { $project: { value: '$category.slug', label: '$category.name', count: 1 } },
@@ -197,59 +207,76 @@ export const getProducts = async (req: Request, res: Response) => {
         const categoryMatchStage = await buildProductMatchStage(req, ['category'], lookupCache);
         const brandMatchStage = await buildProductMatchStage(req, ['brand'], lookupCache);
         const priceMatchStage = await buildProductMatchStage(req, ['price'], lookupCache);
-        const specsMatchStage = await buildProductMatchStage(req, ['specs'], lookupCache);
 
-        const pipeline = [
-            {
-                $facet: {
-                    products: [
-                        { $match: matchStage },
-                        { $sort: sortStage },
-                        { $skip: skip },
-                        { $limit: limitNum },
-                        { $lookup: { from: 'brands', localField: 'brandId', foreignField: '_id', as: 'brand' } },
-                        { $unwind: { path: '$brand', preserveNullAndEmptyArrays: true } },
-                        { $lookup: { from: 'categories', localField: 'categoryIds', foreignField: '_id', as: 'categories' } },
-                    ],
-                    totalCount: [{ $match: matchStage }, { $count: 'count' }],
-                    price: [
-                        { $match: priceMatchStage },
-                        { $group: { _id: null, min: { $min: '$price' }, max: { $max: '$price' } } },
-                    ],
-                    categories: categoryFacetWithAncestors(categoryMatchStage),
-                    brands: [
-                        { $match: brandMatchStage },
-                        { $group: { _id: '$brandId', count: { $sum: 1 } } },
-                        { $lookup: { from: 'brands', localField: '_id', foreignField: '_id', as: 'brand' } },
-                        { $unwind: '$brand' },
-                        { $project: { value: '$brand.slug', label: '$brand.name', count: 1 } },
-                        { $sort: { label: 1 } },
-                    ],
-                    availability: [
-                        { $match: matchStage },
-                        { $group: { _id: '$availability', count: { $sum: 1 } } },
-                        { $project: { value: '$_id', count: 1, _id: 0 } },
-                    ],
-                    specs: [
-                        { $match: specsMatchStage },
-                        SPECS_OBJECT_TO_ARRAY_PROJECT,
-                        { $unwind: '$specs' },
-                        {
-                            $group: {
-                                _id: { key: '$specs.k', value: '$specs.v' },
-                                count: { $sum: 1 },
-                            },
-                        },
-                        {
-                            $group: {
-                                _id: '$_id.key',
-                                values: { $push: { value: '$_id.value', count: '$count' } },
-                            },
-                        },
-                    ],
+        // The specs facet is only ever surfaced when the selected category has
+        // "featured spec keys" configured; resolve that *before* building the
+        // pipeline so we can skip the (expensive) specs aggregation entirely
+        // when its result would just be discarded (e.g. the default, no-category
+        // shop view).
+        let featuredMode: 'restricted' | 'none' = 'none';
+        let featuredSpecKeys: string[] = [];
+        const categoryKeyForSpecs = normalizeCategoryKeyForFeaturedSpecs(category);
+        if (categoryKeyForSpecs) {
+            const featuredConfig = await CategoryFeaturedSpecs.findOne({ categoryKey: categoryKeyForSpecs });
+            if (featuredConfig && Array.isArray(featuredConfig.featuredSpecKeys) && featuredConfig.featuredSpecKeys.length > 0) {
+                featuredSpecKeys = featuredConfig.featuredSpecKeys;
+                featuredMode = 'restricted';
+            }
+        }
+        const needsSpecsFacet = featuredMode === 'restricted';
+        const specsMatchStage = needsSpecsFacet ? await buildProductMatchStage(req, ['specs'], lookupCache) : null;
+
+        const facetStages: Record<string, any[]> = {
+            products: [
+                { $match: matchStage },
+                { $sort: sortStage },
+                { $skip: skip },
+                { $limit: limitNum },
+                { $lookup: { from: 'brands', localField: 'brandId', foreignField: '_id', as: 'brand' } },
+                { $unwind: { path: '$brand', preserveNullAndEmptyArrays: true } },
+                { $lookup: { from: 'categories', localField: 'categoryIds', foreignField: '_id', as: 'categories' } },
+            ],
+            totalCount: [{ $match: matchStage }, { $count: 'count' }],
+            price: [
+                { $match: priceMatchStage },
+                { $group: { _id: null, min: { $min: '$price' }, max: { $max: '$price' } } },
+            ],
+            categories: categoryFacetWithAncestors(categoryMatchStage),
+            brands: [
+                { $match: brandMatchStage },
+                { $group: { _id: '$brandId', count: { $sum: 1 } } },
+                { $lookup: { from: 'brands', localField: '_id', foreignField: '_id', as: 'brand' } },
+                { $unwind: '$brand' },
+                { $project: { value: '$brand.slug', label: '$brand.name', count: 1 } },
+                { $sort: { label: 1 } },
+            ],
+            availability: [
+                { $match: matchStage },
+                { $group: { _id: '$availability', count: { $sum: 1 } } },
+                { $project: { value: '$_id', count: 1, _id: 0 } },
+            ],
+        };
+        if (needsSpecsFacet) {
+            facetStages.specs = [
+                { $match: specsMatchStage },
+                SPECS_OBJECT_TO_ARRAY_PROJECT,
+                { $unwind: '$specs' },
+                {
+                    $group: {
+                        _id: { key: '$specs.k', value: '$specs.v' },
+                        count: { $sum: 1 },
+                    },
                 },
-            },
-        ];
+                {
+                    $group: {
+                        _id: '$_id.key',
+                        values: { $push: { value: '$_id.value', count: '$count' } },
+                    },
+                },
+            ];
+        }
+
+        const pipeline = [{ $facet: facetStages }];
 
         const results = await Product.aggregate(pipeline as any);
         const data = results[0];
@@ -265,22 +292,9 @@ export const getProducts = async (req: Request, res: Response) => {
         }
         const total = data.totalCount?.[0]?.count ?? 0;
 
-        let featuredMode: 'restricted' | 'none' = 'none';
-        let featuredSpecKeys: string[] = [];
-
-        const categoryKeyForSpecs = normalizeCategoryKeyForFeaturedSpecs(category);
-        if (categoryKeyForSpecs) {
-            const featuredConfig = await CategoryFeaturedSpecs.findOne({ categoryKey: categoryKeyForSpecs });
-            if (featuredConfig && Array.isArray(featuredConfig.featuredSpecKeys) && featuredConfig.featuredSpecKeys.length > 0) {
-                featuredSpecKeys = featuredConfig.featuredSpecKeys;
-                featuredMode = 'restricted';
-            }
-        }
-
-        const specsFacet: Record<string, any[]> =
-            featuredMode === 'restricted'
-                ? buildOrderedSpecsFacet(featuredSpecKeys, data.specs || [])
-                : {};
+        const specsFacet: Record<string, any[]> = needsSpecsFacet
+            ? buildOrderedSpecsFacet(featuredSpecKeys, data.specs || [])
+            : {};
 
 
         const finalFacets = {
@@ -318,53 +332,13 @@ export const getProductFacets = async (req: Request, res: Response) => {
         const lookupCache: MatchStageCache = {};
         const matchStage = await buildProductMatchStage(req, [], lookupCache);
         const categoryMatchStage = await buildProductMatchStage(req, ['category'], lookupCache);
-        const specsMatchStage = await buildProductMatchStage(req, ['specs'], lookupCache);
 
-        const pipeline = [
-            { $match: matchStage },
-            {
-                $facet: {
-                    price: [
-                        { $group: { _id: null, min: { $min: "$price" }, max: { $max: "$price" } } }
-                    ],
-                    categories: categoryFacetWithAncestors(categoryMatchStage),
-                    brands: [
-                        { $group: { _id: "$brandId", count: { $sum: 1 } } },
-                        { $lookup: { from: 'brands', localField: '_id', foreignField: '_id', as: 'brand' } },
-                        { $unwind: "$brand" },
-                        { $project: { value: "$brand.slug", label: "$brand.name", count: 1 } }
-                    ],
-                    availability: [
-                        { $group: { _id: "$availability", count: { $sum: 1 } } },
-                        { $project: { value: "$_id", count: 1, _id: 0 } }
-                    ],
-                    specs: [
-                        { $match: specsMatchStage },
-                        SPECS_OBJECT_TO_ARRAY_PROJECT,
-                        { $unwind: "$specs" },
-                        {
-                            $group: {
-                                _id: { key: "$specs.k", value: "$specs.v" },
-                                count: { $sum: 1 }
-                            }
-                        },
-                        {
-                            $group: {
-                                _id: "$_id.key",
-                                values: { $push: { value: "$_id.value", count: "$count" } }
-                            }
-                        }
-                    ]
-                }
-            }
-        ];
-
-        const results = await Product.aggregate(pipeline as any);
-        const data = results[0];
-
+        // Resolve whether this category has featured spec keys *before* building
+        // the pipeline, so the (expensive) specs aggregation can be skipped
+        // entirely when its result would just be discarded — e.g. the default,
+        // no-category shop view, which is also the most-hit case.
         let featuredMode: 'restricted' | 'none' = 'none';
         let featuredSpecKeys: string[] = [];
-
         const categoryKeyForSpecsFacets = normalizeCategoryKeyForFeaturedSpecs(category);
         if (categoryKeyForSpecsFacets) {
             const featuredConfig = await CategoryFeaturedSpecs.findOne({ categoryKey: categoryKeyForSpecsFacets });
@@ -373,11 +347,56 @@ export const getProductFacets = async (req: Request, res: Response) => {
                 featuredMode = 'restricted';
             }
         }
+        const needsSpecsFacet = featuredMode === 'restricted';
+        const specsMatchStage = needsSpecsFacet ? await buildProductMatchStage(req, ['specs'], lookupCache) : null;
 
-        const specsFacet: Record<string, any[]> =
-            featuredMode === 'restricted'
-                ? buildOrderedSpecsFacet(featuredSpecKeys, data.specs || [])
-                : {};
+        const facetStages: Record<string, any[]> = {
+            price: [
+                { $group: { _id: null, min: { $min: "$price" }, max: { $max: "$price" } } }
+            ],
+            categories: categoryFacetWithAncestors(categoryMatchStage),
+            brands: [
+                { $group: { _id: "$brandId", count: { $sum: 1 } } },
+                { $lookup: { from: 'brands', localField: '_id', foreignField: '_id', as: 'brand' } },
+                { $unwind: "$brand" },
+                { $project: { value: "$brand.slug", label: "$brand.name", count: 1 } }
+            ],
+            availability: [
+                { $group: { _id: "$availability", count: { $sum: 1 } } },
+                { $project: { value: "$_id", count: 1, _id: 0 } }
+            ],
+        };
+        if (needsSpecsFacet) {
+            facetStages.specs = [
+                { $match: specsMatchStage },
+                SPECS_OBJECT_TO_ARRAY_PROJECT,
+                { $unwind: "$specs" },
+                {
+                    $group: {
+                        _id: { key: "$specs.k", value: "$specs.v" },
+                        count: { $sum: 1 }
+                    }
+                },
+                {
+                    $group: {
+                        _id: "$_id.key",
+                        values: { $push: { value: "$_id.value", count: "$count" } }
+                    }
+                }
+            ];
+        }
+
+        const pipeline = [
+            { $match: matchStage },
+            { $facet: facetStages },
+        ];
+
+        const results = await Product.aggregate(pipeline as any);
+        const data = results[0];
+
+        const specsFacet: Record<string, any[]> = needsSpecsFacet
+            ? buildOrderedSpecsFacet(featuredSpecKeys, data.specs || [])
+            : {};
 
 
         let finalFacets = {
