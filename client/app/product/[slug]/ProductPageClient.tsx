@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ShoppingCart, Check, AlertCircle, Clock, Package, ArrowLeft, X, ExternalLink } from "lucide-react";
+import { ShoppingCart, Check, AlertCircle, Clock, Package, ArrowLeft, X } from "lucide-react";
 import Image from "next/image";
 import { AnimatePresence, motion } from "framer-motion";
 import { useCart } from "@/context/CartContext";
@@ -10,6 +10,7 @@ import { useRouter } from "next/navigation";
 import ProductCard from "@/components/ProductCard";
 import { useProduct, useProducts } from "@/hooks/useProducts";
 import { buildProductWhatsAppUrl } from "@/lib/whatsapp";
+import { renderRichText } from "@/lib/richText";
 import { getCombinedWarrantyLabel, getWarrantyBreakdownLabel, hasExtendedWarranty } from "@/lib/warranty";
 import LoadingAnimation from "@/components/LoadingAnimation";
 import WhatsAppLogo from "@/components/WhatsAppLogo";
@@ -561,11 +562,11 @@ function ProductPageInner({ slug }: { slug: string }) {
                         </a>
                     </div>
 
-                    <p className="mb-8 whitespace-pre-line text-base leading-relaxed text-[#B0B0B0]">{product.description}</p>
+                    <p className="mb-8 whitespace-pre-line text-base leading-relaxed text-[#B0B0B0]">{renderRichText(product.description)}</p>
 
                     {/* Product details (attributes by category) — one box, categories divided inside */}
                     {(() => {
-                        const groups: { category: string; attributes: { name?: string; value: string; isLink?: boolean }[] }[] = product.attributeGroups?.length
+                        const groups: { category: string; attributes: { name?: string; value: string }[] }[] = product.attributeGroups?.length
                             ? product.attributeGroups
                             : product.attributes?.length
                               ? [{ category: "General", attributes: product.attributes }]
@@ -589,38 +590,23 @@ function ProductPageInner({ slug }: { slug: string }) {
                                                 </div>
                                             )}
                                             <div className="divide-y divide-white/[0.06]">
-                                                {group.attributes.map((attr, i) => {
-                                                    const valueNode = attr.isLink && attr.value ? (
-                                                        <a
-                                                            href={attr.value}
-                                                            target="_blank"
-                                                            rel="noopener noreferrer"
-                                                            className="inline-flex items-center gap-1 text-[#D12B28] hover:underline"
-                                                        >
-                                                            <ExternalLink className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                                                            <span className="break-all">{attr.value}</span>
-                                                        </a>
-                                                    ) : (
-                                                        attr.value
-                                                    );
-                                                    return (
+                                                {group.attributes.map((attr, i) => (
+                                                    <div
+                                                        key={i}
+                                                        className="grid grid-cols-1 gap-x-5 gap-y-1 px-4 py-3.5 text-sm transition-colors hover:bg-white/[0.02] sm:grid-cols-[190px_1fr] sm:px-5"
+                                                    >
+                                                        {attr.name && (
+                                                            <span className="font-medium text-[#8E8E8E]">
+                                                                {formatSpecificationLabel(attr.name)}
+                                                            </span>
+                                                        )}
                                                         <div
-                                                            key={i}
-                                                            className="grid grid-cols-1 gap-x-5 gap-y-1 px-4 py-3.5 text-sm transition-colors hover:bg-white/[0.02] sm:grid-cols-[190px_1fr] sm:px-5"
+                                                            className={`whitespace-pre-line break-words leading-relaxed text-[#D4D4D4] ${!attr.name ? "sm:col-span-2" : ""}`}
                                                         >
-                                                            {attr.name && (
-                                                                <span className="font-medium text-[#8E8E8E]">
-                                                                    {formatSpecificationLabel(attr.name)}
-                                                                </span>
-                                                            )}
-                                                            <div
-                                                                className={`whitespace-pre-line leading-relaxed text-[#D4D4D4] ${!attr.name ? "sm:col-span-2" : ""}`}
-                                                            >
-                                                                {valueNode}
-                                                            </div>
+                                                            {renderRichText(attr.value)}
                                                         </div>
-                                                    );
-                                                })}
+                                                    </div>
+                                                ))}
                                             </div>
                                         </div>
                                     ))}

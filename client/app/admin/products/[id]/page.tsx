@@ -3,7 +3,7 @@
 import { useState, useEffect, use, useMemo } from "react";
 import { isAxiosError } from "axios";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Save, ArrowLeft, Trash2, Edit2, Plus, ChevronUp, ChevronDown, ImagePlus, Upload, Loader2, ArrowRightLeft, ExternalLink } from "lucide-react";
+import { Save, ArrowLeft, Trash2, Edit2, Plus, ChevronUp, ChevronDown, ImagePlus, Upload, Loader2, ArrowRightLeft, ExternalLink, Link2 } from "lucide-react";
 import Link from "next/link";
 import api from "@/lib/api";
 import toast from "react-hot-toast";
@@ -25,7 +25,6 @@ interface Category {
 interface Attribute {
     name: string;
     value: string;
-    isLink?: boolean;
 }
 
 interface AttributeGroup {
@@ -99,6 +98,33 @@ function getApiErrorMessage(error: unknown) {
         }
     }
     return error.message || "Failed to save product";
+}
+
+/**
+ * Wraps the selected text (or prompts for label text if nothing is selected) in
+ * `[label](url)` markdown syntax, so only that word/phrase renders as a link on
+ * the storefront instead of the whole field — the raw URL never has to be shown.
+ */
+function insertMarkdownLink(textareaId: string, currentValue: string, onChange: (next: string) => void) {
+    const el = typeof document !== "undefined" ? (document.getElementById(textareaId) as HTMLTextAreaElement | null) : null;
+    const start = el?.selectionStart ?? currentValue.length;
+    const end = el?.selectionEnd ?? currentValue.length;
+    const selected = currentValue.slice(start, end);
+    const label = (selected || window.prompt("Text to display as the link:", "") || "").trim();
+    if (!label) return;
+    const url = window.prompt("Link URL:", "https://")?.trim();
+    if (!url) return;
+    const markdown = `[${label}](${url})`;
+    const nextValue = currentValue.slice(0, start) + markdown + currentValue.slice(end);
+    onChange(nextValue);
+    requestAnimationFrame(() => {
+        const refreshed = document.getElementById(textareaId) as HTMLTextAreaElement | null;
+        if (refreshed) {
+            const pos = start + markdown.length;
+            refreshed.focus();
+            refreshed.setSelectionRange(pos, pos);
+        }
+    });
 }
 
 function suggestHexFromColorName(name: string): string {
@@ -318,17 +344,16 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                     : [];
                 const attributeGroups: AttributeGroup[] =
                     rawGroups && Array.isArray(rawGroups) && rawGroups.length > 0
-                        ? rawGroups.map((g: { category?: string; attributes?: Array<{ name?: string; value?: string; isLink?: boolean }> }) => ({
+                        ? rawGroups.map((g: { category?: string; attributes?: Array<{ name?: string; value?: string }> }) => ({
                             category: g.category || 'General',
-                            attributes: (g.attributes || []).map((a) => ({ name: a.name || '', value: a.value || '', isLink: !!a.isLink }))
+                            attributes: (g.attributes || []).map((a) => ({ name: a.name || '', value: a.value || '' }))
                         }))
                         : (data.attributes && Array.isArray(data.attributes) && data.attributes.length > 0)
                             ? [{
                                 category: 'General',
-                                attributes: data.attributes.map((a: { name?: string; value?: string; isLink?: boolean }) => ({
+                                attributes: data.attributes.map((a: { name?: string; value?: string }) => ({
                                     name: a.name || '',
                                     value: a.value || '',
-                                    isLink: !!a.isLink,
                                 })),
                             }]
                             : [];
@@ -589,7 +614,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                         category: group.category.trim(),
                         attributes: group.attributes
                             .filter((attribute) => attribute.value.trim())
-                            .map((attribute) => ({ name: attribute.name.trim(), value: attribute.value.trim(), isLink: !!attribute.isLink }))
+                            .map((attribute) => ({ name: attribute.name.trim(), value: attribute.value.trim() }))
                     })),
                 seo: {
                     title: formData.seo.title.trim() || undefined,
@@ -644,15 +669,6 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
         setFormData({ ...formData, attributeGroups: newGroups });
     };
 
-    const toggleAttributeIsLink = (groupIndex: number, attrIndex: number) => {
-        const newGroups = formData.attributeGroups.map((g, i) => {
-            if (i !== groupIndex) return g;
-            const newAttrs = g.attributes.map((a, j) => (j === attrIndex ? { ...a, isLink: !a.isLink } : a));
-            return { ...g, attributes: newAttrs };
-        });
-        setFormData({ ...formData, attributeGroups: newGroups });
-    };
-
     const addAttributeGroup = () => {
         setFormData({
             ...formData,
@@ -674,7 +690,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
 
     const addAttributeToGroup = (groupIndex: number) => {
         const newGroups = formData.attributeGroups.map((g, i) =>
-            i === groupIndex ? { ...g, attributes: [...g.attributes, { name: "", value: "", isLink: false }] } : g
+            i === groupIndex ? { ...g, attributes: [...g.attributes, { name: "", value: "" }] } : g
         );
         setFormData({ ...formData, attributeGroups: newGroups });
     };
@@ -1377,12 +1393,30 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                 </section>
 
                 <section className="border-t border-border-soft pt-6">
-                    <label className="text-sub text-sm">Description</label>
+                    <div className="flex items-center justify-between">
+                        <label htmlFor="product-description" className="text-sub text-sm">Description</label>
+                        <button
+                            type="button"
+                            onClick={() =>
+                                insertMarkdownLink("product-description", formData.description, (next) =>
+                                    setFormData({ ...formData, description: next })
+                                )
+                            }
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-border-soft px-2.5 py-1 text-xs text-sub transition-colors hover:border-accent/50 hover:text-accent"
+                            title="Select text and click to turn it into a link"
+                        >
+                            <Link2 className="h-3.5 w-3.5" /> Insert link
+                        </button>
+                    </div>
                     <textarea
+                        id="product-description"
                         className="mt-2 h-32 w-full rounded-lg border border-border-soft bg-base px-4 py-2 text-main focus:outline-none focus:border-accent"
                         value={formData.description}
                         onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                     ></textarea>
+                    <p className="mt-1 flex items-center gap-1 text-xs text-sub">
+                        Select a word or phrase above and click &quot;Insert link&quot; to hyperlink just that text — the URL stays hidden from customers.
+                    </p>
                 </section>
 
                 <section className="border-t border-border-soft pt-6">
@@ -1772,6 +1806,9 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                         <div>
                             <h2 className="text-xl font-bold text-main">Product details (Attributes)</h2>
                             <p className="mt-0.5 text-sm text-sub">Group details by category (General, Cable Specs, etc.) and update values quickly.</p>
+                            <p className="mt-0.5 flex items-center gap-1 text-xs text-sub">
+                                <Link2 className="h-3 w-3 shrink-0" /> To hyperlink just a word or phrase, select it in a value field and click the link icon — the URL stays hidden from customers.
+                            </p>
                             <p className="mt-1 text-xs text-sub">
                                 {formData.attributeGroups.length} categories,{" "}
                                 {formData.attributeGroups.reduce((sum, g) => sum + g.attributes.length, 0)} total attributes
@@ -1898,7 +1935,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                                             <span className="w-16 shrink-0">Order</span>
                                             <span className="flex-1">Name</span>
                                             <span className="flex-1">Value</span>
-                                            <span className="w-9 shrink-0 text-center">Link</span>
+                                            <span className="w-9 shrink-0" />
                                             <span className="w-8 shrink-0" />
                                         </div>
                                     )}
@@ -1945,30 +1982,25 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                                                 value={attr.name ?? ''}
                                                 onChange={(e) => updateAttribute(groupIndex, attrIndex, "name", e.target.value)}
                                             />
-                                            {attr.isLink ? (
-                                                <input
-                                                    type="text"
-                                                    placeholder="https://example.com"
-                                                    className="flex-1 bg-base border border-border-soft rounded-lg px-3 py-2 text-main text-sm focus:outline-none focus:border-accent min-w-0"
-                                                    value={attr.value ?? ''}
-                                                    onChange={(e) => updateAttribute(groupIndex, attrIndex, "value", e.target.value)}
-                                                />
-                                            ) : (
-                                                <textarea
-                                                    placeholder="Value (e.g. Red, or multiple lines for a longer spec)"
-                                                    rows={2}
-                                                    className="flex-1 resize-y bg-base border border-border-soft rounded-lg px-3 py-2 text-main text-sm focus:outline-none focus:border-accent min-w-0"
-                                                    value={attr.value ?? ''}
-                                                    onChange={(e) => updateAttribute(groupIndex, attrIndex, "value", e.target.value)}
-                                                />
-                                            )}
+                                            <textarea
+                                                id={`attr-value-${groupIndex}-${attrIndex}`}
+                                                placeholder="Value (e.g. Red, or multiple lines for a longer spec)"
+                                                rows={2}
+                                                className="flex-1 resize-y bg-base border border-border-soft rounded-lg px-3 py-2 text-main text-sm focus:outline-none focus:border-accent min-w-0"
+                                                value={attr.value ?? ''}
+                                                onChange={(e) => updateAttribute(groupIndex, attrIndex, "value", e.target.value)}
+                                            />
                                             <button
                                                 type="button"
-                                                onClick={() => toggleAttributeIsLink(groupIndex, attrIndex)}
-                                                className={`flex w-9 shrink-0 items-center justify-center rounded-lg border p-2 transition-colors ${attr.isLink ? "border-accent/50 bg-accent/10 text-accent" : "border-border-soft text-sub hover:text-main"}`}
-                                                title={attr.isLink ? "Marked as link — click to unmark" : "Mark value as a link"}
+                                                onClick={() =>
+                                                    insertMarkdownLink(`attr-value-${groupIndex}-${attrIndex}`, attr.value ?? '', (next) =>
+                                                        updateAttribute(groupIndex, attrIndex, "value", next)
+                                                    )
+                                                }
+                                                className="flex w-9 shrink-0 items-center justify-center rounded-lg border border-border-soft p-2 text-sub transition-colors hover:border-accent/50 hover:text-accent"
+                                                title="Select text above and click to turn it into a link"
                                             >
-                                                <ExternalLink className="h-4 w-4" />
+                                                <Link2 className="h-4 w-4" />
                                             </button>
                                             <button
                                                 type="button"

@@ -81,9 +81,9 @@ export interface Product {
     };
     isFeatured?: boolean;
     specs?: Record<string, string>;
-    attributes?: { name?: string; value: string; isLink?: boolean }[];
+    attributes?: { name?: string; value: string }[];
     /** Grouped attributes for product details (e.g. General, Cable Specs). Falls back to attributes as one group. */
-    attributeGroups?: { category: string; attributes: { name?: string; value: string; isLink?: boolean }[] }[];
+    attributeGroups?: { category: string; attributes: { name?: string; value: string }[] }[];
 }
 
 export interface ProductsResponse {
