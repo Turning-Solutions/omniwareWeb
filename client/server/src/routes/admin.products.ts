@@ -96,7 +96,7 @@ router.post('/backfill-slugs', async (req: Request, res: Response) => {
 
         if (!dryRun && result.updated > 0) {
             invalidateFacetCaches();
-            triggerRevalidation(['/', '/shop', '/sitemap.xml']);
+            await triggerRevalidation(['/', '/shop', '/sitemap.xml']);
         }
 
         await createAuditLog(req, {
@@ -178,7 +178,7 @@ router.post('/', async (req: Request, res: Response) => {
         normalizedBody.slug = await createUniqueProductSlug(normalizedBody.slug || normalizedBody.title);
         const product = await Product.create(normalizedBody);
         invalidateFacetCaches();
-        triggerRevalidation(['/', '/shop', '/sitemap.xml']);
+        await triggerRevalidation(['/', '/shop', '/sitemap.xml']);
 
         await createAuditLog(req, {
             action: 'CREATE_PRODUCT',
@@ -218,7 +218,7 @@ router.patch('/:id', async (req: Request, res: Response) => {
         invalidateFacetCaches();
         const productSlug = getProductSlug(updated);
         const previousSlug = getProductSlug(before);
-        triggerRevalidation([
+        await triggerRevalidation([
             '/',
             '/shop',
             '/sitemap.xml',
@@ -248,7 +248,7 @@ router.delete('/:id', async (req: Request, res: Response) => {
     await Product.findByIdAndDelete(req.params.id);
     invalidateFacetCaches();
     const productSlug = getProductSlug(before);
-    triggerRevalidation(['/', '/shop', '/sitemap.xml', ...(productSlug ? [`/product/${productSlug}`] : [])]);
+    await triggerRevalidation(['/', '/shop', '/sitemap.xml', ...(productSlug ? [`/product/${productSlug}`] : [])]);
 
     await createAuditLog(req, {
         action: 'DELETE_PRODUCT',
@@ -294,7 +294,7 @@ router.post('/categories', async (req: Request, res: Response) => {
             isActive: true,
         });
         invalidateFacetCaches();
-        triggerRevalidation(['/', '/shop']);
+        await triggerRevalidation(['/', '/shop']);
         res.status(201).json(category);
     } catch (error) {
         res.status(400).json({ message: (error as Error).message });
@@ -324,7 +324,7 @@ router.put('/categories/:id', async (req: Request, res: Response) => {
 
         const category = await Category.findByIdAndUpdate(categoryId, update, { returnDocument: 'after' });
         invalidateFacetCaches();
-        triggerRevalidation(['/', '/shop']);
+        await triggerRevalidation(['/', '/shop']);
         clearFeaturedSpecsCache(existingCategory.slug);
         if (category) {
             clearFeaturedSpecsCache(category.slug);
@@ -363,7 +363,7 @@ router.delete('/categories/:id', async (req: Request, res: Response) => {
         await Category.findByIdAndDelete(categoryId);
         invalidateFacetCaches();
         clearFeaturedSpecsCache(category.slug);
-        triggerRevalidation(['/', '/shop']);
+        await triggerRevalidation(['/', '/shop']);
         res.status(204).send();
     } catch (error) {
         res.status(400).json({ message: (error as Error).message });
@@ -399,7 +399,7 @@ router.put('/categories/:id/discount', async (req: Request, res: Response) => {
             { returnDocument: 'after' }
         ).lean();
         invalidateFacetCaches();
-        triggerRevalidation(['/', '/shop']);
+        await triggerRevalidation(['/', '/shop']);
 
         await createAuditLog(req, {
             action: 'UPDATE_CATEGORY_DISCOUNT',

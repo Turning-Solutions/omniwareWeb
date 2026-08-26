@@ -27,7 +27,7 @@ export async function updateHomeSettings(req: Request, res: Response) {
         { $set: { showDiscountedProductsRow } },
         { new: true, upsert: true, setDefaultsOnInsert: true }
     ).lean();
-    triggerRevalidation(['/']);
+    await triggerRevalidation(['/']);
 
     return res.json({
         ...DEFAULT_HOME_SETTINGS,

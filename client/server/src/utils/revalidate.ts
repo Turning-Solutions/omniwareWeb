@@ -2,11 +2,15 @@
  * Triggers Next.js on-demand ISR revalidation after admin mutations.
  *
  * Sends a POST to /api/internal/revalidate with the given paths and tags.
- * Runs fire-and-forget so it never blocks the admin response.
+ * Callers must `await` this *before* sending their HTTP response: on Vercel's
+ * serverless runtime the function can freeze the instant the response is sent,
+ * so a fire-and-forget call here can get dropped mid-flight — leaving a stale
+ * cached page (e.g. a product 404 from before it was reactivated) stuck until
+ * the next ISR window.
  */
 import { getSiteUrl } from "../../../lib/seo/productSeo";
 
-export function triggerRevalidation(paths: string[] = ['/'], tags: string[] = []): void {
+export async function triggerRevalidation(paths: string[] = ['/'], tags: string[] = []): Promise<void> {
     const secret = process.env.REVALIDATION_SECRET;
     if (!secret) {
         // Revalidation not configured — silently skip.
@@ -21,15 +25,16 @@ export function triggerRevalidation(paths: string[] = ['/'], tags: string[] = []
 
     const url = `${baseUrl.replace(/\/+$/, '')}/api/internal/revalidate`;
 
-    // Fire-and-forget: never block the admin API response.
-    void fetch(url, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${secret}`,
-        },
-        body: JSON.stringify({ paths, tags }),
-    }).catch((err) => {
+    try {
+        await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${secret}`,
+            },
+            body: JSON.stringify({ paths, tags }),
+        });
+    } catch (err) {
         console.warn('[Revalidation] Failed:', (err as Error).message);
-    });
+    }
 }

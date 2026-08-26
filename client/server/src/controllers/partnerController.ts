@@ -77,7 +77,7 @@ export const createPartner = async (req: Request, res: Response, next: NextFunct
         }
 
         const partner = await Partner.create(result.data);
-        triggerRevalidation(['/']);
+        await triggerRevalidation(['/']);
         res.status(201).json(partner);
     } catch (error: unknown) {
         const mongoError = error as { code?: number };
@@ -111,8 +111,8 @@ export const updatePartner = async (req: Request, res: Response, next: NextFunct
             return next(err);
         }
 
+        await triggerRevalidation(['/']);
         res.json(partner);
-        triggerRevalidation(['/']);
     } catch (error: unknown) {
         const mongoError = error as { code?: number };
         if (mongoError?.code === 11000) {
@@ -135,8 +135,8 @@ export const deletePartner = async (req: Request, res: Response, next: NextFunct
             err.status = 404;
             return next(err);
         }
+        await triggerRevalidation(['/']);
         res.json({ message: "Partner deleted" });
-        triggerRevalidation(['/']);
     } catch (error) {
         next(error);
     }

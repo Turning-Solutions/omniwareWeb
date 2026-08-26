@@ -133,7 +133,7 @@ export const createPromotion = async (req: Request, res: Response, next: any): P
             validTo: new Date(validTo),
         });
         activePromotionsCache = undefined;
-        triggerRevalidation(['/']);
+        await triggerRevalidation(['/']);
 
         res.status(201).json(promotion);
     } catch (error) {
@@ -167,7 +167,7 @@ export const updatePromotion = async (req: Request, res: Response, next: any): P
             return next(err);
         }
         activePromotionsCache = undefined;
-        triggerRevalidation(['/']);
+        await triggerRevalidation(['/']);
 
         res.json(promotion);
     } catch (error) {
@@ -186,7 +186,7 @@ export const deletePromotion = async (req: Request, res: Response, next: any): P
             return next(err);
         }
         activePromotionsCache = undefined;
-        triggerRevalidation(['/']);
+        await triggerRevalidation(['/']);
         res.json({ message: 'Promotion deleted' });
     } catch (error) {
         next(error);
