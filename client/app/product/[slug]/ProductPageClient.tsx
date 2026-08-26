@@ -609,7 +609,7 @@ function ProductPageInner({ slug }: { slug: string }) {
                                                             className="grid grid-cols-1 gap-x-5 gap-y-1 px-4 py-3.5 text-sm transition-colors hover:bg-white/[0.02] sm:grid-cols-[190px_1fr] sm:px-5"
                                                         >
                                                             {attr.name && (
-                                                                <span className="font-medium text-[#D12B28]">
+                                                                <span className="font-medium text-[#8E8E8E]">
                                                                     {formatSpecificationLabel(attr.name)}
                                                                 </span>
                                                             )}
