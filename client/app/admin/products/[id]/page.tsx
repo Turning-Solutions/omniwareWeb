@@ -25,6 +25,7 @@ interface Category {
 interface Attribute {
     name: string;
     value: string;
+    isLink?: boolean;
 }
 
 interface AttributeGroup {
@@ -317,16 +318,17 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                     : [];
                 const attributeGroups: AttributeGroup[] =
                     rawGroups && Array.isArray(rawGroups) && rawGroups.length > 0
-                        ? rawGroups.map((g: { category?: string; attributes?: Array<{ name?: string; value?: string }> }) => ({
+                        ? rawGroups.map((g: { category?: string; attributes?: Array<{ name?: string; value?: string; isLink?: boolean }> }) => ({
                             category: g.category || 'General',
-                            attributes: (g.attributes || []).map((a) => ({ name: a.name || '', value: a.value || '' }))
+                            attributes: (g.attributes || []).map((a) => ({ name: a.name || '', value: a.value || '', isLink: !!a.isLink }))
                         }))
                         : (data.attributes && Array.isArray(data.attributes) && data.attributes.length > 0)
                             ? [{
                                 category: 'General',
-                                attributes: data.attributes.map((a: { name?: string; value?: string }) => ({
+                                attributes: data.attributes.map((a: { name?: string; value?: string; isLink?: boolean }) => ({
                                     name: a.name || '',
                                     value: a.value || '',
+                                    isLink: !!a.isLink,
                                 })),
                             }]
                             : [];
@@ -587,7 +589,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                         category: group.category.trim(),
                         attributes: group.attributes
                             .filter((attribute) => attribute.value.trim())
-                            .map((attribute) => ({ name: attribute.name.trim(), value: attribute.value.trim() }))
+                            .map((attribute) => ({ name: attribute.name.trim(), value: attribute.value.trim(), isLink: !!attribute.isLink }))
                     })),
                 seo: {
                     title: formData.seo.title.trim() || undefined,
@@ -642,6 +644,15 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
         setFormData({ ...formData, attributeGroups: newGroups });
     };
 
+    const toggleAttributeIsLink = (groupIndex: number, attrIndex: number) => {
+        const newGroups = formData.attributeGroups.map((g, i) => {
+            if (i !== groupIndex) return g;
+            const newAttrs = g.attributes.map((a, j) => (j === attrIndex ? { ...a, isLink: !a.isLink } : a));
+            return { ...g, attributes: newAttrs };
+        });
+        setFormData({ ...formData, attributeGroups: newGroups });
+    };
+
     const addAttributeGroup = () => {
         setFormData({
             ...formData,
@@ -663,7 +674,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
 
     const addAttributeToGroup = (groupIndex: number) => {
         const newGroups = formData.attributeGroups.map((g, i) =>
-            i === groupIndex ? { ...g, attributes: [...g.attributes, { name: "", value: "" }] } : g
+            i === groupIndex ? { ...g, attributes: [...g.attributes, { name: "", value: "", isLink: false }] } : g
         );
         setFormData({ ...formData, attributeGroups: newGroups });
     };
@@ -1887,18 +1898,19 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                                             <span className="w-16 shrink-0">Order</span>
                                             <span className="flex-1">Name</span>
                                             <span className="flex-1">Value</span>
+                                            <span className="w-9 shrink-0 text-center">Link</span>
                                             <span className="w-8 shrink-0" />
                                         </div>
                                     )}
                                     {group.attributes.map((attr, attrIndex) => (
                                         <div
                                             key={attrIndex}
-                                            className={`grid grid-cols-1 items-center gap-2 rounded-lg border border-border-soft p-2 lg:grid-cols-[auto_auto_1fr_1fr_auto] ${isAttributeSelected(groupIndex, attrIndex) ? "border-accent/50 bg-accent/10" : "bg-base/40"}`}
+                                            className={`grid grid-cols-1 items-start gap-2 rounded-lg border border-border-soft p-2 lg:grid-cols-[auto_auto_1fr_1fr_auto_auto] ${isAttributeSelected(groupIndex, attrIndex) ? "border-accent/50 bg-accent/10" : "bg-base/40"}`}
                                         >
                                             <div className="flex items-center justify-between lg:hidden">
                                                 <span className="text-xs font-medium text-sub">Attribute {attrIndex + 1}</span>
                                             </div>
-                                            <label className="flex w-14 shrink-0 cursor-pointer items-center" title="Select to move to another category">
+                                            <label className="flex w-14 shrink-0 cursor-pointer items-center lg:pt-2" title="Select to move to another category">
                                                 <input
                                                     type="checkbox"
                                                     checked={isAttributeSelected(groupIndex, attrIndex)}
@@ -1933,13 +1945,31 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                                                 value={attr.name ?? ''}
                                                 onChange={(e) => updateAttribute(groupIndex, attrIndex, "name", e.target.value)}
                                             />
-                                            <input
-                                                type="text"
-                                                placeholder="Value (e.g. Red)"
-                                                className="flex-1 bg-base border border-border-soft rounded-lg px-3 py-2 text-main text-sm focus:outline-none focus:border-accent min-w-0"
-                                                value={attr.value ?? ''}
-                                                onChange={(e) => updateAttribute(groupIndex, attrIndex, "value", e.target.value)}
-                                            />
+                                            {attr.isLink ? (
+                                                <input
+                                                    type="text"
+                                                    placeholder="https://example.com"
+                                                    className="flex-1 bg-base border border-border-soft rounded-lg px-3 py-2 text-main text-sm focus:outline-none focus:border-accent min-w-0"
+                                                    value={attr.value ?? ''}
+                                                    onChange={(e) => updateAttribute(groupIndex, attrIndex, "value", e.target.value)}
+                                                />
+                                            ) : (
+                                                <textarea
+                                                    placeholder="Value (e.g. Red, or multiple lines for a longer spec)"
+                                                    rows={2}
+                                                    className="flex-1 resize-y bg-base border border-border-soft rounded-lg px-3 py-2 text-main text-sm focus:outline-none focus:border-accent min-w-0"
+                                                    value={attr.value ?? ''}
+                                                    onChange={(e) => updateAttribute(groupIndex, attrIndex, "value", e.target.value)}
+                                                />
+                                            )}
+                                            <button
+                                                type="button"
+                                                onClick={() => toggleAttributeIsLink(groupIndex, attrIndex)}
+                                                className={`flex w-9 shrink-0 items-center justify-center rounded-lg border p-2 transition-colors ${attr.isLink ? "border-accent/50 bg-accent/10 text-accent" : "border-border-soft text-sub hover:text-main"}`}
+                                                title={attr.isLink ? "Marked as link — click to unmark" : "Mark value as a link"}
+                                            >
+                                                <ExternalLink className="h-4 w-4" />
+                                            </button>
                                             <button
                                                 type="button"
                                                 onClick={() => removeAttribute(groupIndex, attrIndex)}

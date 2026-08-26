@@ -12,6 +12,10 @@ export default function robots(): MetadataRoute.Robots {
             // The proxy serves them a 410, and Google must be able to crawl
             // them to see it — blocking them would keep them indexed forever.
             disallow: [
+                // Internal rewrite target for the unfiltered /shop landing. Crawlers
+                // request /shop (allowed) and this rule never affects that; it only
+                // stops /shop-all being indexed as a duplicate if it is found directly.
+                "/shop-all",
                 "/admin/",
                 "/account/",
                 "/api/",

@@ -1,36 +1,13 @@
-import { headers } from "next/headers";
 import { QueryClient } from "@tanstack/react-query";
 import {
     getProductFacetsQueryOptions,
     getProductsQueryOptions,
-    normalizeCategoryForApi,
-    type Facets,
     type ProductsResponse,
     type UseProductsOptions,
 } from "@/hooks/useProducts";
 import { SHOP_PRODUCTS_PER_PAGE } from "@/lib/shopConstants";
 import { fetchShopProductsDirect } from "@/lib/server/shopProductsDirect";
-
-const PRODUCTS_REVALIDATE_SECONDS = 60;
-
-export async function resolveServerApiBaseUrl(): Promise<string> {
-    const raw = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
-    if (raw && /^https?:\/\//i.test(raw)) {
-        return raw.replace(/\/+$/, "");
-    }
-    const h = await headers();
-    const host = h.get("x-forwarded-host") ?? h.get("host");
-    const proto = h.get("x-forwarded-proto") ?? "http";
-    if (host) {
-        return `${proto}://${host}`.replace(/\/+$/, "");
-    }
-    const vercel = process.env.VERCEL_URL?.trim();
-    if (vercel) {
-        return (vercel.startsWith("http") ? vercel : `https://${vercel}`).replace(/\/+$/, "");
-    }
-    const port = process.env.PORT ?? "3000";
-    return `http://127.0.0.1:${port}`;
-}
+import { fetchShopFacetsDirect } from "@/lib/server/shopFacetsDirect";
 
 export async function fetchShopProductsJson(options: UseProductsOptions): Promise<ProductsResponse> {
     // In-process controller call — no HTTP loopback. Fetching our own public URL
@@ -74,54 +51,44 @@ export async function prefetchShopProductsList(
     }
 }
 
-export async function fetchShopFacetsJson(options: UseProductsOptions): Promise<{ facets: Facets }> {
-    const base = await resolveServerApiBaseUrl();
-    const params = new URLSearchParams();
-    if (options.search) params.append("search", options.search);
-    const subcategoryParts = options.subcategories
-        ? String(options.subcategories)
-              .split(",")
-              .map((s) => normalizeCategoryForApi(s))
-              .filter(Boolean)
-        : [];
-    const categoryParts: string[] =
-        subcategoryParts.length > 0
-            ? subcategoryParts
-            : options.category
-              ? [normalizeCategoryForApi(String(options.category))]
-              : [];
-    if (categoryParts.length > 0) {
-        const unique = Array.from(new Set(categoryParts));
-        params.append("category", unique.join(","));
-    }
-    if (options.brand) params.append("brand", options.brand);
-    if (options.minPrice != null) params.append("minPrice", String(options.minPrice));
-    if (options.maxPrice != null) params.append("maxPrice", String(options.maxPrice));
-    if (options.availability) params.append("availability", options.availability);
-    if (options.inStock) params.append("inStock", options.inStock);
-    if (options.isFeatured != null) params.append("isFeatured", String(options.isFeatured));
-    if (options.facetMode === "lite") params.append("mode", "lite");
-    if (options.spec && typeof options.spec === "object") {
-        for (const [key, value] of Object.entries(options.spec)) {
-            if (value != null && value !== "") params.append(`spec[${key}]`, value);
-        }
-    }
-    const query = params.toString();
-    const url = `${base}/api/v1/products/facets${query ? `?${query}` : ""}`;
-    const res = await fetch(url, {
-        next: { revalidate: PRODUCTS_REVALIDATE_SECONDS },
-        headers: { Accept: "application/json" },
-    });
-    if (!res.ok) throw new Error(`GET facets failed: ${res.status}`);
-    return (await res.json()) as { facets: Facets };
+/**
+ * Longest we let the facets aggregation hold up SSR. If it overruns we ship the
+ * page without hydrated facets and the client fetches them exactly as before —
+ * a slow facet query degrades the sidebar, it never delays the product grid.
+ */
+const FACETS_SSR_BUDGET_MS = 1200;
+
+export async function fetchShopFacetsJson(options: UseProductsOptions): Promise<unknown> {
+    // In-process controller call — same reasoning as the product list above.
+    return fetchShopFacetsDirect(options);
 }
 
+/**
+ * Hydrate the filter sidebar from SSR. Without this the sidebar has no data until
+ * the browser has downloaded, parsed and hydrated the page bundle and then made a
+ * round trip of its own — seconds after the product grid is already painted.
+ *
+ * `options` must come from `shopFacetsOptions()` so the key matches the client's
+ * `useProductFacets` query exactly; otherwise this warms a key nobody reads.
+ */
 export async function prefetchShopFacets(queryClient: QueryClient, options: UseProductsOptions) {
-    await queryClient.prefetchQuery({
-        ...getProductFacetsQueryOptions(options),
-        queryFn: () => fetchShopFacetsJson(options),
-        staleTime: 2 * 60 * 1000,
-    });
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+        await Promise.race([
+            queryClient.prefetchQuery({
+                ...getProductFacetsQueryOptions(options),
+                queryFn: () => fetchShopFacetsJson(options),
+                staleTime: 2 * 60 * 1000,
+            }),
+            new Promise<void>((resolve) => {
+                timer = setTimeout(resolve, FACETS_SSR_BUDGET_MS);
+            }),
+        ]);
+    } catch (error) {
+        console.error("[shop] SSR facets prefetch failed:", error);
+    } finally {
+        if (timer) clearTimeout(timer);
+    }
 }
 
 /** Options object must match `useProducts({ ...filters, limit, includeFacets })` for the default shop list. */

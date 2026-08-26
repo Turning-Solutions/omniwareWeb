@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ShoppingCart, Check, AlertCircle, Clock, Package, ArrowLeft, X } from "lucide-react";
+import { ShoppingCart, Check, AlertCircle, Clock, Package, ArrowLeft, X, ExternalLink } from "lucide-react";
 import Image from "next/image";
 import { AnimatePresence, motion } from "framer-motion";
 import { useCart } from "@/context/CartContext";
@@ -565,7 +565,7 @@ function ProductPageInner({ slug }: { slug: string }) {
 
                     {/* Product details (attributes by category) — one box, categories divided inside */}
                     {(() => {
-                        const groups: { category: string; attributes: { name?: string; value: string }[] }[] = product.attributeGroups?.length
+                        const groups: { category: string; attributes: { name?: string; value: string; isLink?: boolean }[] }[] = product.attributeGroups?.length
                             ? product.attributeGroups
                             : product.attributes?.length
                               ? [{ category: "General", attributes: product.attributes }]
@@ -580,29 +580,48 @@ function ProductPageInner({ slug }: { slug: string }) {
                                 </h3>
                                 <div className="overflow-hidden rounded-2xl border border-white/[0.07] bg-[#121212]/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
                                     {groups.map((group, idx) => (
-                                        <div key={idx} className="px-4 py-4 sm:px-5">
-                                            <div className="mb-3 font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-[#D12B28]/85">
-                                                {formatSpecificationLabel(group.category)}
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
-                                                {group.attributes.map((attr, i) => (
-                                                    <div key={i}>
-                                                        {attr.name ? (
-                                                            <>
-                                                                <span className="block text-[11px] uppercase tracking-wide text-[#8E8E8E]">
+                                        <div key={idx}>
+                                            {groups.length > 1 && (
+                                                <div className="border-b border-white/[0.06] bg-white/[0.03] px-4 py-2.5 sm:px-5">
+                                                    <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-[#D12B28]/85">
+                                                        {formatSpecificationLabel(group.category)}
+                                                    </span>
+                                                </div>
+                                            )}
+                                            <div className="divide-y divide-white/[0.06]">
+                                                {group.attributes.map((attr, i) => {
+                                                    const valueNode = attr.isLink && attr.value ? (
+                                                        <a
+                                                            href={attr.value}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="inline-flex items-center gap-1 text-[#D12B28] hover:underline"
+                                                        >
+                                                            <ExternalLink className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                                                            <span className="break-all">{attr.value}</span>
+                                                        </a>
+                                                    ) : (
+                                                        attr.value
+                                                    );
+                                                    return (
+                                                        <div
+                                                            key={i}
+                                                            className="grid grid-cols-1 gap-x-5 gap-y-1 px-4 py-3.5 text-sm transition-colors hover:bg-white/[0.02] sm:grid-cols-[190px_1fr] sm:px-5"
+                                                        >
+                                                            {attr.name && (
+                                                                <span className="font-medium text-[#D12B28]">
                                                                     {formatSpecificationLabel(attr.name)}
                                                                 </span>
-                                                                <span className="text-[#D4D4D4]">{attr.value}</span>
-                                                            </>
-                                                        ) : (
-                                                            <span className="text-[#D4D4D4]">{attr.value}</span>
-                                                        )}
-                                                    </div>
-                                                ))}
+                                                            )}
+                                                            <div
+                                                                className={`whitespace-pre-line leading-relaxed text-[#D4D4D4] ${!attr.name ? "sm:col-span-2" : ""}`}
+                                                            >
+                                                                {valueNode}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
                                             </div>
-                                            {idx < groups.length - 1 && (
-                                                <div className="mt-4 border-b border-white/[0.06]" aria-hidden />
-                                            )}
                                         </div>
                                     ))}
                                 </div>

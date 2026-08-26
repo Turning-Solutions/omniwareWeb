@@ -22,6 +22,20 @@ export function isControlledShopQueryKey(key: string): boolean {
     return key.startsWith("spec[");
 }
 
+/**
+ * True when the URL carries any param the shop listing actually consumes, so a
+ * request with none of them renders the plain, identical-for-everyone landing.
+ * `s` is checked separately: `parseShopFiltersFromLocation` reads it as a legacy
+ * search alias, but it is deliberately NOT in CONTROLLED_KEYS (that set also
+ * drives which params `serializeShopListingUrl` strips when rewriting the URL).
+ */
+export function hasShopListingParams(sp: URLSearchParams): boolean {
+    for (const key of sp.keys()) {
+        if (isControlledShopQueryKey(key) || key === "s") return true;
+    }
+    return false;
+}
+
 /** Next.js `searchParams` record → flat URLSearchParams (supports repeated keys). */
 export function nextSearchParamsRecordToURLSearchParams(
     sp: Record<string, string | string[] | undefined>

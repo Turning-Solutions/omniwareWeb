@@ -50,8 +50,18 @@ function cacheFlagEnabled(name: string): boolean {
     return String(process.env[name] ?? '').toLowerCase() === 'true';
 }
 
+/**
+ * Facet caching is on unless explicitly switched off. It used to be opt-in, which
+ * meant an unset env var quietly ran the full aggregation on every CDN miss — the
+ * expensive default, in the one place we least want it. Set the var to "false" to
+ * disable (e.g. when debugging stale facet counts).
+ */
+function cacheFlagEnabledByDefault(name: string): boolean {
+    return String(process.env[name] ?? '').toLowerCase() !== 'false';
+}
+
 function shouldUseFacetRequestCache(req: Request): boolean {
-    if (!cacheFlagEnabled('FACET_REQUEST_CACHE_ENABLED')) return false;
+    if (!cacheFlagEnabledByDefault('FACET_REQUEST_CACHE_ENABLED')) return false;
     const path = req.path ?? '';
     if (path.includes('/admin')) return false;
     if (req.headers.authorization) return false;
@@ -59,7 +69,7 @@ function shouldUseFacetRequestCache(req: Request): boolean {
 }
 
 function shouldUseFacetSnapshot(req: Request): boolean {
-    if (!cacheFlagEnabled('FACET_SNAPSHOT_ENABLED')) return false;
+    if (!cacheFlagEnabledByDefault('FACET_SNAPSHOT_ENABLED')) return false;
     const q = req.query as Record<string, unknown>;
     const hasSearch = Boolean(String(q.search ?? '').trim());
     const hasSpec = Object.keys(q).some((k) => k.startsWith('spec['));
@@ -389,22 +399,24 @@ export const getProducts = async (req: Request, res: Response) => {
             ];
         }
 
-        const pipeline = [{ $facet: facetStages }];
-        maybeExplainAggregate(req, 'getProducts', pipeline as any[]);
-
-        const results = await Product.aggregate(pipeline as any);
-        const data = results[0];
-        if (!data) {
-            return res.json({
-                products: [],
-                pagination: { total: 0, page: pageNum, limit: limitNum, pages: 0 },
-                categoryKey: category || null,
-                featuredMode: 'default_all',
-                featuredSpecKeys: [],
-                facets: { price: { min: 0, max: 0 }, categories: [], brands: [], availability: [], specs: {} },
-            });
+        // Each branch runs as its own aggregation rather than one `$facet` stage:
+        // `$facet` sub-pipelines cannot use indexes, so the single-stage version
+        // scanned the whole collection even though every branch starts with a
+        // `$match`. See the matching note in `getProductFacets`.
+        for (const [label, stages] of Object.entries(facetStages)) {
+            maybeExplainAggregate(req, `getProducts:${label}`, stages);
         }
-        const total = data.totalCount?.[0]?.count ?? 0;
+
+        const facetNames = Object.keys(facetStages);
+        const facetResults = await Promise.all(
+            facetNames.map((name) => Product.aggregate(facetStages[name] as any))
+        );
+        const data: Record<string, any[]> = {};
+        facetNames.forEach((name, i) => {
+            data[name] = facetResults[i] ?? [];
+        });
+
+        const total = (data.totalCount?.[0] as { count?: number } | undefined)?.count ?? 0;
 
         const specsFacet: Record<string, any[]> = needsSpecsFacet
             ? buildOrderedSpecsFacet(featuredSpecKeys, data.specs || [])
@@ -536,12 +548,27 @@ export const getProductFacets = async (req: Request, res: Response) => {
             ];
         }
 
-        const pipeline = [{ $facet: facetStages }];
+        /**
+         * Run each facet as its own aggregation instead of one `$facet` stage.
+         * `$facet` and its sub-pipelines cannot use indexes — even when `$facet` is
+         * the first stage — so the whole products collection was scanned on every
+         * facets request while the (identically filtered) listing query rode an
+         * index. Standalone pipelines start with their own `$match`, which does use
+         * one; running them with `Promise.all` keeps wall-clock at the slowest
+         * branch rather than their sum.
+         */
+        for (const [label, stages] of Object.entries(facetStages)) {
+            maybeExplainAggregate(req, `getProductFacets:${label}`, stages);
+        }
 
-        maybeExplainAggregate(req, 'getProductFacets', pipeline as any[]);
-
-        const results = await Product.aggregate(pipeline as any);
-        const data = results[0];
+        const facetNames = Object.keys(facetStages);
+        const facetResults = await Promise.all(
+            facetNames.map((name) => Product.aggregate(facetStages[name] as any))
+        );
+        const data: Record<string, any[]> = {};
+        facetNames.forEach((name, i) => {
+            data[name] = facetResults[i] ?? [];
+        });
 
         const specsFacet: Record<string, any[]> = needsSpecsFacet
             ? buildOrderedSpecsFacet(featuredSpecKeys, data.specs || [])

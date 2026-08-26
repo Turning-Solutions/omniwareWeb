@@ -22,7 +22,8 @@ export const productSchema = z.object({
         category: z.string(),
         attributes: z.array(z.object({
             name: z.string(),
-            value: z.string()
+            value: z.string(),
+            isLink: z.boolean().optional()
         }))
     })).optional(),
     attributes: z.array(z.object({

@@ -81,9 +81,9 @@ export interface Product {
     };
     isFeatured?: boolean;
     specs?: Record<string, string>;
-    attributes?: { name?: string; value: string }[];
+    attributes?: { name?: string; value: string; isLink?: boolean }[];
     /** Grouped attributes for product details (e.g. General, Cable Specs). Falls back to attributes as one group. */
-    attributeGroups?: { category: string; attributes: { name?: string; value: string }[] }[];
+    attributeGroups?: { category: string; attributes: { name?: string; value: string; isLink?: boolean }[] }[];
 }
 
 export interface ProductsResponse {
@@ -177,41 +177,50 @@ export const useProducts = (options: UseProductsOptions = {}) => {
     });
 };
 
+/**
+ * Facet query string. Extracted so the SSR prefetch, the in-process controller
+ * call, and the browser request all build byte-identical params — a drift here
+ * silently produces a different React Query key and nothing ever hydrates.
+ */
+export function buildProductFacetsQueryString(options: UseProductsOptions = {}): string {
+    const params = new URLSearchParams();
+    if (options.search) params.append('search', options.search);
+    const subcategoryParts = options.subcategories
+        ? String(options.subcategories)
+              .split(',')
+              .map((s) => normalizeCategoryForApi(s))
+              .filter(Boolean)
+        : [];
+    const categoryParts: string[] =
+        subcategoryParts.length > 0
+            ? subcategoryParts
+            : options.category
+              ? [normalizeCategoryForApi(String(options.category))]
+              : [];
+    if (categoryParts.length > 0) {
+        const unique = Array.from(new Set(categoryParts));
+        params.append('category', unique.join(','));
+    }
+    if (options.brand) params.append('brand', options.brand);
+    if (options.minPrice != null) params.append('minPrice', options.minPrice.toString());
+    if (options.maxPrice != null) params.append('maxPrice', options.maxPrice.toString());
+    if (options.availability) params.append('availability', options.availability);
+    if (options.inStock) params.append('inStock', options.inStock);
+    if (options.isFeatured != null) params.append('isFeatured', String(options.isFeatured));
+    if (options.facetMode === 'lite') params.append('mode', 'lite');
+    if (options.spec && typeof options.spec === 'object') {
+        for (const [key, value] of Object.entries(options.spec)) {
+            if (value != null && value !== '') params.append(`spec[${key}]`, value);
+        }
+    }
+    return params.toString();
+}
+
 export function getProductFacetsQueryOptions(options: UseProductsOptions = {}) {
     return {
         queryKey: ['product-facets', options] as const,
         queryFn: async () => {
-            const params = new URLSearchParams();
-            if (options.search) params.append('search', options.search);
-            const subcategoryParts = options.subcategories
-                ? String(options.subcategories)
-                      .split(',')
-                      .map((s) => normalizeCategoryForApi(s))
-                      .filter(Boolean)
-                : [];
-            const categoryParts: string[] =
-                subcategoryParts.length > 0
-                    ? subcategoryParts
-                    : options.category
-                      ? [normalizeCategoryForApi(String(options.category))]
-                      : [];
-            if (categoryParts.length > 0) {
-                const unique = Array.from(new Set(categoryParts));
-                params.append('category', unique.join(','));
-            }
-            if (options.brand) params.append('brand', options.brand);
-            if (options.minPrice != null) params.append('minPrice', options.minPrice.toString());
-            if (options.maxPrice != null) params.append('maxPrice', options.maxPrice.toString());
-            if (options.availability) params.append('availability', options.availability);
-            if (options.inStock) params.append('inStock', options.inStock);
-            if (options.isFeatured != null) params.append('isFeatured', String(options.isFeatured));
-            if (options.facetMode === 'lite') params.append('mode', 'lite');
-            if (options.spec && typeof options.spec === 'object') {
-                for (const [key, value] of Object.entries(options.spec)) {
-                    if (value != null && value !== '') params.append(`spec[${key}]`, value);
-                }
-            }
-            const query = params.toString();
+            const query = buildProductFacetsQueryString(options);
             const { data } = await api.get(`/products/facets${query ? `?${query}` : ''}`);
             return data;
         },

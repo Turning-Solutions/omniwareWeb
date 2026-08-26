@@ -27,7 +27,8 @@ const productSchema = new mongoose.Schema({
         category: { type: String, required: true, default: 'General' },
         attributes: [{
             name: { type: String, required: false },
-            value: { type: String, required: true }
+            value: { type: String, required: true },
+            isLink: { type: Boolean, default: false }
         }]
     }],
     attributes: [{

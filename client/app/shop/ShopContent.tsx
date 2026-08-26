@@ -9,7 +9,6 @@ import {
     useProducts,
     useProductFacets,
     type Facets,
-    type UseProductsOptions,
 } from "@/hooks/useProducts";
 import ProductCard from "@/components/ProductCard";
 import DynamicFilterSidebar, { countActiveFilters } from "@/components/DynamicFilterSidebar";
@@ -17,6 +16,7 @@ import LoadingAnimation from "@/components/LoadingAnimation";
 import { SlidersHorizontal, ArrowUpDown, X, ChevronLeft, ChevronRight, Search, Loader2 } from "lucide-react";
 import { SHOP_PRODUCTS_PER_PAGE } from "@/lib/shopConstants";
 import { serializeShopListingUrl, shopListingUrlsEquivalent } from "@/lib/shopUrlFilters";
+import { buildShopFilters, shopFacetsOptions, type ShopFilters } from "@/lib/shopFacetsQuery";
 import api from "@/lib/api";
 
 const SEARCH_DEBOUNCE_MS = 380;
@@ -32,22 +32,7 @@ const FILTERS_REVEAL_DELAY_MS = 120;
 /** Minimum time the grid overlay stays visible after a filter change (covers instant cache hits). */
 const PRODUCTS_REFRESH_MIN_MS = 400;
 
-type Filters = UseProductsOptions & Record<string, unknown>;
-
-const DEFAULT_FILTERS: Filters = { search: "", sort: "newest", page: 1 };
-
-function hasNarrowingFilters(filters: Filters): boolean {
-    if (typeof filters.category === "string" && filters.category.trim()) return true;
-    if (typeof filters.subcategories === "string" && filters.subcategories.trim()) return true;
-    if (typeof filters.brand === "string" && filters.brand.trim()) return true;
-    if (filters.minPrice !== undefined || filters.maxPrice !== undefined) return true;
-    if (typeof filters.search === "string" && filters.search.trim()) return true;
-    if (filters.availability) return true;
-    if (filters.inStock === "true") return true;
-    if (filters.isFeatured === true || filters.isFeatured === false || filters.isFeatured === "true" || filters.isFeatured === "false") return true;
-    if (filters.spec && typeof filters.spec === "object" && Object.keys(filters.spec).length > 0) return true;
-    return false;
-}
+type Filters = ShopFilters;
 
 export interface ShopContentProps {
     basePath?: string;
@@ -82,7 +67,7 @@ export function ShopContent({
                 }
             }
         }
-        return { ...DEFAULT_FILTERS, ...(initialFilters ?? {}) };
+        return buildShopFilters(initialFilters);
     });
 
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -112,7 +97,8 @@ export function ShopContent({
                 limit: SHOP_PRODUCTS_PER_PAGE,
                 includeFacets: false,
             });
-            const facetOpts = getProductFacetsQueryOptions(next);
+            // Must match the live query key exactly — `next` still carries page/sort.
+            const facetOpts = getProductFacetsQueryOptions(shopFacetsOptions(next));
             void queryClient.prefetchQuery({ ...listOpts, staleTime: SHOP_LIST_STALE_MS });
             void queryClient.prefetchQuery({ ...facetOpts, staleTime: SHOP_LIST_STALE_MS });
         },
@@ -281,23 +267,16 @@ export function ShopContent({
         limit: SHOP_PRODUCTS_PER_PAGE,
         includeFacets: false,
     });
-    // Fetch facets asynchronously so grid can render sooner
-    const facetsFilters = useMemo(() => {
-        const rest = { ...filters };
-        delete rest.page;
-        delete rest.sort;
-        return rest;
-    }, [filters]);
-    const facetsMode = hasNarrowingFilters(facetsFilters) ? "full" : "lite";
+    // Facets are hydrated from SSR on first load; this query keeps them in sync
+    // as filters change. Options come from `shopFacetsOptions` so the cache key
+    // matches the server prefetch and the hover prefetch.
+    const facetsOptions = useMemo(() => shopFacetsOptions(filters), [filters]);
     const {
         data: facetsData,
         isLoading: isFacetsLoading,
         isFetching: isFacetsFetching,
         refetch: refetchFacets,
-    } = useProductFacets({
-        ...facetsFilters,
-        facetMode: facetsMode,
-    });
+    } = useProductFacets(facetsOptions);
     const products = data?.products || [];
     const listingKey = JSON.stringify(filters);
     const prevListingKeyRef = useRef(listingKey);
@@ -390,6 +369,13 @@ export function ShopContent({
         return () =>
             window.clearTimeout(timer);
     }, [isFacetsLoading, isFacetsFetching, facetsData, showFiltersPanel]);
+
+    /**
+     * Facets hydrated from SSR are present on the very first render, so the sidebar
+     * ships visible in the HTML — no reveal timer, no fade-in. The effect above only
+     * still matters when the SSR prefetch missed its budget and the client fetches.
+     */
+    const hasFacetData = Boolean(facetsData);
 
     useEffect(() => {
         if (!showFiltersPanel) return;
@@ -566,7 +552,7 @@ export function ShopContent({
         onNavigateToProduct: rememberCurrentShopState,
     } as const;
     const visibleProducts = products.slice(0, Math.min(visibleProductsCount, products.length));
-    const shouldShowFiltersPanel = showFiltersPanel || isSidebarOpen;
+    const shouldShowFiltersPanel = showFiltersPanel || isSidebarOpen || hasFacetData;
 
     const getPageNumbers = () => {
         if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1);
@@ -659,24 +645,34 @@ export function ShopContent({
                     </button>
                 </div>
 
-                <div
-                    className={`transition-opacity duration-300 ${
-                        shouldShowFiltersPanel
-                            ? "opacity-100"
-                            : "pointer-events-none opacity-0"
-                    }`}
-                >
-                    <DynamicFilterSidebar
-                        facets={facets}
-                        filters={filters}
-                        setFilters={setFilters}
-                        isOpen={isSidebarOpen}
-                        onClose={() => setIsSidebarOpen(false)}
-                        onCategoryPrefetchEnter={prefetchCategoryHover}
-                        onSubcategoryPrefetchEnter={prefetchSubcategoryHover}
-                        onBrandPrefetchEnter={prefetchBrandHover}
-                        onSpecPrefetchEnter={prefetchSpecHover}
-                    />
+                <div className="relative lg:shrink-0">
+                    {/* Shown only when the SSR facet prefetch missed its budget, so the
+                        column reads as "loading" instead of silently absent. The real
+                        sidebar stays mounted underneath (it owns the mobile drawer), and
+                        the skeleton holds the same 17rem column width — no layout shift
+                        when facets land. */}
+                    {!shouldShowFiltersPanel && <FilterSidebarSkeleton />}
+
+                    <div
+                        className={
+                            shouldShowFiltersPanel
+                                ? "transition-opacity duration-300 opacity-100"
+                                : "pointer-events-none absolute inset-0 opacity-0"
+                        }
+                        aria-hidden={!shouldShowFiltersPanel}
+                    >
+                        <DynamicFilterSidebar
+                            facets={facets}
+                            filters={filters}
+                            setFilters={setFilters}
+                            isOpen={isSidebarOpen}
+                            onClose={() => setIsSidebarOpen(false)}
+                            onCategoryPrefetchEnter={prefetchCategoryHover}
+                            onSubcategoryPrefetchEnter={prefetchSubcategoryHover}
+                            onBrandPrefetchEnter={prefetchBrandHover}
+                            onSpecPrefetchEnter={prefetchSpecHover}
+                        />
+                    </div>
                 </div>
 
                 <div ref={productsTopRef} className="flex-1 min-w-0 space-y-6">
@@ -858,6 +854,33 @@ export function ShopContent({
                         </>
                     )}
                 </div>
+            </div>
+        </div>
+    );
+}
+
+function FilterSidebarSkeleton() {
+    return (
+        <div
+            className="hidden animate-pulse lg:block lg:w-[17rem] lg:shrink-0 lg:self-start lg:rounded-2xl lg:border lg:border-white/[0.08] lg:bg-zinc-900/50"
+            aria-hidden
+        >
+            <div className="flex items-center gap-2.5 border-b border-white/[0.06] px-4 py-3.5">
+                <div className="h-7 w-7 rounded-lg bg-zinc-800" />
+                <div className="h-4 w-16 rounded-full bg-zinc-800" />
+            </div>
+            <div className="space-y-6 px-4 py-5">
+                {[...Array(4)].map((_, section) => (
+                    <div key={section} className="space-y-3">
+                        <div className="h-3.5 w-24 rounded-full bg-zinc-800" />
+                        {[...Array(4)].map((_, row) => (
+                            <div key={row} className="flex items-center gap-2.5">
+                                <div className="h-4 w-4 shrink-0 rounded bg-zinc-800/70" />
+                                <div className="h-3 flex-1 rounded-full bg-zinc-800/50" />
+                            </div>
+                        ))}
+                    </div>
+                ))}
             </div>
         </div>
     );
