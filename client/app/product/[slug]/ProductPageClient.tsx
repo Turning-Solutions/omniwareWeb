@@ -590,23 +590,28 @@ function ProductPageInner({ slug }: { slug: string }) {
                                                 </div>
                                             )}
                                             <div className="divide-y divide-white/[0.06]">
-                                                {group.attributes.map((attr, i) => (
-                                                    <div
-                                                        key={i}
-                                                        className="grid grid-cols-1 gap-x-5 gap-y-1 px-4 py-3.5 text-sm transition-colors hover:bg-white/[0.02] sm:grid-cols-[190px_1fr] sm:px-5"
-                                                    >
-                                                        {attr.name && (
+                                                {group.attributes.map((attr, i) =>
+                                                    attr.name ? (
+                                                        <div
+                                                            key={i}
+                                                            className="grid grid-cols-1 gap-x-5 gap-y-1 px-4 py-3.5 text-sm transition-colors hover:bg-white/[0.02] sm:grid-cols-[190px_1fr] sm:px-5"
+                                                        >
                                                             <span className="font-medium text-[#8E8E8E]">
                                                                 {formatSpecificationLabel(attr.name)}
                                                             </span>
-                                                        )}
-                                                        <div
-                                                            className={`whitespace-pre-line break-words leading-relaxed text-[#D4D4D4] ${!attr.name ? "sm:col-span-2" : ""}`}
-                                                        >
-                                                            {renderRichText(attr.value)}
+                                                            <div className="whitespace-pre-line break-words leading-relaxed text-[#D4D4D4]">
+                                                                {renderRichText(attr.value)}
+                                                            </div>
                                                         </div>
-                                                    </div>
-                                                ))}
+                                                    ) : (
+                                                        <div
+                                                            key={i}
+                                                            className="px-4 py-3.5 text-sm leading-relaxed text-[#D4D4D4] transition-colors hover:bg-white/[0.02] sm:px-5"
+                                                        >
+                                                            <div className="whitespace-pre-line break-words">{renderRichText(attr.value)}</div>
+                                                        </div>
+                                                    )
+                                                )}
                                             </div>
                                         </div>
                                     ))}

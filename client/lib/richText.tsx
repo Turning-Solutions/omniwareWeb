@@ -8,7 +8,7 @@ const BARE_URL_RE = /(https?:\/\/[^\s<>()]+)/g;
  * bare URLs, turning both into clickable <a> tags while leaving the rest as text.
  * Lets admins hyperlink a word or phrase without exposing the raw URL.
  */
-export function renderRichText(text: string | undefined | null, linkClassName = "text-[#D12B28] hover:underline"): ReactNode {
+export function renderRichText(text: string | undefined | null, linkClassName = "text-[#D12B28] underline underline-offset-2"): ReactNode {
     if (!text) return text ?? null;
 
     const nodes: ReactNode[] = [];

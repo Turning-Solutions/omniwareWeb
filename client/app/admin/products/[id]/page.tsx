@@ -8,6 +8,7 @@ import Link from "next/link";
 import api from "@/lib/api";
 import toast from "react-hot-toast";
 import { buildProductSeo, type SeoProduct } from "@/lib/seo/productSeo";
+import LinkInsertDialog from "@/components/LinkInsertDialog";
 
 interface Brand {
     _id: string;
@@ -100,31 +101,12 @@ function getApiErrorMessage(error: unknown) {
     return error.message || "Failed to save product";
 }
 
-/**
- * Wraps the selected text (or prompts for label text if nothing is selected) in
- * `[label](url)` markdown syntax, so only that word/phrase renders as a link on
- * the storefront instead of the whole field — the raw URL never has to be shown.
- */
-function insertMarkdownLink(textareaId: string, currentValue: string, onChange: (next: string) => void) {
-    const el = typeof document !== "undefined" ? (document.getElementById(textareaId) as HTMLTextAreaElement | null) : null;
+/** Reads the current text selection from a textarea/input, falling back to the end of the value. */
+function getFieldSelection(fieldId: string, currentValue: string): { start: number; end: number } {
+    const el = typeof document !== "undefined" ? (document.getElementById(fieldId) as HTMLTextAreaElement | HTMLInputElement | null) : null;
     const start = el?.selectionStart ?? currentValue.length;
     const end = el?.selectionEnd ?? currentValue.length;
-    const selected = currentValue.slice(start, end);
-    const label = (selected || window.prompt("Text to display as the link:", "") || "").trim();
-    if (!label) return;
-    const url = window.prompt("Link URL:", "https://")?.trim();
-    if (!url) return;
-    const markdown = `[${label}](${url})`;
-    const nextValue = currentValue.slice(0, start) + markdown + currentValue.slice(end);
-    onChange(nextValue);
-    requestAnimationFrame(() => {
-        const refreshed = document.getElementById(textareaId) as HTMLTextAreaElement | null;
-        if (refreshed) {
-            const pos = start + markdown.length;
-            refreshed.focus();
-            refreshed.setSelectionRange(pos, pos);
-        }
-    });
+    return { start, end };
 }
 
 function suggestHexFromColorName(name: string): string {
@@ -219,6 +201,13 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
     const [initialCategoryDiscountPercent, setInitialCategoryDiscountPercent] = useState<string>("");
     // Selected attributes for "move to category": Set of "groupIndex-attrIndex"
     const [selectedAttributeKeys, setSelectedAttributeKeys] = useState<Set<string>>(new Set());
+    const [linkDialog, setLinkDialog] = useState<{
+        fieldId: string;
+        start: number;
+        end: number;
+        currentValue: string;
+        onChange: (next: string) => void;
+    } | null>(null);
     const previewTarget = !isNew ? (formData.slug?.trim() || id) : "";
     const previewPath = previewTarget ? `/product/${previewTarget}?preview=${previewRefreshKey}` : "";
     const mainCategories = sortByName(categories.filter((category) => !category.parentId));
@@ -667,6 +656,28 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
             return { ...g, attributes: newAttrs };
         });
         setFormData({ ...formData, attributeGroups: newGroups });
+    };
+
+    const openLinkDialog = (fieldId: string, currentValue: string, onChange: (next: string) => void) => {
+        const { start, end } = getFieldSelection(fieldId, currentValue);
+        setLinkDialog({ fieldId, start, end, currentValue, onChange });
+    };
+
+    const handleInsertLink = (label: string, url: string) => {
+        if (!linkDialog) return;
+        const { fieldId, start, end, currentValue, onChange } = linkDialog;
+        const markdown = `[${label}](${url})`;
+        const nextValue = currentValue.slice(0, start) + markdown + currentValue.slice(end);
+        onChange(nextValue);
+        setLinkDialog(null);
+        requestAnimationFrame(() => {
+            const refreshed = document.getElementById(fieldId) as HTMLTextAreaElement | HTMLInputElement | null;
+            if (refreshed) {
+                const pos = start + markdown.length;
+                refreshed.focus();
+                refreshed.setSelectionRange(pos, pos);
+            }
+        });
     };
 
     const addAttributeGroup = () => {
@@ -1398,7 +1409,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                         <button
                             type="button"
                             onClick={() =>
-                                insertMarkdownLink("product-description", formData.description, (next) =>
+                                openLinkDialog("product-description", formData.description, (next) =>
                                     setFormData({ ...formData, description: next })
                                 )
                             }
@@ -1993,7 +2004,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                                             <button
                                                 type="button"
                                                 onClick={() =>
-                                                    insertMarkdownLink(`attr-value-${groupIndex}-${attrIndex}`, attr.value ?? '', (next) =>
+                                                    openLinkDialog(`attr-value-${groupIndex}-${attrIndex}`, attr.value ?? '', (next) =>
                                                         updateAttribute(groupIndex, attrIndex, "value", next)
                                                     )
                                                 }
@@ -2048,6 +2059,13 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                     </div>
                 </section>
             </form>
+
+            <LinkInsertDialog
+                open={!!linkDialog}
+                initialLabel={linkDialog ? linkDialog.currentValue.slice(linkDialog.start, linkDialog.end) : ""}
+                onCancel={() => setLinkDialog(null)}
+                onInsert={handleInsertLink}
+            />
         </div>
     );
 }
