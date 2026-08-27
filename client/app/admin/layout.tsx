@@ -129,7 +129,7 @@ export default function AdminLayout({
                                 <ShieldCheck className="h-5 w-5" />
                             </div>
                             <div className="min-w-0">
-                                <p className="truncate text-sm font-semibold text-main sm:text-base">Admin Workspace</p>
+                                <p className="truncate text-sm font-semibold text-[#edeef1] sm:text-base">Admin Workspace</p>
                                 <p className="truncate text-xs text-sub">{currentSection}</p>
                             </div>
                         </div>
