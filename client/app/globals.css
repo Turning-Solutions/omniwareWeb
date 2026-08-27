@@ -7,39 +7,39 @@
     --store-accent: #d12b28;
 }
 
-/* Admin: soothing dark theme — applied via .admin-theme wrapper */
+/* Admin: "Indigo Slate" dark theme — applied via .admin-theme wrapper */
 :root {
-    --admin-bg: #0d0e12;
-    --admin-surface: #16181d;
+    --admin-bg: #0b0c10;
+    --admin-surface: #131417;
     --admin-base: #bebebe;
-    --admin-border: #2a2d35;
-    --admin-main: #e2e4e9;
-    --admin-sub: #8c8f99;
-    --admin-accent: #5ba89c;
-    --admin-accent-soft: #3d7a72;
+    --admin-border: #2a2c32;
+    --admin-main: #edeef1;
+    --admin-sub: #94969e;
+    --admin-accent: #6d6af6;
+    --admin-accent-soft: #4b48c4;
     /* Semantic status tones — shared by every status pill/badge across admin pages */
-    --admin-success: var(--admin-accent);
-    --admin-warning: #c9a24d;
-    --admin-danger: #c96a63;
-    --admin-info: #5b84a8;
+    --admin-success: #34b978;
+    --admin-warning: #d9a441;
+    --admin-danger: #ea5a4f;
+    --admin-info: #4f8ff7;
     --admin-neutral: var(--admin-sub);
 }
 
 .admin-theme {
     --background: var(--admin-bg);
     --foreground: var(--admin-main);
-    --admin-main: #e2e4e9;
-    --admin-sub: #8c8f99;
-    --admin-surface: #16181d;
-    --admin-base: #1c1e24;
-    --admin-border: #2a2d35;
-    --admin-accent: #5ba89c;
-    --admin-success: var(--admin-accent);
-    --admin-warning: #c9a24d;
-    --admin-danger: #c96a63;
-    --admin-info: #5b84a8;
-    --admin-neutral: #8c8f99;
-    /* Inside admin, accent + primary utilities use admin teal */
+    --admin-main: #edeef1;
+    --admin-sub: #94969e;
+    --admin-surface: #131417;
+    --admin-base: #1a1c20;
+    --admin-border: #2a2c32;
+    --admin-accent: #6d6af6;
+    --admin-success: #34b978;
+    --admin-warning: #d9a441;
+    --admin-danger: #ea5a4f;
+    --admin-info: #4f8ff7;
+    --admin-neutral: #94969e;
+    /* Inside admin, accent + primary utilities use the indigo brand accent */
     --store-accent: var(--admin-accent);
 }
 
@@ -66,11 +66,11 @@
     --color-border-soft: var(--admin-border, #e4e4e7);
     --color-accent: var(--store-accent);
     --color-primary: var(--store-accent);
-    --color-success: var(--admin-success, #5ba89c);
-    --color-warning: var(--admin-warning, #c9a24d);
-    --color-danger: var(--admin-danger, #c96a63);
-    --color-info: var(--admin-info, #5b84a8);
-    --color-neutral: var(--admin-neutral, #8c8f99);
+    --color-success: var(--admin-success, #34b978);
+    --color-warning: var(--admin-warning, #d9a441);
+    --color-danger: var(--admin-danger, #ea5a4f);
+    --color-info: var(--admin-info, #4f8ff7);
+    --color-neutral: var(--admin-neutral, #94969e);
     --font-sans: var(--font-geist-sans);
     --font-mono: var(--font-geist-mono);
 }
