@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ShoppingCart, Check, AlertCircle, Clock, Package, ArrowLeft, X } from "lucide-react";
+import { ShoppingCart, Check, AlertCircle, Clock, Package, ArrowLeft, ShieldCheck, X } from "lucide-react";
 import Image from "next/image";
 import { AnimatePresence, motion } from "framer-motion";
 import { useCart } from "@/context/CartContext";
@@ -257,7 +257,7 @@ function ProductPageInner({ slug }: { slug: string }) {
                             <div className="pointer-events-none absolute -right-28 -top-28 h-64 w-64 rounded-full bg-[#D12B28]/10 blur-3xl" aria-hidden />
                             <div className="pointer-events-none absolute -bottom-20 -left-20 h-52 w-52 rounded-full bg-[#D12B28]/6 blur-3xl" aria-hidden />
 
-                            <div className="relative grid grid-cols-1 gap-10 md:grid-cols-2 md:gap-12 lg:gap-14">
+                            <div className="relative grid grid-cols-1 gap-x-10 gap-y-8 md:grid-cols-2 md:gap-x-12 lg:gap-x-14">
                 {/* Image Gallery */}
                 <div>
                     <motion.div
@@ -323,26 +323,46 @@ function ProductPageInner({ slug }: { slug: string }) {
                         </div>
                     )}
 
-                    <div className="mb-6 flex flex-wrap items-center gap-x-6 gap-y-3">
-                        <div className="flex flex-wrap items-baseline gap-3">
-                            <span className="text-3xl font-bold tabular-nums text-[#F1F1F1]">
-                                LKR {currentPrice.toLocaleString()}
-                            </span>
-                            {effectiveDiscountAmount > 0 && (
-                                <span className="text-sm text-[#8E8E8E] line-through">
-                                    LKR {currentOriginalPrice.toLocaleString()}
+                    <div className="mb-6">
+                        <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+                            <div className="flex flex-wrap items-baseline gap-3">
+                                <span className="text-3xl font-bold tabular-nums text-[#F1F1F1]">
+                                    LKR {currentPrice.toLocaleString()}
                                 </span>
-                            )}
-                            {effectiveDiscountAmount > 0 && (
-                                <span className="rounded-full border border-[#D12B28]/35 bg-[#D12B28]/15 px-2.5 py-1 text-xs font-bold text-[#F4C5C5]">
-                                    Save LKR {Math.round(effectiveDiscountAmount).toLocaleString()}
+                                {effectiveDiscountAmount > 0 && (
+                                    <span className="text-sm text-[#8E8E8E] line-through">
+                                        LKR {currentOriginalPrice.toLocaleString()}
+                                    </span>
+                                )}
+                                {effectiveDiscountAmount > 0 && (
+                                    <span className="rounded-full border border-[#D12B28]/35 bg-[#D12B28]/15 px-2.5 py-1 text-xs font-bold text-[#F4C5C5]">
+                                        Save LKR {Math.round(effectiveDiscountAmount).toLocaleString()}
+                                    </span>
+                                )}
+                            </div>
+                            <span className={`flex items-center text-sm font-semibold ${availInfo.className}`}>
+                                <AvailIcon className="h-4 w-4 mr-1" />
+                                {availInfo.label}
+                            </span>
+                            {/* Warranty rides the end of the price row. Kept to the headline figure so it
+                                stays on that line; the breakdown drops to the note below. */}
+                            {(product.warranty || hasExtendedWarranty(product.extendedWarranty)) && (
+                                <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-emerald-500/25 bg-emerald-500/[0.08] px-3 py-1.5 text-xs font-semibold text-emerald-200/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:ml-auto">
+                                    <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-emerald-400" aria-hidden />
+                                    {getCombinedWarrantyLabel(product.warranty, product.extendedWarranty) || product.warranty}
                                 </span>
                             )}
                         </div>
-                        <span className={`flex items-center text-sm font-semibold ${availInfo.className}`}>
-                            <AvailIcon className="h-4 w-4 mr-1" />
-                            {availInfo.label}
-                        </span>
+                        {(() => {
+                            const notes = [
+                                hasExtendedWarranty(product.extendedWarranty)
+                                    ? getWarrantyBreakdownLabel(product.warranty, product.extendedWarranty)
+                                    : null,
+                                product.extendedWarranty?.description || null,
+                            ].filter(Boolean);
+                            if (notes.length === 0) return null;
+                            return <p className="mt-2 text-xs text-emerald-200/70">{notes.join(" · ")}</p>;
+                        })()}
                     </div>
 
                     {availability === "pre_order" && (
@@ -358,26 +378,6 @@ function ProductPageInner({ slug }: { slug: string }) {
                                     always confirm the final price with you before proceeding.
                                 </p>
                             </div>
-                        </div>
-                    )}
-
-                    {(product.warranty || hasExtendedWarranty(product.extendedWarranty)) && (
-                        <div className="mb-6 rounded-2xl border border-emerald-500/25 bg-emerald-500/[0.08] px-4 py-3 text-sm font-medium text-emerald-200/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-                            <div>
-                                Warranty:{" "}
-                                {getCombinedWarrantyLabel(product.warranty, product.extendedWarranty) || product.warranty}
-                                {hasExtendedWarranty(product.extendedWarranty) && (
-                                    <span className="font-normal text-emerald-200/75">
-                                        {" "}
-                                        ({getWarrantyBreakdownLabel(product.warranty, product.extendedWarranty)})
-                                    </span>
-                                )}
-                            </div>
-                            {product.extendedWarranty?.description && (
-                                <p className="mt-1.5 text-xs font-normal text-emerald-200/70">
-                                    {product.extendedWarranty.description}
-                                </p>
-                            )}
                         </div>
                     )}
 
@@ -542,9 +542,7 @@ function ProductPageInner({ slug }: { slug: string }) {
                         </a>
                     </div>
 
-                    <p className="mb-8 whitespace-pre-line text-base leading-relaxed text-[#B0B0B0]">{renderRichText(product.description)}</p>
-
-                    {/* Specs Map (filter specs) — sits where Product details used to */}
+                    {/* Specs Map (filter specs) — key specs sit above the prose description. */}
                     {product.specs && Object.keys(product.specs).length > 0 && (
                         <div className="mb-8">
                             <h3 className="mb-4 flex items-center gap-2 text-base font-semibold text-[#F1F1F1]">
@@ -564,6 +562,8 @@ function ProductPageInner({ slug }: { slug: string }) {
                             </div>
                         </div>
                     )}
+
+                    <p className="mb-8 whitespace-pre-line text-base leading-relaxed text-[#B0B0B0]">{renderRichText(product.description)}</p>
                 </motion.div>
 
                             {/* Product details (attributes by category) — full-width band, categories divided inside */}
@@ -577,7 +577,7 @@ function ProductPageInner({ slug }: { slug: string }) {
                                 if (groups.length === 0) return null;
 
                                 return (
-                                    <div className="col-span-full mt-10 border-t border-white/[0.08] pt-10 md:col-span-2">
+                                    <div className="col-span-full border-t border-white/[0.08] pt-7 md:col-span-2">
                                         <h3 className="mb-4 flex items-center gap-2 text-base font-semibold text-[#F1F1F1]">
                                             <AlertCircle className="h-4 w-4 text-[#D12B28]" aria-hidden /> Product details
                                         </h3>
