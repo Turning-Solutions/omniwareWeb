@@ -400,7 +400,7 @@ export function ShopContent({
         if (prevCategoryRef.current !== filters.category) {
             // eslint-disable-next-line react-hooks/set-state-in-effect -- derived reset when department changes
             setFilters((prev) => {
-                const next = { ...prev };
+                const next = { ...prev, page: 1 };
                 delete next.spec;
                 delete next.brand;
                 delete next.subcategories;
@@ -471,7 +471,7 @@ export function ShopContent({
         if (changed) {
             // eslint-disable-next-line react-hooks/set-state-in-effect -- drop spec keys no longer in facet response
             setFilters((prev: Filters) => {
-                const next = { ...prev };
+                const next = { ...prev, page: 1 };
                 if (Object.keys(newSpecParams).length > 0) {
                     next.spec = newSpecParams;
                 } else {
@@ -546,6 +546,20 @@ export function ShopContent({
     const totalPages = pagination?.pages ?? (data as { pages?: number })?.pages ?? 1;
     const totalProducts = pagination?.total ?? (data as { total?: number })?.total;
     const showPagination = totalPages > 1 && !isLoading && !error;
+
+    // A `page` left over from a wider result set (bookmarked/shared URL, or a
+    // product removed since) can point past the last page. The response still
+    // reports the real total, so the header reads "N products" over an empty
+    // grid. Snap back to the last real page once the count is known.
+    useEffect(() => {
+        if (isLoading || isPlaceholderData || !data) return;
+        const requestedPage = typeof filters.page === "number" ? filters.page : 1;
+        if (requestedPage > 1 && requestedPage > totalPages) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect -- clamp a stale page to the last real one
+            setFilters((prev: Filters) => ({ ...prev, page: Math.max(totalPages, 1) }));
+        }
+    }, [data, isLoading, isPlaceholderData, filters.page, totalPages, setFilters]);
+
     const shopProductCardProps = {
         showWhatsAppButton: false,
         showOrderNowButton: true,

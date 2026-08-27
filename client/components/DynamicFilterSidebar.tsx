@@ -789,12 +789,12 @@ export default function DynamicFilterSidebar({
     }, [facets.price, filters.minPrice, filters.maxPrice]);
 
     const applyPriceFilter = () =>
-        setFilters({ ...filters, minPrice: priceRange.min, maxPrice: priceRange.max });
+        setFilters({ ...filters, minPrice: priceRange.min, maxPrice: priceRange.max, page: 1 });
 
     const resetPriceFilter = () => {
         if (!facets.price) return;
         setPriceRange({ min: facets.price.min, max: facets.price.max });
-        const next = { ...filters };
+        const next = { ...filters, page: 1 };
         delete next.minPrice;
         delete next.maxPrice;
         setFilters(next);
@@ -806,7 +806,7 @@ export default function DynamicFilterSidebar({
         const next = current.includes(slug)
             ? current.filter((b: string) => b !== slug)
             : [...current, slug];
-        const updated = { ...filters, brand: next.join(",") };
+        const updated = { ...filters, brand: next.join(","), page: 1 };
         if (next.length === 0) delete updated.brand;
         setFilters(updated);
     };
@@ -820,7 +820,7 @@ export default function DynamicFilterSidebar({
         const newSpec = { ...currentSpec };
         if (next.length > 0) newSpec[key] = next.join(",");
         else delete newSpec[key];
-        const updated = { ...filters, spec: newSpec };
+        const updated = { ...filters, spec: newSpec, page: 1 };
         if (Object.keys(newSpec).length === 0) delete updated.spec;
         setFilters(updated);
     };
@@ -892,7 +892,7 @@ export default function DynamicFilterSidebar({
                 id: `cat-${filters.category}`,
                 label: lbl,
                 onRemove: () => {
-                    const next = { ...filters };
+                    const next = { ...filters, page: 1 };
                     delete next.category;
                     delete next.subcategories;
                     delete next.brand;

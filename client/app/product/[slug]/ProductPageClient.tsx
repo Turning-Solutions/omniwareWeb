@@ -305,26 +305,6 @@ function ProductPageInner({ slug }: { slug: string }) {
                             ))}
                         </div>
                     )}
-
-                    {/* Specs Map (filter specs) */}
-                    {product.specs && Object.keys(product.specs).length > 0 && (
-                        <div className="mt-6 rounded-2xl border border-white/[0.07] bg-[#121212]/90 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-                            <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-[#F1F1F1]">
-                                <AlertCircle className="h-4 w-4 text-[#D12B28]" aria-hidden />
-                                Specifications
-                            </h3>
-                            <div className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
-                                {Object.entries(product.specs).map(([key, value]) => (
-                                    <div key={key}>
-                                        <span className="block text-[11px] font-medium uppercase tracking-wide text-[#8E8E8E]">
-                                            {formatSpecificationLabel(key)}
-                                        </span>
-                                        <span className="text-[#D4D4D4]">{value as string}</span>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
                 </div>
 
                 {/* Product Info */}
@@ -564,57 +544,79 @@ function ProductPageInner({ slug }: { slug: string }) {
 
                     <p className="mb-8 whitespace-pre-line text-base leading-relaxed text-[#B0B0B0]">{renderRichText(product.description)}</p>
 
-                    {/* Product details (attributes by category) — one box, categories divided inside */}
-                    {(() => {
-                        const groups: { category: string; attributes: { name?: string; value: string }[] }[] = product.attributeGroups?.length
-                            ? product.attributeGroups
-                            : product.attributes?.length
-                              ? [{ category: "General", attributes: product.attributes }]
-                              : [];
-
-                        if (groups.length === 0) return null;
-
-                        return (
-                            <div className="mb-8">
-                                <h3 className="mb-4 flex items-center gap-2 text-base font-semibold text-[#F1F1F1]">
-                                    <AlertCircle className="h-4 w-4 text-[#D12B28]" aria-hidden /> Product details
-                                </h3>
-                                <div className="overflow-hidden rounded-2xl border border-white/[0.07] bg-[#121212]/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-                                    {groups.map((group, idx) => (
-                                        <div key={idx}>
-                                            {groups.length > 1 && (
-                                                <div className="border-b border-white/[0.06] bg-white/[0.03] px-4 py-2.5 sm:px-5">
-                                                    <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-[#D12B28]/85">
-                                                        {formatSpecificationLabel(group.category)}
-                                                    </span>
-                                                </div>
-                                            )}
-                                            <div className="divide-y divide-white/[0.06]">
-                                                {group.attributes.map((attr, i) => (
-                                                    <div
-                                                        key={i}
-                                                        className="grid grid-cols-1 gap-x-5 gap-y-1 px-4 py-3.5 text-sm transition-colors hover:bg-white/[0.02] sm:grid-cols-[190px_1fr] sm:px-5"
-                                                    >
-                                                        {attr.name ? (
-                                                            <span className="font-medium text-[#8E8E8E]">
-                                                                {formatSpecificationLabel(attr.name)}
-                                                            </span>
-                                                        ) : (
-                                                            <span className="hidden sm:block" aria-hidden />
-                                                        )}
-                                                        <div className="whitespace-pre-line break-words leading-relaxed text-[#D4D4D4]">
-                                                            {renderRichText(attr.value)}
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
+                    {/* Specs Map (filter specs) — sits where Product details used to */}
+                    {product.specs && Object.keys(product.specs).length > 0 && (
+                        <div className="mb-8">
+                            <h3 className="mb-4 flex items-center gap-2 text-base font-semibold text-[#F1F1F1]">
+                                <AlertCircle className="h-4 w-4 text-[#D12B28]" aria-hidden /> Specifications
+                            </h3>
+                            <div className="rounded-2xl border border-white/[0.07] bg-[#121212]/90 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                                <div className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
+                                    {Object.entries(product.specs).map(([key, value]) => (
+                                        <div key={key}>
+                                            <span className="block text-[11px] font-medium uppercase tracking-wide text-[#8E8E8E]">
+                                                {formatSpecificationLabel(key)}
+                                            </span>
+                                            <span className="text-[#D4D4D4]">{value as string}</span>
                                         </div>
                                     ))}
                                 </div>
                             </div>
-                        );
-                    })()}
+                        </div>
+                    )}
                 </motion.div>
+
+                            {/* Product details (attributes by category) — full-width band, categories divided inside */}
+                            {(() => {
+                                const groups: { category: string; attributes: { name?: string; value: string }[] }[] = product.attributeGroups?.length
+                                    ? product.attributeGroups
+                                    : product.attributes?.length
+                                      ? [{ category: "General", attributes: product.attributes }]
+                                      : [];
+
+                                if (groups.length === 0) return null;
+
+                                return (
+                                    <div className="col-span-full mt-10 border-t border-white/[0.08] pt-10 md:col-span-2">
+                                        <h3 className="mb-4 flex items-center gap-2 text-base font-semibold text-[#F1F1F1]">
+                                            <AlertCircle className="h-4 w-4 text-[#D12B28]" aria-hidden /> Product details
+                                        </h3>
+                                        <div className="overflow-hidden rounded-2xl border border-white/[0.07] bg-[#121212]/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                                            {groups.map((group, idx) => (
+                                                <div key={idx}>
+                                                    {groups.length > 1 && (
+                                                        <div className="border-b border-white/[0.06] bg-white/[0.03] px-4 py-2.5 sm:px-5">
+                                                            <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-[#D12B28]/85">
+                                                                {formatSpecificationLabel(group.category)}
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                    <div className="divide-y divide-white/[0.06]">
+                                                        {group.attributes.map((attr, i) => (
+                                                            <div
+                                                                key={i}
+                                                                className="grid grid-cols-1 gap-x-5 gap-y-1 px-4 py-3.5 text-sm transition-colors hover:bg-white/[0.02] sm:grid-cols-[190px_1fr] sm:px-5"
+                                                            >
+                                                                {attr.name ? (
+                                                                    <span className="font-medium text-[#8E8E8E]">
+                                                                        {formatSpecificationLabel(attr.name)}
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className="hidden sm:block" aria-hidden />
+                                                                )}
+                                                                <div className="whitespace-pre-line break-words leading-relaxed text-[#D4D4D4]">
+                                                                    {renderRichText(attr.value)}
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                );
+                            })()}
+
                             <div className="col-span-full mt-10 border-t border-white/[0.08] pt-10 md:col-span-2">
                                 <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
                                     <div>
