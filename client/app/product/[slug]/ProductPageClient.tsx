@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ShoppingCart, Check, AlertCircle, Clock, Package, ArrowLeft, ShieldCheck, X } from "lucide-react";
 import Image from "next/image";
 import { AnimatePresence, motion } from "framer-motion";
@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation";
 
 import ProductCard from "@/components/ProductCard";
 import { useProduct, useProducts } from "@/hooks/useProducts";
+import api from "@/lib/api";
 import { buildProductWhatsAppUrl } from "@/lib/whatsapp";
 import { renderRichText } from "@/lib/richText";
 import { getCombinedWarrantyLabel, getWarrantyBreakdownLabel, hasExtendedWarranty } from "@/lib/warranty";
@@ -73,6 +74,14 @@ function ProductPageInner({ slug }: { slug: string }) {
         setSelectedVariant(null);
         setQty(1);
     }, [product]);
+
+    // Record a page view once per product load (fire-and-forget, never blocks the UI)
+    const trackedProductId = useRef<string | null>(null);
+    useEffect(() => {
+        if (!product?._id || trackedProductId.current === product._id) return;
+        trackedProductId.current = product._id;
+        api.post("/events", { type: "product_view", productId: product._id }).catch(() => {});
+    }, [product?._id]);
 
     useEffect(() => {
         if (!cartToastVisible) return undefined;

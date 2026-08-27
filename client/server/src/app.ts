@@ -67,7 +67,7 @@ function createApp() {
     app.use('/api/v1/admin/quotes', adminQuotesRoutes);
     app.use('/api/v1/admin', adminRoutes);
     app.use('/api/v1/builder', builderRoutes);
-    app.use('/api/v1/analytics', analyticsRoutes);
+    app.use('/api/v1', analyticsRoutes); // analyticsRoutes defines its own full sub-paths (e.g. /events)
     app.use('/api/v1/promotions', promotionRoutes);
     app.use('/api/v1/partners', partnerRoutes);
     app.use('/api/v1/quotes', quoteRoutes);

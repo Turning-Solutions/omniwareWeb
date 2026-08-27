@@ -214,3 +214,126 @@ export const getAnalyticsSummary = async (req: Request, res: Response) => {
         res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: 'Failed to fetch analytics' } });
     }
 };
+
+/**
+ * GET /api/v1/admin/analytics/product-views
+ * Returns per-product view counts, most-viewed first, aggregated live from the Event log.
+ * Query: range (today|7d|30d|all, default 30d), search (product title), page, limit
+ */
+export const getProductViewStats = async (req: Request, res: Response) => {
+    try {
+        const { range = '30d', search, page = '1', limit = '20' } = req.query;
+
+        const pageNum = Math.max(parseInt(page as string, 10) || 1, 1);
+        const limitNum = Math.min(Math.max(parseInt(limit as string, 10) || 20, 1), 100);
+        const skip = (pageNum - 1) * limitNum;
+
+        const match: Record<string, any> = { type: 'product_view', productId: { $exists: true, $ne: null } };
+
+        if (range !== 'all') {
+            const start = new Date();
+            if (range === 'today') {
+                start.setHours(0, 0, 0, 0);
+            } else if (range === '7d') {
+                start.setDate(start.getDate() - 7);
+            } else {
+                // Default / '30d'
+                start.setDate(start.getDate() - 30);
+            }
+            match.ts = { $gte: start };
+        }
+
+        const searchTerm = typeof search === 'string' ? search.trim() : '';
+
+        const basePipeline: any[] = [
+            { $match: match },
+            { $group: { _id: '$productId', views: { $sum: 1 }, lastViewedAt: { $max: '$ts' } } },
+            {
+                $lookup: {
+                    from: 'products',
+                    localField: '_id',
+                    foreignField: '_id',
+                    as: 'product'
+                }
+            },
+            { $unwind: '$product' }
+        ];
+
+        if (searchTerm) {
+            basePipeline.push({ $match: { 'product.title': { $regex: searchTerm, $options: 'i' } } });
+        }
+
+        const [rows] = await Event.aggregate([
+            ...basePipeline,
+            { $sort: { views: -1 } },
+            {
+                $facet: {
+                    data: [
+                        { $skip: skip },
+                        { $limit: limitNum },
+                        {
+                            $project: {
+                                _id: 0,
+                                productId: '$_id',
+                                views: 1,
+                                lastViewedAt: 1,
+                                title: '$product.title',
+                                slug: '$product.slug',
+                                image: { $arrayElemAt: ['$product.images', 0] },
+                                price: '$product.price',
+                                isActive: '$product.isActive'
+                            }
+                        }
+                    ],
+                    totals: [
+                        {
+                            $group: {
+                                _id: null,
+                                totalViews: { $sum: '$views' },
+                                distinctProducts: { $sum: 1 }
+                            }
+                        }
+                    ],
+                    top: [
+                        { $limit: 1 },
+                        {
+                            $project: {
+                                _id: 0,
+                                productId: '$_id',
+                                views: 1,
+                                lastViewedAt: 1,
+                                title: '$product.title',
+                                slug: '$product.slug',
+                                image: { $arrayElemAt: ['$product.images', 0] },
+                                price: '$product.price',
+                                isActive: '$product.isActive'
+                            }
+                        }
+                    ]
+                }
+            }
+        ]);
+
+        const data = rows?.data ?? [];
+        const totals = rows?.totals?.[0] ?? { totalViews: 0, distinctProducts: 0 };
+        const topProduct = rows?.top?.[0] ?? null;
+
+        res.json({
+            data,
+            pagination: {
+                page: pageNum,
+                limit: limitNum,
+                total: totals.distinctProducts,
+                pages: Math.max(1, Math.ceil(totals.distinctProducts / limitNum))
+            },
+            totals: {
+                totalViews: totals.totalViews,
+                distinctProducts: totals.distinctProducts,
+                topProduct
+            }
+        });
+    } catch (error) {
+        console.error('Get Product View Stats Error:', error);
+        res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: 'Failed to fetch product view stats' } });
+    }
+};

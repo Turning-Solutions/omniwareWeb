@@ -2,7 +2,7 @@ import express from 'express';
 import { requireAuth } from '../middleware/requireAuth';
 import { requireAdmin } from '../middleware/requireAdmin';
 import { getOrders, updateOrderStatus, getOrderById } from '../controllers/orderController';
-import { getAnalyticsSummary } from '../controllers/analyticsController';
+import { getAnalyticsSummary, getProductViewStats } from '../controllers/analyticsController';
 import { listAdminReviews, updateReviewStatus, deleteAdminReview } from '../controllers/adminReviewController';
 import {
     getGoogleReviewSyncStatus,
@@ -18,6 +18,7 @@ router.use(requireAuth, requireAdmin);
 
 // Analytics
 router.get('/analytics/summary', getAnalyticsSummary);
+router.get('/analytics/product-views', getProductViewStats);
 
 // Orders
 router.get('/orders', getOrders);

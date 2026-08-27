@@ -37,7 +37,7 @@ app.use('/api/v1/admin/products', adminProductRoutes);
 app.use('/api/v1/admin/categories', featuredSpecsRoutes);
 app.use('/api/v1/admin', adminRoutes);
 app.use('/api/v1/builder', builderRoutes);
-app.use('/api/v1/analytics', analyticsRoutes); // Mount analytics routes
+app.use('/api/v1', analyticsRoutes); // Mount analytics routes (routes below already define full sub-paths)
 app.use('/api/v1/reviews', reviewRoutes);
 
 app.get('/', (req, res) => {
