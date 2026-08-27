@@ -4,6 +4,9 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Search, Eye } from "lucide-react";
 import api from "@/lib/api";
+import PageHeader from "@/components/admin/PageHeader";
+import StatusBadge, { type StatusTone } from "@/components/admin/StatusBadge";
+import Pagination from "@/components/admin/Pagination";
 
 interface Order {
     _id: string;
@@ -65,26 +68,25 @@ export default function AdminOrdersPage() {
         return () => clearTimeout(timer);
     }, [search, status, minTotal, maxTotal, sort, page]);
 
-    const getStatusColor = (status: string) => {
+    const getStatusTone = (status: string): StatusTone => {
         switch (status) {
-            case 'confirmed': return 'text-blue-400 bg-blue-400/10';
-            case 'preparing': return 'text-purple-400 bg-purple-400/10';
-            case 'ready_for_pickup': return 'text-cyan-400 bg-cyan-400/10';
-            case 'out_for_delivery': return 'text-indigo-400 bg-indigo-400/10';
-            case 'delivered': return 'text-green-400 bg-green-400/10';
-            case 'waiting_confirmation': return 'text-yellow-400 bg-yellow-400/10';
-            case 'rejected': return 'text-red-400 bg-red-400/10';
-            default: return 'text-gray-400 bg-gray-400/10';
+            case 'confirmed':
+            case 'preparing':
+            case 'ready_for_pickup':
+            case 'out_for_delivery':
+                return 'info';
+            case 'delivered': return 'success';
+            case 'waiting_confirmation': return 'warning';
+            case 'rejected': return 'danger';
+            default: return 'neutral';
         }
     };
 
     const formatOrderNumber = (orderId: string) => `ORD-${orderId.slice(-8).toUpperCase()}`;
 
     return (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-            <div className="mb-8">
-                <h1 className="text-3xl font-bold text-main">Orders</h1>
-            </div>
+        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8 lg:py-12">
+            <PageHeader title="Orders" subtitle="Track and manage customer orders." />
 
             <div className="admin-card rounded-xl p-4 sm:p-6 mb-8 space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
@@ -160,9 +162,9 @@ export default function AdminOrdersPage() {
                                         <td className="px-4 sm:px-6 py-4 text-sm whitespace-nowrap">{new Date(order.createdAt).toLocaleDateString()}</td>
                                         <td className="px-4 sm:px-6 py-4 text-sm whitespace-nowrap">LKR {order.totalPrice.toLocaleString()}</td>
                                         <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
-                                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
+                                            <StatusBadge tone={getStatusTone(order.status)}>
                                                 {order.status.replace(/_/g, ' ')}
-                                            </span>
+                                            </StatusBadge>
                                         </td>
                                         <td className="px-4 sm:px-6 py-4 text-right">
                                             <Link href={`/admin/orders/${order._id}`} className="inline-flex items-center justify-center p-2 hover:bg-base rounded-lg text-accent transition-colors">
@@ -175,14 +177,8 @@ export default function AdminOrdersPage() {
                         </tbody>
                     </table>
                 </div>
-                <div className="p-4 border-t border-border-soft flex flex-wrap justify-center items-center gap-2">
-                    <button disabled={page === 1} onClick={() => setPage(p => Math.max(1, p - 1))} className="px-3 py-1 rounded bg-base hover:bg-base/80 disabled:opacity-50 text-sm text-main">
-                        Prev
-                    </button>
-                    <span className="px-3 py-1 text-sm text-sub">Page {page} of {totalPages}</span>
-                    <button disabled={page === totalPages} onClick={() => setPage(p => Math.min(totalPages, p + 1))} className="px-3 py-1 rounded bg-base hover:bg-base/80 disabled:opacity-50 text-sm text-main">
-                        Next
-                    </button>
+                <div className="border-t border-border-soft p-4">
+                    <Pagination page={page} totalPages={totalPages} onPageChange={setPage} disabled={loading} />
                 </div>
             </div>
         </div>

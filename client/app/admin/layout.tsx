@@ -6,19 +6,42 @@ import { usePathname } from "next/navigation";
 import { LayoutDashboard, ShoppingBag, Package, Settings, Filter, Tag, ShieldCheck, ExternalLink, Menu, X, FileText, Star, Handshake, FolderTree, Eye } from "lucide-react";
 import AdminAuthGuard from "@/components/AdminAuthGuard";
 
-const navItems = [
-    { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
-    { href: "/admin/orders", label: "Orders", icon: ShoppingBag },
-    { href: "/admin/products", label: "Products", icon: Package },
-    { href: "/admin/product-views", label: "Product Views", icon: Eye },
-    { href: "/admin/category-manager", label: "Category Manager", icon: FolderTree },
-    { href: "/admin/quotes", label: "Quotations", icon: FileText },
-    { href: "/admin/reviews", label: "Reviews", icon: Star },
-    { href: "/admin/categories/spec-features", label: "Featured Specs", icon: Filter },
-    { href: "/admin/promotions", label: "Promotions", icon: Tag },
-    { href: "/admin/partners", label: "Partners", icon: Handshake },
-    { href: "/admin/settings", label: "Settings", icon: Settings },
+const navGroups = [
+    {
+        label: "Overview",
+        items: [{ href: "/admin", label: "Dashboard", icon: LayoutDashboard }],
+    },
+    {
+        label: "Catalog",
+        items: [
+            { href: "/admin/products", label: "Products", icon: Package },
+            { href: "/admin/category-manager", label: "Category Manager", icon: FolderTree },
+            { href: "/admin/categories/spec-features", label: "Featured Specs", icon: Filter },
+        ],
+    },
+    {
+        label: "Sales",
+        items: [
+            { href: "/admin/orders", label: "Orders", icon: ShoppingBag },
+            { href: "/admin/quotes", label: "Quotations", icon: FileText },
+            { href: "/admin/product-views", label: "Product Views", icon: Eye },
+        ],
+    },
+    {
+        label: "Engagement",
+        items: [
+            { href: "/admin/reviews", label: "Reviews", icon: Star },
+            { href: "/admin/promotions", label: "Promotions", icon: Tag },
+            { href: "/admin/partners", label: "Partners", icon: Handshake },
+        ],
+    },
+    {
+        label: "System",
+        items: [{ href: "/admin/settings", label: "Settings", icon: Settings }],
+    },
 ];
+
+const navItems = navGroups.flatMap((group) => group.items);
 
 export default function AdminLayout({
     children,
@@ -57,26 +80,35 @@ export default function AdminLayout({
                 <div className="p-6">
                     <h2 className="text-xl font-bold text-main">Admin Panel</h2>
                 </div>
-                <nav className="mt-6 px-4 space-y-2">
-                    {navItems.map((item) => {
-                        const Icon = item.icon;
-                        const active = isActive(item.href);
-                        return (
-                            <Link
-                                key={item.href}
-                                href={item.href}
-                                className={`flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${
-                                    active
-                                        ? "bg-accent/15 text-main border border-accent/30"
-                                        : "text-sub hover:bg-white/5 hover:text-main border border-transparent"
-                                }`}
-                                aria-current={active ? "page" : undefined}
-                            >
-                                <Icon className="w-5 h-5" />
-                                <span>{item.label}</span>
-                            </Link>
-                        );
-                    })}
+                <nav className="mt-6 px-4 space-y-5">
+                    {navGroups.map((group) => (
+                        <div key={group.label}>
+                            <p className="mb-1.5 px-4 text-[10px] font-semibold uppercase tracking-wider text-sub/70">
+                                {group.label}
+                            </p>
+                            <div className="space-y-1">
+                                {group.items.map((item) => {
+                                    const Icon = item.icon;
+                                    const active = isActive(item.href);
+                                    return (
+                                        <Link
+                                            key={item.href}
+                                            href={item.href}
+                                            className={`flex items-center space-x-3 px-4 py-2.5 rounded-lg transition-colors ${
+                                                active
+                                                    ? "bg-accent/15 text-main border border-accent/30"
+                                                    : "text-sub hover:bg-white/5 hover:text-main border border-transparent"
+                                            }`}
+                                            aria-current={active ? "page" : undefined}
+                                        >
+                                            <Icon className="w-5 h-5" />
+                                            <span>{item.label}</span>
+                                        </Link>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    ))}
                 </nav>
             </aside>
 
@@ -138,26 +170,35 @@ export default function AdminLayout({
                             <X className="h-5 w-5" />
                         </button>
                     </div>
-                    <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain p-3">
-                        {navItems.map((item) => {
-                            const Icon = item.icon;
-                            const active = isActive(item.href);
-                            return (
-                                <Link
-                                    key={item.href}
-                                    href={item.href}
-                                    className={`flex min-h-[3rem] items-center gap-3 rounded-xl border px-3.5 py-3 text-sm transition-colors active:scale-[0.99] ${
-                                        active
-                                            ? "border-accent/30 bg-accent/15 text-main"
-                                            : "border-transparent text-sub hover:border-border-soft hover:bg-white/5 hover:text-main"
-                                    }`}
-                                    aria-current={active ? "page" : undefined}
-                                >
-                                    <Icon className="h-5 w-5 shrink-0 opacity-90" />
-                                    <span className="font-medium">{item.label}</span>
-                                </Link>
-                            );
-                        })}
+                    <nav className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-3">
+                        {navGroups.map((group) => (
+                            <div key={group.label}>
+                                <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-wider text-sub/70">
+                                    {group.label}
+                                </p>
+                                <div className="space-y-1">
+                                    {group.items.map((item) => {
+                                        const Icon = item.icon;
+                                        const active = isActive(item.href);
+                                        return (
+                                            <Link
+                                                key={item.href}
+                                                href={item.href}
+                                                className={`flex min-h-[3rem] items-center gap-3 rounded-xl border px-3.5 py-3 text-sm transition-colors active:scale-[0.99] ${
+                                                    active
+                                                        ? "border-accent/30 bg-accent/15 text-main"
+                                                        : "border-transparent text-sub hover:border-border-soft hover:bg-white/5 hover:text-main"
+                                                }`}
+                                                aria-current={active ? "page" : undefined}
+                                            >
+                                                <Icon className="h-5 w-5 shrink-0 opacity-90" />
+                                                <span className="font-medium">{item.label}</span>
+                                            </Link>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        ))}
                     </nav>
                 </aside>
                 {children}

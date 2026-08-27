@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Save, RefreshCw, Search, Plus, Trash2 } from "lucide-react";
 import api from "@/lib/api";
 import PopupDialog from "@/components/PopupDialog";
+import PageHeader from "@/components/admin/PageHeader";
+import StatusBadge, { type StatusTone } from "@/components/admin/StatusBadge";
 
 interface Category {
     _id: string;
@@ -184,11 +186,17 @@ export default function FeaturedSpecsAdmin() {
         }
     };
 
-    return (
-        <div className="max-w-4xl mx-auto px-4 py-8">
-            <h1 className="text-3xl font-bold text-main mb-8">Featured Category Specs Config</h1>
+    const modeTone: Record<typeof mode, StatusTone> = {
+        default_all: "info",
+        restricted: "warning",
+        none: "danger",
+    };
 
-            <div className="bg-surface border border-border-soft rounded-xl p-6 mb-8">
+    return (
+        <div className="mx-auto max-w-4xl px-4 py-8 sm:py-10 lg:py-12">
+            <PageHeader title="Featured Category Specs Config" />
+
+            <div className="admin-card rounded-xl p-6 mb-8">
                 <label className="block text-sub mb-2">Select Category</label>
                 <select
                     className="w-full bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:ring-accent focus:border-accent [&>option]:text-white"
@@ -208,27 +216,24 @@ export default function FeaturedSpecsAdmin() {
             </div>
 
             {selectedCategory && (
-                <div className="bg-surface border border-border-soft rounded-xl p-6">
+                <div className="admin-card rounded-xl p-6">
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
                         <div>
                             <h2 className="text-xl font-bold text-main">Configure Filters</h2>
-                            <p className="text-sm text-sub mt-1">
+                            <div className="mt-1.5 flex items-center gap-2 text-sm text-sub">
                                 Mode:
-                                <span className={`ml-2 font-medium px-2 py-0.5 rounded text-xs ${mode === 'default_all' ? 'bg-blue-500/10 text-blue-400' :
-                                        mode === 'restricted' ? 'bg-amber-500/10 text-amber-400' :
-                                            'bg-red-500/10 text-red-400'
-                                    }`}>
+                                <StatusBadge tone={modeTone[mode]}>
                                     {mode === 'default_all' ? 'All spec filters shown (no config)' :
                                         mode === 'restricted' ? 'Only selected specs will show as filters' :
                                             'No spec filters will show for this category'}
-                                </span>
-                            </p>
+                                </StatusBadge>
+                            </div>
                         </div>
                         <div className="flex w-full md:w-auto flex-col sm:flex-row gap-3">
                             <button
                                 onClick={() => setShowResetConfirm(true)}
                                 disabled={loading || mode === 'default_all'}
-                                className="px-4 py-2 bg-red-500/10 text-red-400 hover:bg-red-500/20 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                                className="px-4 py-2 bg-danger/10 text-danger hover:bg-danger/20 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                             >
                                 <RefreshCw className="h-4 w-4" /> Reset to Default
                             </button>
@@ -265,7 +270,7 @@ export default function FeaturedSpecsAdmin() {
                                             <button
                                                 type="button"
                                                 onClick={() => removeFeatured(index)}
-                                                className="p-1.5 text-red-400 hover:bg-red-400/10 rounded transition-colors"
+                                                className="p-1.5 text-danger hover:bg-danger/10 rounded transition-colors"
                                                 title="Remove"
                                             >
                                                 <Trash2 className="h-4 w-4" />

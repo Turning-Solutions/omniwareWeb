@@ -18,18 +18,18 @@ interface PopupDialogProps {
 const toneStyles: Record<PopupTone, { icon: typeof Info; iconClass: string; buttonClass: string }> = {
     info: {
         icon: Info,
-        iconClass: "text-blue-400",
-        buttonClass: "bg-blue-500 hover:bg-blue-500/90 text-white",
+        iconClass: "text-info",
+        buttonClass: "bg-info hover:bg-info/90 text-white",
     },
     success: {
         icon: CheckCircle2,
-        iconClass: "text-emerald-400",
-        buttonClass: "bg-emerald-500 hover:bg-emerald-500/90 text-white",
+        iconClass: "text-success",
+        buttonClass: "bg-success hover:bg-success/90 text-white",
     },
     danger: {
         icon: AlertTriangle,
-        iconClass: "text-red-400",
-        buttonClass: "bg-red-500 hover:bg-red-500/90 text-white",
+        iconClass: "text-danger",
+        buttonClass: "bg-danger hover:bg-danger/90 text-white",
     },
 };
 

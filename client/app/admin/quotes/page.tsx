@@ -5,6 +5,8 @@ import api from "@/lib/api";
 import { Search, FileText, Eye } from "lucide-react";
 import toast from "react-hot-toast";
 import Link from "next/link";
+import PageHeader from "@/components/admin/PageHeader";
+import Pagination from "@/components/admin/Pagination";
 
 type QuotationItem = {
     productId?: string;
@@ -61,10 +63,8 @@ export default function AdminQuotesPage() {
     }, [search, page]);
 
     return (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-            <div className="mb-8">
-                <h1 className="text-3xl font-bold text-main">Quotations</h1>
-            </div>
+        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8 lg:py-12">
+            <PageHeader title="Quotations" subtitle="Review quote requests submitted by customers." />
 
             <div className="admin-card rounded-xl p-4 sm:p-6 mb-8 space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4 items-center">
@@ -145,24 +145,8 @@ export default function AdminQuotesPage() {
                     </table>
                 </div>
 
-                <div className="p-4 border-t border-border-soft flex flex-wrap justify-center items-center gap-2">
-                    <button
-                        disabled={page === 1}
-                        onClick={() => setPage((p) => Math.max(1, p - 1))}
-                        className="px-3 py-1 rounded bg-base hover:bg-base/80 disabled:opacity-50 text-sm text-main"
-                    >
-                        Prev
-                    </button>
-                    <span className="px-3 py-1 text-sm text-sub">
-                        Page {page} of {totalPages}
-                    </span>
-                    <button
-                        disabled={page === totalPages}
-                        onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                        className="px-3 py-1 rounded bg-base hover:bg-base/80 disabled:opacity-50 text-sm text-main"
-                    >
-                        Next
-                    </button>
+                <div className="border-t border-border-soft p-4">
+                    <Pagination page={page} totalPages={totalPages} onPageChange={setPage} disabled={loading} />
                 </div>
             </div>
         </div>

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, use } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { ArrowLeft, Package, User, MapPin, CreditCard, Calendar, ChevronDown, Check } from "lucide-react";
 import api from "@/lib/api";
 import PopupDialog from "@/components/PopupDialog";
@@ -170,10 +171,10 @@ export default function AdminOrderDetailsPage({ params }: PageProps) {
         /\/raw\/upload\//i.test(receiptUrl);
 
     if (loading) return <div className="text-center py-20 text-main">Loading Order...</div>;
-    if (!order) return <div className="text-center py-20 text-red-400">Order not found</div>;
+    if (!order) return <div className="text-center py-20 text-danger">Order not found</div>;
 
     return (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8 lg:py-12">
             <div className="mb-8">
                 <Link href="/admin/orders" className="text-sub hover:text-main flex items-center gap-2 mb-4 transition-colors">
                     <ArrowLeft className="h-4 w-4" /> Back to Orders
@@ -256,8 +257,8 @@ export default function AdminOrderDetailsPage({ params }: PageProps) {
                         <div className="space-y-4">
                             {order.orderItems.map((item, idx) => (
                                 <div key={idx} className="flex items-center gap-4 py-4 border-b border-border-soft last:border-0">
-                                    <div className="h-16 w-16 bg-base rounded-lg overflow-hidden flex-shrink-0">
-                                        <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                                    <div className="relative h-16 w-16 bg-base rounded-lg overflow-hidden flex-shrink-0">
+                                        <Image src={item.image} alt={item.name} fill className="object-cover" sizes="64px" />
                                     </div>
                                     <div className="flex-1">
                                         <h3 className="text-main font-medium">{item.name}</h3>
@@ -346,7 +347,7 @@ export default function AdminOrderDetailsPage({ params }: PageProps) {
                                 <span className="text-main capitalize">{order.paymentMethod}</span>
                             </div>
                             <div className="flex items-center gap-2 text-sm mt-2">
-                                <span className={`w-2 h-2 rounded-full ${order.isPaid ? 'bg-accent' : 'bg-red-400'}`} />
+                                <span className={`w-2 h-2 rounded-full ${order.isPaid ? 'bg-accent' : 'bg-danger'}`} />
                                 <span className="text-sub">
                                     {order.isPaid
                                         ? `Paid on ${new Date(order.paidAt!).toLocaleDateString()}`
@@ -371,15 +372,19 @@ export default function AdminOrderDetailsPage({ params }: PageProps) {
                                                     PDF receipt uploaded. Click View uploaded receipt to open it.
                                                 </div>
                                             ) : (
-                                                <img
-                                                    src={receiptUrl}
-                                                    alt="Bank transfer receipt"
-                                                    className="w-full max-h-60 object-contain rounded border border-border-soft bg-base"
-                                                />
+                                                <div className="relative h-60 w-full rounded border border-border-soft bg-base">
+                                                    <Image
+                                                        src={receiptUrl}
+                                                        alt="Bank transfer receipt"
+                                                        fill
+                                                        className="object-contain"
+                                                        sizes="(min-width: 1024px) 33vw, 100vw"
+                                                    />
+                                                </div>
                                             )}
                                         </div>
                                     ) : (
-                                        <p className="text-sm text-red-400">No receipt uploaded by customer.</p>
+                                        <p className="text-sm text-danger">No receipt uploaded by customer.</p>
                                     )}
                                 </div>
                             )}

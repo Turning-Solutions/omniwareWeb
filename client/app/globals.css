@@ -17,6 +17,12 @@
     --admin-sub: #8c8f99;
     --admin-accent: #5ba89c;
     --admin-accent-soft: #3d7a72;
+    /* Semantic status tones — shared by every status pill/badge across admin pages */
+    --admin-success: var(--admin-accent);
+    --admin-warning: #c9a24d;
+    --admin-danger: #c96a63;
+    --admin-info: #5b84a8;
+    --admin-neutral: var(--admin-sub);
 }
 
 .admin-theme {
@@ -28,6 +34,11 @@
     --admin-base: #1c1e24;
     --admin-border: #2a2d35;
     --admin-accent: #5ba89c;
+    --admin-success: var(--admin-accent);
+    --admin-warning: #c9a24d;
+    --admin-danger: #c96a63;
+    --admin-info: #5b84a8;
+    --admin-neutral: #8c8f99;
     /* Inside admin, accent + primary utilities use admin teal */
     --store-accent: var(--admin-accent);
 }
@@ -55,6 +66,11 @@
     --color-border-soft: var(--admin-border, #e4e4e7);
     --color-accent: var(--store-accent);
     --color-primary: var(--store-accent);
+    --color-success: var(--admin-success, #5ba89c);
+    --color-warning: var(--admin-warning, #c9a24d);
+    --color-danger: var(--admin-danger, #c96a63);
+    --color-info: var(--admin-info, #5b84a8);
+    --color-neutral: var(--admin-neutral, #8c8f99);
     --font-sans: var(--font-geist-sans);
     --font-mono: var(--font-geist-mono);
 }

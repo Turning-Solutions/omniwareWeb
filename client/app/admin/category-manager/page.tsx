@@ -5,6 +5,7 @@ import { Plus, Save, Trash2 } from "lucide-react";
 import api from "@/lib/api";
 import { isAxiosError } from "axios";
 import PopupDialog from "@/components/PopupDialog";
+import PageHeader from "@/components/admin/PageHeader";
 
 interface Category {
     _id: string;
@@ -186,16 +187,14 @@ export default function CategoryManagerPage() {
     };
 
     return (
-        <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
-            <div className="mb-8">
-                <h1 className="text-3xl font-bold text-main">Category Manager</h1>
-                <p className="mt-1 text-sm text-sub">
-                    Create categories, add subcategories, and change parent-child structure.
-                </p>
-            </div>
+        <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8 lg:py-12">
+            <PageHeader
+                title="Category Manager"
+                subtitle="Create categories, add subcategories, and change parent-child structure."
+            />
 
             <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-                <section className="rounded-xl border border-border-soft bg-base/20 p-5">
+                <section className="admin-card rounded-xl p-5">
                     <h2 className="text-lg font-semibold text-main">Add category / subcategory</h2>
                     <p className="mt-1 text-sm text-sub">Select a parent to create a subcategory. Leave empty for main category.</p>
                     <form onSubmit={handleCreate} className="mt-4 space-y-3">
@@ -236,7 +235,7 @@ export default function CategoryManagerPage() {
                     </form>
                 </section>
 
-                <section className="rounded-xl border border-border-soft bg-base/20 p-5">
+                <section className="admin-card rounded-xl p-5">
                     <h2 className="text-lg font-semibold text-main">Edit category</h2>
                     <p className="mt-1 text-sm text-sub">
                         Rename categories or move a category under a different parent. Products stay linked by category ID, so renaming updates product category names automatically.
@@ -320,7 +319,7 @@ export default function CategoryManagerPage() {
                                     setCategoryToDelete(selectedEditCategory);
                                 }
                             }}
-                            className="ml-2 inline-flex items-center gap-2 rounded-lg border border-red-500/40 px-4 py-2 text-red-400 hover:bg-red-500/10 disabled:opacity-50"
+                            className="ml-2 inline-flex items-center gap-2 rounded-lg border border-danger/40 px-4 py-2 text-danger hover:bg-danger/10 disabled:opacity-50"
                         >
                             <Trash2 className="h-4 w-4" />
                             Delete
@@ -329,7 +328,7 @@ export default function CategoryManagerPage() {
                 </section>
             </div>
 
-            <section className="mt-6 rounded-xl border border-border-soft bg-base/20 p-5">
+            <section className="admin-card mt-6 rounded-xl p-5">
                 <h2 className="text-lg font-semibold text-main">Current category tree</h2>
                 {loading ? (
                     <p className="mt-3 text-sm text-sub">Loading categories...</p>

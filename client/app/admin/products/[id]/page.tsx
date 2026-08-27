@@ -9,6 +9,18 @@ import api from "@/lib/api";
 import toast from "react-hot-toast";
 import { buildProductSeo, type SeoProduct } from "@/lib/seo/productSeo";
 import LinkInsertDialog from "@/components/LinkInsertDialog";
+import ProductFormSectionNav from "@/components/admin/ProductFormSectionNav";
+
+const PRODUCT_FORM_SECTIONS = [
+    { id: "basic-info", label: "Basic Info" },
+    { id: "discounts", label: "Discounts" },
+    { id: "description", label: "Description" },
+    { id: "seo", label: "SEO" },
+    { id: "color-variants", label: "Colors" },
+    { id: "product-images", label: "Images" },
+    { id: "featured-specs", label: "Featured Specs" },
+    { id: "attributes", label: "Attributes" },
+];
 
 interface Brand {
     _id: string;
@@ -1100,8 +1112,10 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                 </span>
             </div>
 
+            <ProductFormSectionNav sections={PRODUCT_FORM_SECTIONS} />
+
             <form onSubmit={handleSubmit} className="space-y-8 pb-28 sm:pb-24">
-                <section className="pb-2">
+                <section id="basic-info" className="scroll-mt-32 pb-2">
                     <div className="mb-5">
                         <h2 className="text-lg font-semibold text-main">Basic information</h2>
                         <p className="mt-1 text-sm text-sub">Core product details for catalog and pricing.</p>
@@ -1363,7 +1377,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                     </div>
                 </section>
 
-                <section className="border-t border-border-soft pt-6">
+                <section id="discounts" className="scroll-mt-32 border-t border-border-soft pt-6">
                     <div className="mb-4">
                         <h2 className="text-xl font-bold text-main">Discounts</h2>
                         <p className="text-sub text-sm mt-0.5">
@@ -1403,7 +1417,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                     </div>
                 </section>
 
-                <section className="border-t border-border-soft pt-6">
+                <section id="description" className="scroll-mt-32 border-t border-border-soft pt-6">
                     <div className="flex items-center justify-between">
                         <label htmlFor="product-description" className="text-sub text-sm">Description</label>
                         <button
@@ -1430,7 +1444,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                     </p>
                 </section>
 
-                <section className="border-t border-border-soft pt-6">
+                <section id="seo" className="scroll-mt-32 border-t border-border-soft pt-6">
                     <div className="mb-5">
                         <h2 className="text-xl font-bold text-main">Search engine optimization</h2>
                         <p className="mt-1 text-sm text-sub">
@@ -1559,7 +1573,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                     </div>
                 </section>
 
-                <section className="border-t border-border-soft pt-6">
+                <section id="color-variants" className="scroll-mt-32 border-t border-border-soft pt-6">
                     <div className="flex items-center justify-between mb-4">
                         <div>
                             <h2 className="text-xl font-bold text-main">Color variants</h2>
@@ -1656,7 +1670,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                 </section>
 
                 {/* Product images (Cloudinary) */}
-                <section className="border-t border-border-soft pt-6">
+                <section id="product-images" className="scroll-mt-32 border-t border-border-soft pt-6">
                     <h2 className="text-xl font-bold text-main mb-2">Product images</h2>
                     <p className="text-sub text-sm mb-4">Upload images to Cloudinary. You can delete or replace any image.</p>
                     <div className="flex flex-wrap gap-4">
@@ -1709,7 +1723,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                 </section>
 
                 {/* Filter Specs — only featured spec keys for the selected category */}
-                <section className="border-t border-border-soft pt-6">
+                <section id="featured-specs" className="scroll-mt-32 border-t border-border-soft pt-6">
                     <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
                         <div>
                             <h2 className="text-xl font-bold text-main">Featured specs</h2>
@@ -1812,7 +1826,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                 </section>
 
                 {/* Product details — attribute groups (e.g. General, Cable Specs) */}
-                <section className="border-t border-border-soft pt-6">
+                <section id="attributes" className="scroll-mt-32 border-t border-border-soft pt-6">
                     <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
                         <div>
                             <h2 className="text-xl font-bold text-main">Product details (Attributes)</h2>

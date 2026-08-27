@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import toast from "react-hot-toast";
+import PageHeader from "@/components/admin/PageHeader";
 
 type QuotationItem = {
     productId?: string;
@@ -48,23 +49,20 @@ export default function AdminQuotationDetailsPage() {
     }, [id]);
 
     return (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-            <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div>
-                    <h1 className="text-3xl font-bold text-main">Quotation Details</h1>
-                    <p className="text-sub text-sm mt-1">
-                        {quote ? `Quote ${quote._id}` : id ? `Quote ${id}` : ""}
-                    </p>
-                </div>
-
-                <Link
-                    href="/admin/quotes"
-                    className="inline-flex items-center gap-2 rounded-lg border border-border-soft px-3 py-2 text-sm text-sub hover:text-main hover:bg-white/5 transition-colors"
-                >
-                    <ArrowLeft className="h-4 w-4" />
-                    Back to list
-                </Link>
-            </div>
+        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8 lg:py-12">
+            <PageHeader
+                title="Quotation Details"
+                subtitle={quote ? `Quote ${quote._id}` : id ? `Quote ${id}` : ""}
+                action={
+                    <Link
+                        href="/admin/quotes"
+                        className="inline-flex items-center gap-2 rounded-lg border border-border-soft px-3 py-2 text-sm text-sub hover:text-main hover:bg-white/5 transition-colors"
+                    >
+                        <ArrowLeft className="h-4 w-4" />
+                        Back to list
+                    </Link>
+                }
+            />
 
             <div className="admin-card rounded-xl p-4 sm:p-6 mb-6">
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

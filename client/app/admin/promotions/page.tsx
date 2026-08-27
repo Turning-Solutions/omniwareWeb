@@ -1,10 +1,14 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { Plus, Edit2, Trash2, X, Check, Tag, Image as ImageIcon, Upload } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Plus, Edit2, Trash2, X, Check, Tag, Image as ImageIcon } from "lucide-react";
 import api from "@/lib/api";
 import Image from "next/image";
 import PopupDialog from "@/components/PopupDialog";
+import PageHeader from "@/components/admin/PageHeader";
+import Toggle from "@/components/admin/Toggle";
+import ImageDropzone from "@/components/admin/ImageDropzone";
+import type { StatusTone } from "@/components/admin/StatusBadge";
 
 interface Promotion {
     _id: string;
@@ -45,6 +49,20 @@ function isOngoing(promo: Promotion): boolean {
         new Date(promo.validTo).getTime() >= now;
 }
 
+function promoTone(promo: Promotion): StatusTone {
+    if (isOngoing(promo)) return "success";
+    if (promo.isActive) return "warning";
+    return "neutral";
+}
+
+const toneButtonClasses: Record<StatusTone, string> = {
+    success: "bg-success/15 text-success hover:bg-success/25",
+    warning: "bg-warning/15 text-warning hover:bg-warning/25",
+    danger: "bg-danger/15 text-danger hover:bg-danger/25",
+    info: "bg-info/15 text-info hover:bg-info/25",
+    neutral: "bg-base text-sub hover:bg-white/5",
+};
+
 export default function PromotionsPage() {
     const [promotions, setPromotions] = useState<Promotion[]>([]);
     const [loading, setLoading] = useState(true);
@@ -55,7 +73,6 @@ export default function PromotionsPage() {
     const [error, setError] = useState("");
     const [uploading, setUploading] = useState(false);
     const [promotionToDeleteId, setPromotionToDeleteId] = useState<string | null>(null);
-    const fileRef = useRef<HTMLInputElement>(null);
 
     const load = async () => {
         setLoading(true);
@@ -101,9 +118,7 @@ export default function PromotionsPage() {
         setEditing(null);
     };
 
-    const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
+    const handleUpload = async (file: File) => {
         const fd = new FormData();
         fd.append("image", file);
         setUploading(true);
@@ -114,7 +129,6 @@ export default function PromotionsPage() {
             setError("Image upload failed.");
         } finally {
             setUploading(false);
-            if (fileRef.current) fileRef.current.value = "";
         }
     };
 
@@ -163,24 +177,23 @@ export default function PromotionsPage() {
     };
 
     return (
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-            {/* Header */}
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-8">
-                <div>
-                    <h1 className="text-3xl font-bold text-main">Promotions</h1>
-                    <p className="text-sub mt-1 text-sm">Manage promotional banners shown on the home page.</p>
-                </div>
-                <button
-                    onClick={openCreate}
-                    className="flex items-center justify-center gap-2 bg-accent hover:bg-accent/90 text-white px-4 py-2 rounded-lg transition-colors text-sm font-medium w-full sm:w-auto"
-                >
-                    <Plus className="h-4 w-4" />
-                    New Promotion
-                </button>
-            </div>
+        <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8 lg:py-12">
+            <PageHeader
+                title="Promotions"
+                subtitle="Manage promotional banners shown on the home page."
+                action={
+                    <button
+                        onClick={openCreate}
+                        className="flex items-center justify-center gap-2 bg-accent hover:bg-accent/90 text-white px-4 py-2 rounded-lg transition-colors text-sm font-medium w-full sm:w-auto"
+                    >
+                        <Plus className="h-4 w-4" />
+                        New Promotion
+                    </button>
+                }
+            />
 
             {error && !showForm && (
-                <div className="mb-6 rounded-lg bg-red-500/10 border border-red-500/30 px-4 py-3 text-sm text-red-400">{error}</div>
+                <div className="mb-6 rounded-lg bg-danger/10 border border-danger/30 px-4 py-3 text-sm text-danger">{error}</div>
             )}
 
             {/* Modal Form */}
@@ -198,49 +211,20 @@ export default function PromotionsPage() {
 
                         <div className="px-6 py-5 space-y-4">
                             {error && (
-                                <div className="rounded-lg bg-red-500/10 border border-red-500/30 px-3 py-2 text-sm text-red-400">{error}</div>
+                                <div className="rounded-lg bg-danger/10 border border-danger/30 px-3 py-2 text-sm text-danger">{error}</div>
                             )}
 
-                            {/* Image preview & upload */}
-                            <div>
-                                <label className="block text-xs font-medium text-sub mb-1.5 uppercase tracking-wider">Promotion Image</label>
-                                {form.imageUrl ? (
-                                    <div className="relative w-full h-36 rounded-xl overflow-hidden border border-border-soft mb-2">
-                                        <Image src={form.imageUrl} alt="Preview" fill className="object-cover" sizes="512px" />
-                                        <button
-                                            onClick={() => setForm(f => ({ ...f, imageUrl: "" }))}
-                                            className="absolute top-2 right-2 rounded-full bg-black/60 p-1 text-white hover:bg-black/80"
-                                        >
-                                            <X className="h-3.5 w-3.5" />
-                                        </button>
-                                    </div>
-                                ) : (
-                                    <div
-                                        onClick={() => fileRef.current?.click()}
-                                        className="flex h-28 w-full cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-border-soft bg-base hover:border-accent transition-colors mb-2"
-                                    >
-                                        {uploading ? (
-                                            <span className="text-sm text-sub">Uploading…</span>
-                                        ) : (
-                                            <>
-                                                <Upload className="h-6 w-6 text-sub mb-1" />
-                                                <span className="text-sm text-sub">Click to upload image</span>
-                                            </>
-                                        )}
-                                    </div>
-                                )}
-                                <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleUpload} />
-                                <div className="flex items-center gap-2 mt-1">
-                                    <ImageIcon className="h-4 w-4 text-sub shrink-0" />
-                                    <input
-                                        type="text"
-                                        placeholder="Or paste image URL"
-                                        value={form.imageUrl}
-                                        onChange={e => setForm(f => ({ ...f, imageUrl: e.target.value }))}
-                                        className="flex-1 bg-base border border-border-soft rounded-lg px-3 py-1.5 text-sm text-main placeholder:text-sub focus:outline-none focus:border-accent"
-                                    />
-                                </div>
-                            </div>
+                            <ImageDropzone
+                                label="Promotion Image"
+                                value={form.imageUrl}
+                                onUploadFile={handleUpload}
+                                onUrlChange={(url) => setForm(f => ({ ...f, imageUrl: url }))}
+                                onClear={() => setForm(f => ({ ...f, imageUrl: "" }))}
+                                uploading={uploading}
+                                previewAspect="cover"
+                                height="h-36"
+                                uploadHint="Click to upload image"
+                            />
 
                             <div>
                                 <label className="block text-xs font-medium text-sub mb-1.5 uppercase tracking-wider">Title *</label>
@@ -318,28 +302,20 @@ export default function PromotionsPage() {
                                 </div>
                             </div>
 
-                            <label className="flex items-center gap-3 cursor-pointer select-none">
-                                <div
-                                    onClick={() => setForm(f => ({ ...f, isActive: !f.isActive }))}
-                                    className={`relative h-6 w-11 rounded-full transition-colors ${form.isActive ? "bg-accent" : "bg-[#3a3a3a]"}`}
-                                >
-                                    <span className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${form.isActive ? "translate-x-5" : "translate-x-0"}`} />
-                                </div>
-                                <span className="text-sm text-main">Active</span>
-                            </label>
+                            <Toggle
+                                layout="inline"
+                                checked={form.isActive}
+                                onChange={(next) => setForm(f => ({ ...f, isActive: next }))}
+                                label="Active"
+                            />
 
-                            <label className="flex items-center gap-3 cursor-pointer select-none">
-                                <div
-                                    onClick={() => setForm(f => ({ ...f, directRedirect: !f.directRedirect }))}
-                                    className={`relative h-6 w-11 rounded-full transition-colors ${form.directRedirect ? "bg-accent" : "bg-[#3a3a3a]"}`}
-                                >
-                                    <span className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${form.directRedirect ? "translate-x-5" : "translate-x-0"}`} />
-                                </div>
-                                <div>
-                                    <span className="text-sm text-main block">Direct Redirect</span>
-                                    <span className="text-[10px] text-sub block">If enabled, clicking the promotion redirects immediately instead of showing details.</span>
-                                </div>
-                            </label>
+                            <Toggle
+                                layout="inline"
+                                checked={form.directRedirect}
+                                onChange={(next) => setForm(f => ({ ...f, directRedirect: next }))}
+                                label="Direct Redirect"
+                                description="If enabled, clicking the promotion redirects immediately instead of showing details."
+                            />
                         </div>
 
                         <div className="flex justify-end gap-3 px-6 py-4 border-t border-border-soft">
@@ -416,13 +392,7 @@ export default function PromotionsPage() {
                                         <td className="px-5 py-3">
                                             <button
                                                 onClick={() => toggleActive(promo)}
-                                                className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
-                                                    isOngoing(promo)
-                                                        ? "bg-green-500/20 text-green-400"
-                                                        : promo.isActive
-                                                        ? "bg-yellow-500/20 text-yellow-400"
-                                                        : "bg-red-500/20 text-red-400"
-                                                }`}
+                                                className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${toneButtonClasses[promoTone(promo)]}`}
                                             >
                                                 {isOngoing(promo) ? "Live" : promo.isActive ? "Scheduled" : "Inactive"}
                                             </button>
@@ -437,7 +407,7 @@ export default function PromotionsPage() {
                                                 </button>
                                                 <button
                                                     onClick={() => setPromotionToDeleteId(promo._id)}
-                                                    className="p-2 hover:bg-base rounded-lg text-red-400 transition-colors"
+                                                    className="p-2 hover:bg-base rounded-lg text-danger transition-colors"
                                                 >
                                                     <Trash2 className="h-4 w-4" />
                                                 </button>

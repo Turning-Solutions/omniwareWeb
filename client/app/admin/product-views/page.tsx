@@ -5,6 +5,9 @@ import Link from "next/link";
 import Image from "next/image";
 import { Search, Eye, Package, TrendingUp } from "lucide-react";
 import api from "@/lib/api";
+import PageHeader from "@/components/admin/PageHeader";
+import StatCard from "@/components/admin/StatCard";
+import Pagination from "@/components/admin/Pagination";
 
 interface ProductViewRow {
     productId: string;
@@ -69,42 +72,17 @@ export default function AdminProductViewsPage() {
     }, [search, range]);
 
     return (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-            <div className="mb-8">
-                <h1 className="text-3xl font-bold text-main">Product Views</h1>
-                <p className="mt-1 text-sm text-sub">See which products get the most visits.</p>
-            </div>
+        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8 lg:py-12">
+            <PageHeader title="Product Views" subtitle="See which products get the most visits." />
 
             <div className="mb-8 grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
-                <div className="admin-card flex items-center gap-3 rounded-xl p-4 shadow-sm sm:gap-4 sm:p-6">
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-accent/20 text-accent sm:h-12 sm:w-12">
-                        <Eye className="h-5 w-5 sm:h-6 sm:w-6" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                        <p className="text-xs text-sub sm:text-sm">Total Views</p>
-                        <h3 className="text-lg font-bold tabular-nums text-main sm:text-2xl">{totals.totalViews}</h3>
-                    </div>
-                </div>
-                <div className="admin-card flex items-center gap-3 rounded-xl p-4 shadow-sm sm:gap-4 sm:p-6">
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-accent/20 text-accent sm:h-12 sm:w-12">
-                        <Package className="h-5 w-5 sm:h-6 sm:w-6" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                        <p className="text-xs text-sub sm:text-sm">Products Viewed</p>
-                        <h3 className="text-lg font-bold tabular-nums text-main sm:text-2xl">{totals.distinctProducts}</h3>
-                    </div>
-                </div>
-                <div className="admin-card flex items-center gap-3 rounded-xl p-4 shadow-sm sm:gap-4 sm:p-6">
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-accent/20 text-accent sm:h-12 sm:w-12">
-                        <TrendingUp className="h-5 w-5 sm:h-6 sm:w-6" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                        <p className="text-xs text-sub sm:text-sm">Most Visited</p>
-                        <h3 className="truncate text-sm font-bold text-main sm:text-base">
-                            {totals.topProduct?.title || "—"}
-                        </h3>
-                    </div>
-                </div>
+                <StatCard icon={Eye} label="Total Views" value={totals.totalViews} />
+                <StatCard icon={Package} label="Products Viewed" value={totals.distinctProducts} />
+                <StatCard
+                    icon={TrendingUp}
+                    label="Most Visited"
+                    value={<span className="block truncate text-sm sm:text-base">{totals.topProduct?.title || "—"}</span>}
+                />
             </div>
 
             <div className="admin-card rounded-xl p-4 sm:p-6 mb-8 space-y-4">
@@ -178,14 +156,8 @@ export default function AdminProductViewsPage() {
                         </tbody>
                     </table>
                 </div>
-                <div className="p-4 border-t border-border-soft flex flex-wrap justify-center items-center gap-2">
-                    <button disabled={page === 1} onClick={() => setPage(p => Math.max(1, p - 1))} className="px-3 py-1 rounded bg-base hover:bg-base/80 disabled:opacity-50 text-sm text-main">
-                        Prev
-                    </button>
-                    <span className="px-3 py-1 text-sm text-sub">Page {page} of {totalPages}</span>
-                    <button disabled={page === totalPages} onClick={() => setPage(p => Math.min(totalPages, p + 1))} className="px-3 py-1 rounded bg-base hover:bg-base/80 disabled:opacity-50 text-sm text-main">
-                        Next
-                    </button>
+                <div className="border-t border-border-soft p-4">
+                    <Pagination page={page} totalPages={totalPages} onPageChange={setPage} disabled={loading} />
                 </div>
             </div>
         </div>

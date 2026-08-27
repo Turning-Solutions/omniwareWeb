@@ -1,10 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, Edit2, Trash2, X, Check, Handshake, Upload, Image as ImageIcon } from "lucide-react";
+import { Plus, Edit2, Trash2, X, Check, Handshake } from "lucide-react";
 import api from "@/lib/api";
 import PopupDialog from "@/components/PopupDialog";
-import Image from "next/image";
+import PageHeader from "@/components/admin/PageHeader";
+import Toggle from "@/components/admin/Toggle";
+import StatusBadge from "@/components/admin/StatusBadge";
+import ImageDropzone from "@/components/admin/ImageDropzone";
 
 interface Partner {
     _id: string;
@@ -31,7 +34,6 @@ export default function PartnersPage() {
     const [error, setError] = useState("");
     const [uploading, setUploading] = useState(false);
     const [partnerToDeleteId, setPartnerToDeleteId] = useState<string | null>(null);
-    const [fileInputKey, setFileInputKey] = useState(0);
 
     const load = async () => {
         setLoading(true);
@@ -73,10 +75,7 @@ export default function PartnersPage() {
         setEditing(null);
     };
 
-    const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-
+    const handleUpload = async (file: File) => {
         const formData = new FormData();
         formData.append("image", file);
         setUploading(true);
@@ -87,7 +86,6 @@ export default function PartnersPage() {
             setError("Image upload failed.");
         } finally {
             setUploading(false);
-            setFileInputKey((prev) => prev + 1);
         }
     };
 
@@ -134,23 +132,23 @@ export default function PartnersPage() {
     };
 
     return (
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-8">
-                <div>
-                    <h1 className="text-3xl font-bold text-main">Partners</h1>
-                    <p className="text-sub mt-1 text-sm">Manage brands shown in the home page partnership strip.</p>
-                </div>
-                <button
-                    onClick={openCreate}
-                    className="flex items-center justify-center gap-2 bg-accent hover:bg-accent/90 text-white px-4 py-2 rounded-lg transition-colors text-sm font-medium w-full sm:w-auto"
-                >
-                    <Plus className="h-4 w-4" />
-                    Add Partner
-                </button>
-            </div>
+        <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8 lg:py-12">
+            <PageHeader
+                title="Partners"
+                subtitle="Manage brands shown in the home page partnership strip."
+                action={
+                    <button
+                        onClick={openCreate}
+                        className="flex items-center justify-center gap-2 bg-accent hover:bg-accent/90 text-white px-4 py-2 rounded-lg transition-colors text-sm font-medium w-full sm:w-auto"
+                    >
+                        <Plus className="h-4 w-4" />
+                        Add Partner
+                    </button>
+                }
+            />
 
             {error && !showForm && (
-                <div className="mb-6 rounded-lg bg-red-500/10 border border-red-500/30 px-4 py-3 text-sm text-red-400">{error}</div>
+                <div className="mb-6 rounded-lg bg-danger/10 border border-danger/30 px-4 py-3 text-sm text-danger">{error}</div>
             )}
 
             {showForm && (
@@ -165,7 +163,7 @@ export default function PartnersPage() {
 
                         <div className="px-6 py-5 space-y-4">
                             {error && (
-                                <div className="rounded-lg bg-red-500/10 border border-red-500/30 px-3 py-2 text-sm text-red-400">{error}</div>
+                                <div className="rounded-lg bg-danger/10 border border-danger/30 px-3 py-2 text-sm text-danger">{error}</div>
                             )}
 
                             <div>
@@ -179,49 +177,17 @@ export default function PartnersPage() {
                                 />
                             </div>
 
-                            <div>
-                                <label className="block text-xs font-medium text-sub mb-1.5 uppercase tracking-wider">Partner Logo</label>
-                                {form.logoUrl ? (
-                                    <div className="relative w-full h-28 rounded-xl overflow-hidden border border-border-soft mb-2 bg-base">
-                                        <Image src={form.logoUrl} alt="Partner logo preview" fill className="object-contain p-3" sizes="512px" />
-                                        <button
-                                            onClick={() => setForm((f) => ({ ...f, logoUrl: "" }))}
-                                            className="absolute top-2 right-2 rounded-full bg-black/60 p-1 text-white hover:bg-black/80"
-                                            type="button"
-                                        >
-                                            <X className="h-3.5 w-3.5" />
-                                        </button>
-                                    </div>
-                                ) : (
-                                    <label className="flex h-24 w-full cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-border-soft bg-base hover:border-accent transition-colors mb-2">
-                                        {uploading ? (
-                                            <span className="text-sm text-sub">Uploading...</span>
-                                        ) : (
-                                            <>
-                                                <Upload className="h-6 w-6 text-sub mb-1" />
-                                                <span className="text-sm text-sub">Click to upload logo</span>
-                                            </>
-                                        )}
-                                        <input
-                                            key={fileInputKey}
-                                            type="file"
-                                            accept="image/*"
-                                            className="hidden"
-                                            onChange={handleUpload}
-                                        />
-                                    </label>
-                                )}
-                                <div className="flex items-center gap-2 mt-1">
-                                    <ImageIcon className="h-4 w-4 text-sub shrink-0" />
-                                    <input
-                                        type="text"
-                                        value={form.logoUrl}
-                                        onChange={(e) => setForm((f) => ({ ...f, logoUrl: e.target.value }))}
-                                        className="w-full bg-base border border-border-soft rounded-lg px-3 py-2 text-main placeholder:text-sub focus:outline-none focus:border-accent"
-                                        placeholder="Or paste image URL"
-                                    />
-                                </div>
-                            </div>
+                            <ImageDropzone
+                                label="Partner Logo"
+                                value={form.logoUrl}
+                                onUploadFile={handleUpload}
+                                onUrlChange={(url) => setForm((f) => ({ ...f, logoUrl: url }))}
+                                onClear={() => setForm((f) => ({ ...f, logoUrl: "" }))}
+                                uploading={uploading}
+                                previewAspect="contain"
+                                height="h-28"
+                                uploadHint="Click to upload logo"
+                            />
 
                             <div>
                                 <label className="block text-xs font-medium text-sub mb-1.5 uppercase tracking-wider">Sort Order</label>
@@ -233,15 +199,12 @@ export default function PartnersPage() {
                                 />
                             </div>
 
-                            <label className="flex items-center gap-3 cursor-pointer select-none">
-                                <div
-                                    onClick={() => setForm((f) => ({ ...f, isActive: !f.isActive }))}
-                                    className={`relative h-6 w-11 rounded-full transition-colors ${form.isActive ? "bg-accent" : "bg-[#3a3a3a]"}`}
-                                >
-                                    <span className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${form.isActive ? "translate-x-5" : "translate-x-0"}`} />
-                                </div>
-                                <span className="text-sm text-main">Active</span>
-                            </label>
+                            <Toggle
+                                layout="inline"
+                                checked={form.isActive}
+                                onChange={(next) => setForm((f) => ({ ...f, isActive: next }))}
+                                label="Active"
+                            />
                         </div>
 
                         <div className="flex justify-end gap-3 px-6 py-4 border-t border-border-soft">
@@ -296,13 +259,10 @@ export default function PartnersPage() {
                                         </td>
                                         <td className="px-5 py-3 text-sm text-sub">{partner.sortOrder}</td>
                                         <td className="px-5 py-3">
-                                            <button
-                                                onClick={() => toggleActive(partner)}
-                                                className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
-                                                    partner.isActive ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400"
-                                                }`}
-                                            >
-                                                {partner.isActive ? "Active" : "Inactive"}
+                                            <button onClick={() => toggleActive(partner)}>
+                                                <StatusBadge tone={partner.isActive ? "success" : "neutral"}>
+                                                    {partner.isActive ? "Active" : "Inactive"}
+                                                </StatusBadge>
                                             </button>
                                         </td>
                                         <td className="px-5 py-3">
@@ -315,7 +275,7 @@ export default function PartnersPage() {
                                                 </button>
                                                 <button
                                                     onClick={() => setPartnerToDeleteId(partner._id)}
-                                                    className="p-2 hover:bg-base rounded-lg text-red-400 transition-colors"
+                                                    className="p-2 hover:bg-base rounded-lg text-danger transition-colors"
                                                 >
                                                     <Trash2 className="h-4 w-4" />
                                                 </button>

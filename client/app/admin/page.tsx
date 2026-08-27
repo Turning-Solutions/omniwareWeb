@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { ShoppingBag, DollarSign, Activity, Eye, ArrowRight, Package } from "lucide-react";
 import api from "@/lib/api";
+import StatCard from "@/components/admin/StatCard";
+import StatusBadge, { type StatusTone } from "@/components/admin/StatusBadge";
 
 interface DashboardSummary {
     revenue: number;
@@ -66,6 +68,12 @@ export default function AdminPage() {
 
     const formatStatus = (status: string) => status.charAt(0).toUpperCase() + status.slice(1);
 
+    const orderStatusTone = (status: string): StatusTone => {
+        if (status === "paid" || status === "delivered") return "success";
+        if (status === "pending") return "warning";
+        return "neutral";
+    };
+
     return (
         <div className="mx-auto max-w-7xl px-3 py-6 sm:px-6 sm:py-8 lg:px-8 lg:py-12">
             <div className="mb-6 flex flex-col gap-4 sm:mb-8 sm:flex-row sm:items-center sm:justify-between">
@@ -97,44 +105,10 @@ export default function AdminPage() {
 
             {/* Stats Grid */}
             <div className="mb-8 grid grid-cols-1 gap-3 sm:mb-12 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4 xl:gap-6">
-                <div className="admin-card flex items-center gap-3 rounded-xl p-4 shadow-sm sm:gap-4 sm:p-6">
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-accent/20 text-accent sm:h-12 sm:w-12">
-                        <DollarSign className="h-5 w-5 sm:h-6 sm:w-6" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                        <p className="text-xs text-sub sm:text-sm">Revenue</p>
-                        <h3 className="break-words text-lg font-bold tabular-nums text-main sm:text-2xl">
-                            LKR {summary?.revenue.toLocaleString() || 0}
-                        </h3>
-                    </div>
-                </div>
-                <div className="admin-card flex items-center gap-3 rounded-xl p-4 shadow-sm sm:gap-4 sm:p-6">
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-accent/20 text-accent sm:h-12 sm:w-12">
-                        <ShoppingBag className="h-5 w-5 sm:h-6 sm:w-6" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                        <p className="text-xs text-sub sm:text-sm">Orders</p>
-                        <h3 className="text-lg font-bold tabular-nums text-main sm:text-2xl">{summary?.orders || 0}</h3>
-                    </div>
-                </div>
-                <div className="admin-card flex items-center gap-3 rounded-xl p-4 shadow-sm sm:gap-4 sm:p-6">
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-accent/20 text-accent sm:h-12 sm:w-12">
-                        <Eye className="h-5 w-5 sm:h-6 sm:w-6" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                        <p className="text-xs text-sub sm:text-sm">Product Views</p>
-                        <h3 className="text-lg font-bold tabular-nums text-main sm:text-2xl">{summary?.productViews || 0}</h3>
-                    </div>
-                </div>
-                <div className="admin-card flex items-center gap-3 rounded-xl p-4 shadow-sm sm:gap-4 sm:p-6">
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-accent/20 text-accent sm:h-12 sm:w-12">
-                        <Activity className="h-5 w-5 sm:h-6 sm:w-6" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                        <p className="text-xs text-sub sm:text-sm">Conversion</p>
-                        <h3 className="text-lg font-bold tabular-nums text-main sm:text-2xl">{conversionRate}%</h3>
-                    </div>
-                </div>
+                <StatCard icon={DollarSign} label="Revenue" value={`LKR ${summary?.revenue.toLocaleString() || 0}`} />
+                <StatCard icon={ShoppingBag} label="Orders" value={summary?.orders || 0} />
+                <StatCard icon={Eye} label="Product Views" value={summary?.productViews || 0} />
+                <StatCard icon={Activity} label="Conversion" value={`${conversionRate}%`} />
             </div>
 
             <div className="mb-8 sm:mb-10">
@@ -209,17 +183,9 @@ export default function AdminPage() {
                                                 LKR {order.total.toLocaleString()}
                                             </td>
                                             <td className="px-3 py-3 sm:px-6 sm:py-4">
-                                                <span
-                                                    className={`inline-block max-w-full truncate rounded-full px-2 py-1 text-[11px] font-medium sm:text-xs ${
-                                                        order.status === "paid" || order.status === "delivered"
-                                                            ? "bg-accent/20 text-accent"
-                                                            : order.status === "pending"
-                                                              ? "bg-amber-500/20 text-amber-400"
-                                                              : "bg-base text-sub"
-                                                    }`}
-                                                >
+                                                <StatusBadge tone={orderStatusTone(order.status)} className="max-w-full truncate text-[11px] sm:text-xs">
                                                     {formatStatus(order.status)}
-                                                </span>
+                                                </StatusBadge>
                                             </td>
                                         </tr>
                                     ))

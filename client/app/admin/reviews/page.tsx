@@ -13,6 +13,8 @@ import {
     type GoogleReviewSyncStatus,
     type AdminReviewRow,
 } from "@/hooks/useAdminReviews";
+import PageHeader from "@/components/admin/PageHeader";
+import StatusBadge, { type StatusTone } from "@/components/admin/StatusBadge";
 
 /** Normalize for display and actions (legacy docs may omit `status`). */
 function moderationStatus(row: AdminReviewRow): "pending" | "approved" | "rejected" {
@@ -21,17 +23,17 @@ function moderationStatus(row: AdminReviewRow): "pending" | "approved" | "reject
     return "pending";
 }
 
-function statusBadge(status: "pending" | "approved" | "rejected") {
-    if (status === "approved") return "bg-emerald-500/15 text-emerald-400 border-emerald-500/30";
-    if (status === "pending") return "bg-amber-500/15 text-amber-400 border-amber-500/30";
-    return "bg-red-500/15 text-red-400 border-red-500/30";
+function statusTone(status: "pending" | "approved" | "rejected"): StatusTone {
+    if (status === "approved") return "success";
+    if (status === "pending") return "warning";
+    return "danger";
 }
 
-function syncStatusBadge(status: GoogleReviewSyncStatus["lastImportStatus"]) {
-    if (status === "success") return "bg-emerald-500/15 text-emerald-400 border-emerald-500/30";
-    if (status === "pending") return "bg-amber-500/15 text-amber-400 border-amber-500/30";
-    if (status === "error") return "bg-red-500/15 text-red-400 border-red-500/30";
-    return "bg-white/5 text-sub border-border-soft";
+function syncStatusTone(status: GoogleReviewSyncStatus["lastImportStatus"]): StatusTone {
+    if (status === "success") return "success";
+    if (status === "pending") return "warning";
+    if (status === "error") return "danger";
+    return "neutral";
 }
 
 function formatTimestamp(value: string | null) {
@@ -116,25 +118,19 @@ export default function AdminReviewsPage() {
     const viewingSt = viewing ? moderationStatus(viewing) : null;
 
     return (
-        <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-            <div className="mb-8">
-                <h1 className="text-3xl font-bold text-main">Customer reviews</h1>
-                <p className="mt-1 text-sm text-sub">
-                    View submissions, approve or reject them, or delete. Only approved reviews appear on the storefront.
-                </p>
-            </div>
+        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8 lg:py-12">
+            <PageHeader
+                title="Customer reviews"
+                subtitle="View submissions, approve or reject them, or delete. Only approved reviews appear on the storefront."
+            />
 
             <div className="admin-card mb-8 flex flex-wrap items-center gap-3 rounded-xl p-4">
                 <div className="min-w-[14rem] flex-1 space-y-2">
                     <div className="flex flex-wrap items-center gap-2">
                         <span className="text-xs uppercase tracking-wide text-sub">Google review sync</span>
-                        <span
-                            className={`inline-block rounded-full border px-2 py-0.5 text-xs font-medium capitalize ${
-                                syncStatusBadge(googleSync?.lastImportStatus || "idle")
-                            }`}
-                        >
+                        <StatusBadge tone={syncStatusTone(googleSync?.lastImportStatus || "idle")} className="capitalize">
                             {googleSync?.lastImportStatus || "idle"}
-                        </span>
+                        </StatusBadge>
                     </div>
                     <p className="text-sm text-sub">
                         {isGoogleSyncLoading
@@ -142,7 +138,7 @@ export default function AdminReviewsPage() {
                             : `${googleSync?.reviewCount ?? 0} stored review(s). Last synced ${formatTimestamp(googleSync?.lastSyncedAt ?? null)}.`}
                     </p>
                     {googleSync?.lastError ? (
-                        <p className="text-xs text-red-400">{googleSync.lastError}</p>
+                        <p className="text-xs text-danger">{googleSync.lastError}</p>
                     ) : (
                         <p className="text-xs text-sub">
                             Requested by {googleSync?.lastRequestedBy || "—"} on{" "}
@@ -203,7 +199,7 @@ export default function AdminReviewsPage() {
             </div>
 
             {error ? (
-                <p className="text-red-400">Failed to load reviews.</p>
+                <p className="text-danger">Failed to load reviews.</p>
             ) : isLoading ? (
                 <div className="flex items-center gap-2 text-sub">
                     <Loader2 className="h-5 w-5 animate-spin" />
@@ -246,11 +242,9 @@ export default function AdminReviewsPage() {
                                         </td>
                                         <td className="max-w-[140px] px-4 py-3 text-xs">{productLink(row)}</td>
                                         <td className="px-4 py-3">
-                                            <span
-                                                className={`inline-block rounded-full border px-2 py-0.5 text-xs font-medium capitalize ${statusBadge(st)}`}
-                                            >
+                                            <StatusBadge tone={statusTone(st)} className="capitalize">
                                                 {st}
-                                            </span>
+                                            </StatusBadge>
                                         </td>
                                         <td className="px-4 py-3">
                                             <div className="flex flex-wrap items-center gap-1.5">
@@ -269,7 +263,7 @@ export default function AdminReviewsPage() {
                                                         type="button"
                                                         disabled={busy}
                                                         onClick={() => handleStatus(row._id, "approved")}
-                                                        className="inline-flex items-center gap-1 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-2 py-1 text-xs text-emerald-400 hover:bg-emerald-500/20 disabled:opacity-50"
+                                                        className="inline-flex items-center gap-1 rounded-lg border border-success/40 bg-success/10 px-2 py-1 text-xs text-success hover:bg-success/20 disabled:opacity-50"
                                                     >
                                                         <Check className="h-3.5 w-3.5" />
                                                         Approve
@@ -280,7 +274,7 @@ export default function AdminReviewsPage() {
                                                         type="button"
                                                         disabled={busy}
                                                         onClick={() => handleStatus(row._id, "rejected")}
-                                                        className="inline-flex items-center gap-1 rounded-lg border border-red-500/40 bg-red-500/10 px-2 py-1 text-xs text-red-400 hover:bg-red-500/20 disabled:opacity-50"
+                                                        className="inline-flex items-center gap-1 rounded-lg border border-danger/40 bg-danger/10 px-2 py-1 text-xs text-danger hover:bg-danger/20 disabled:opacity-50"
                                                     >
                                                         <X className="h-3.5 w-3.5" />
                                                         Reject
@@ -302,7 +296,7 @@ export default function AdminReviewsPage() {
                                                     type="button"
                                                     disabled={busy}
                                                     onClick={() => handleDelete(row._id)}
-                                                    className="inline-flex items-center gap-1 rounded-lg border border-red-500/30 px-2 py-1 text-xs text-red-400 hover:bg-red-500/10 disabled:opacity-50"
+                                                    className="inline-flex items-center gap-1 rounded-lg border border-danger/30 px-2 py-1 text-xs text-danger hover:bg-danger/10 disabled:opacity-50"
                                                 >
                                                     <Trash2 className="h-3.5 w-3.5" />
                                                     Delete
@@ -346,11 +340,9 @@ export default function AdminReviewsPage() {
                         </div>
 
                         {viewingSt ? (
-                            <span
-                                className={`mb-4 inline-block rounded-full border px-2.5 py-0.5 text-xs font-medium capitalize ${statusBadge(viewingSt)}`}
-                            >
+                            <StatusBadge tone={statusTone(viewingSt)} className="mb-4 capitalize">
                                 {viewingSt}
-                            </span>
+                            </StatusBadge>
                         ) : null}
 
                         <dl className="space-y-3 text-sm">
@@ -393,7 +385,7 @@ export default function AdminReviewsPage() {
                                     type="button"
                                     disabled={rowBusy(viewing._id)}
                                     onClick={() => handleStatus(viewing._id, "approved")}
-                                    className="inline-flex flex-1 min-w-[7rem] items-center justify-center gap-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-sm font-medium text-emerald-400 hover:bg-emerald-500/20 disabled:opacity-50"
+                                    className="inline-flex flex-1 min-w-[7rem] items-center justify-center gap-1.5 rounded-lg border border-success/40 bg-success/10 px-3 py-2 text-sm font-medium text-success hover:bg-success/20 disabled:opacity-50"
                                 >
                                     <Check className="h-4 w-4" />
                                     Approve
@@ -404,7 +396,7 @@ export default function AdminReviewsPage() {
                                     type="button"
                                     disabled={rowBusy(viewing._id)}
                                     onClick={() => handleStatus(viewing._id, "rejected")}
-                                    className="inline-flex flex-1 min-w-[7rem] items-center justify-center gap-1.5 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm font-medium text-red-400 hover:bg-red-500/20 disabled:opacity-50"
+                                    className="inline-flex flex-1 min-w-[7rem] items-center justify-center gap-1.5 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm font-medium text-danger hover:bg-danger/20 disabled:opacity-50"
                                 >
                                     <X className="h-4 w-4" />
                                     Reject
@@ -425,7 +417,7 @@ export default function AdminReviewsPage() {
                                 type="button"
                                 disabled={rowBusy(viewing._id)}
                                 onClick={() => handleDelete(viewing._id)}
-                                className="inline-flex flex-1 min-w-[7rem] items-center justify-center gap-1.5 rounded-lg border border-red-500/30 px-3 py-2 text-sm font-medium text-red-400 hover:bg-red-500/10 disabled:opacity-50"
+                                className="inline-flex flex-1 min-w-[7rem] items-center justify-center gap-1.5 rounded-lg border border-danger/30 px-3 py-2 text-sm font-medium text-danger hover:bg-danger/10 disabled:opacity-50"
                             >
                                 <Trash2 className="h-4 w-4" />
                                 Delete
