@@ -199,7 +199,7 @@ export default function FeaturedSpecsAdmin() {
             <div className="admin-card rounded-xl p-6 mb-8">
                 <label className="block text-sub mb-2">Select Category</label>
                 <select
-                    className="w-full bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:ring-accent focus:border-accent [&>option]:text-white"
+                    className="w-full bg-panel border border-border-soft rounded-lg px-4 py-2 text-main focus:ring-accent focus:border-accent [&>option]:text-white"
                     value={selectedCategory}
                     onChange={(e) => setSelectedCategory(e.target.value)}
                 >
@@ -307,7 +307,7 @@ export default function FeaturedSpecsAdmin() {
                                         placeholder="Search..."
                                         value={searchQuery}
                                         onChange={(e) => setSearchQuery(e.target.value)}
-                                        className="w-full bg-base border border-border-soft rounded-lg pl-9 pr-4 py-2 text-sm text-main focus:ring-accent"
+                                        className="w-full bg-panel border border-border-soft rounded-lg pl-9 pr-4 py-2 text-sm text-main focus:ring-accent"
                                     />
                                 </div>
                                 {availableOnly.length === 0 ? (
@@ -323,7 +323,7 @@ export default function FeaturedSpecsAdmin() {
                                                 key={k}
                                                 type="button"
                                                 onClick={() => addFromAvailable(k)}
-                                                className="text-left px-3 py-2 rounded-lg border border-border-soft bg-base hover:border-accent/40 hover:bg-white/5 text-sub hover:text-main text-sm transition-colors"
+                                                className="text-left px-3 py-2 rounded-lg border border-border-soft bg-panel hover:border-accent/40 hover:bg-white/5 text-sub hover:text-main text-sm transition-colors"
                                             >
                                                 + {k}
                                             </button>

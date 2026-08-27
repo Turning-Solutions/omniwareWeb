@@ -266,7 +266,7 @@ export default function ProductsPage() {
                         <input
                             type="text"
                             placeholder="Search by product name or SKU..."
-                            className="w-full bg-base border border-border-soft rounded-lg pl-10 pr-4 py-2.5 text-main focus:outline-none focus:border-accent transition-colors"
+                            className="w-full bg-panel border border-border-soft rounded-lg pl-10 pr-4 py-2.5 text-main focus:outline-none focus:border-accent transition-colors"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             onKeyDown={(e) => {
@@ -279,7 +279,7 @@ export default function ProductsPage() {
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-[1fr_1fr_1fr_auto_auto] gap-3">
                         <select
-                            className="bg-base border border-border-soft rounded-lg px-4 py-2.5 text-main focus:outline-none focus:border-accent [&>option]:text-white"
+                            className="bg-panel border border-border-soft rounded-lg px-4 py-2.5 text-main focus:outline-none focus:border-accent [&>option]:text-white"
                             value={selectedMainCategory}
                             onChange={(e) => {
                                 setCurrentPage(1);
@@ -293,7 +293,7 @@ export default function ProductsPage() {
                             ))}
                         </select>
                         <select
-                            className="bg-base border border-border-soft rounded-lg px-4 py-2.5 text-main focus:outline-none focus:border-accent [&>option]:text-white disabled:opacity-60"
+                            className="bg-panel border border-border-soft rounded-lg px-4 py-2.5 text-main focus:outline-none focus:border-accent [&>option]:text-white disabled:opacity-60"
                             value={selectedSubCategory}
                             disabled={!selectedMainCategory}
                             onChange={(e) => {
@@ -307,7 +307,7 @@ export default function ProductsPage() {
                             ))}
                         </select>
                         <select
-                            className="bg-base border border-border-soft rounded-lg px-4 py-2.5 text-main focus:outline-none focus:border-accent [&>option]:text-white"
+                            className="bg-panel border border-border-soft rounded-lg px-4 py-2.5 text-main focus:outline-none focus:border-accent [&>option]:text-white"
                             value={selectedBrand}
                             onChange={(e) => {
                                 setCurrentPage(1);
@@ -328,7 +328,7 @@ export default function ProductsPage() {
                             className={`inline-flex items-center justify-center gap-2 rounded-lg border px-4 py-2.5 text-sm transition-colors ${
                                 featuredOnly
                                     ? "border-warning/60 bg-warning/15 text-warning"
-                                    : "border-border-soft text-main hover:bg-base"
+                                    : "border-border-soft text-main hover:bg-panel"
                             }`}
                         >
                             <Star className="h-4 w-4" />
@@ -338,7 +338,7 @@ export default function ProductsPage() {
                             type="button"
                             onClick={clearFilters}
                             disabled={!hasFilters}
-                            className="inline-flex items-center justify-center gap-2 rounded-lg border border-border-soft px-4 py-2.5 text-sm text-main disabled:opacity-50 disabled:cursor-not-allowed hover:bg-base transition-colors sm:col-span-2 xl:col-span-1"
+                            className="inline-flex items-center justify-center gap-2 rounded-lg border border-border-soft px-4 py-2.5 text-sm text-main disabled:opacity-50 disabled:cursor-not-allowed hover:bg-panel transition-colors sm:col-span-2 xl:col-span-1"
                         >
                             <X className="h-4 w-4" />
                             Clear
@@ -352,22 +352,22 @@ export default function ProductsPage() {
                 <div className="mb-6 flex flex-wrap items-center gap-2">
                     <span className="text-xs text-sub uppercase tracking-wide">Active filters</span>
                     {searchTerm ? (
-                        <span className="text-xs px-2 py-1 rounded-full bg-base text-main border border-border-soft">
+                        <span className="text-xs px-2 py-1 rounded-full bg-panel text-main border border-border-soft">
                             Search: {searchTerm}
                         </span>
                     ) : null}
                     {selectedMainCategory ? (
-                        <span className="text-xs px-2 py-1 rounded-full bg-base text-main border border-border-soft">
+                        <span className="text-xs px-2 py-1 rounded-full bg-panel text-main border border-border-soft">
                             Main: {selectedMainCategoryName || "Selected"}
                         </span>
                     ) : null}
                     {selectedSubCategory ? (
-                        <span className="text-xs px-2 py-1 rounded-full bg-base text-main border border-border-soft">
+                        <span className="text-xs px-2 py-1 rounded-full bg-panel text-main border border-border-soft">
                             Sub: {selectedSubCategoryName || "Selected"}
                         </span>
                     ) : null}
                     {selectedBrand ? (
-                        <span className="text-xs px-2 py-1 rounded-full bg-base text-main border border-border-soft">
+                        <span className="text-xs px-2 py-1 rounded-full bg-panel text-main border border-border-soft">
                             Brand: {selectedBrandName || "Selected"}
                         </span>
                     ) : null}
@@ -387,7 +387,7 @@ export default function ProductsPage() {
                 ) : null}
                 <div className="overflow-x-auto">
                     <table className="w-full text-left">
-                        <thead className="bg-base text-sub uppercase text-xs sticky top-0">
+                        <thead className="bg-panel text-sub uppercase text-xs sticky top-0">
                             <tr>
                                 <th className="px-4 sm:px-6 py-4">Title</th>
                                 <th className="px-4 sm:px-6 py-4">Price</th>
@@ -411,7 +411,7 @@ export default function ProductsPage() {
                                     return (
                                     <tr
                                         key={product._id}
-                                        className={`transition-colors ${isRecentlyUpdated ? "bg-accent/10 ring-1 ring-inset ring-accent/50" : "hover:bg-base/50"}`}
+                                        className={`transition-colors ${isRecentlyUpdated ? "bg-accent/10 ring-1 ring-inset ring-accent/50" : "hover:bg-panel/50"}`}
                                     >
                                         <td className="px-4 sm:px-6 py-4 font-medium max-w-[260px] truncate" title={product.title}>
                                             <span>{product.title}</span>
@@ -439,7 +439,7 @@ export default function ProductsPage() {
                                                 className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
                                                     product.isFeatured
                                                         ? "bg-warning/15 text-warning hover:bg-warning/20"
-                                                        : "bg-base text-sub hover:text-main"
+                                                        : "bg-panel text-sub hover:text-main"
                                                 }`}
                                             >
                                                 <Star className={`h-3.5 w-3.5 ${product.isFeatured ? "fill-warning text-warning" : "text-sub"}`} />
@@ -448,13 +448,13 @@ export default function ProductsPage() {
                                         </td>
                                         <td className="px-4 sm:px-6 py-4 text-right">
                                             <div className="flex justify-end gap-2">
-                                                <Link href={`/admin/products/${product._id}?returnTo=${returnTo}`} className="p-2 hover:bg-base rounded-lg text-accent transition-colors" title="Edit product">
+                                                <Link href={`/admin/products/${product._id}?returnTo=${returnTo}`} className="p-2 hover:bg-panel rounded-lg text-accent transition-colors" title="Edit product">
                                                     <Edit className="h-4 w-4" />
                                                 </Link>
                                                 <button
                                                     onClick={() => setProductToDeleteId(product._id)}
                                                     disabled={deletingId === product._id}
-                                                    className="p-2 hover:bg-base rounded-lg text-danger transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                                    className="p-2 hover:bg-panel rounded-lg text-danger transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                                                     title="Delete product"
                                                 >
                                                     <Trash2 className="h-4 w-4" />

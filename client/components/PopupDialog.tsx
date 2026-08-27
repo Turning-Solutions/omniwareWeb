@@ -63,7 +63,7 @@ export default function PopupDialog({
                         <button
                             type="button"
                             onClick={onClose}
-                            className="rounded-lg border border-border-soft px-4 py-2 text-sm text-main hover:bg-base transition-colors"
+                            className="rounded-lg border border-border-soft px-4 py-2 text-sm text-main hover:bg-panel transition-colors"
                         >
                             {cancelText}
                         </button>

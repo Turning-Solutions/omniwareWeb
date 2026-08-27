@@ -92,13 +92,13 @@ export default function AdminProductViewsPage() {
                         <input
                             type="text"
                             placeholder="Search product name..."
-                            className="w-full bg-base border border-border-soft rounded-lg pl-10 pr-4 py-2 text-main text-sm focus:outline-none focus:border-accent"
+                            className="w-full bg-panel border border-border-soft rounded-lg pl-10 pr-4 py-2 text-main text-sm focus:outline-none focus:border-accent"
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                         />
                     </div>
                     <select
-                        className="bg-base border border-border-soft rounded-lg px-4 py-2 text-main text-sm focus:outline-none focus:border-accent [&>option]:text-white"
+                        className="bg-panel border border-border-soft rounded-lg px-4 py-2 text-main text-sm focus:outline-none focus:border-accent [&>option]:text-white"
                         value={range}
                         onChange={(e) => setRange(e.target.value)}
                     >
@@ -113,7 +113,7 @@ export default function AdminProductViewsPage() {
             <div className="admin-card rounded-xl overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="w-full text-left">
-                        <thead className="bg-base text-sub uppercase text-xs">
+                        <thead className="bg-panel text-sub uppercase text-xs">
                             <tr>
                                 <th className="px-4 sm:px-6 py-4">Product</th>
                                 <th className="px-4 sm:px-6 py-4">Views</th>
@@ -127,14 +127,14 @@ export default function AdminProductViewsPage() {
                                 <tr><td colSpan={3} className="px-6 py-8 text-center text-sub">No product views recorded for this range</td></tr>
                             ) : (
                                 rows.map((row) => (
-                                    <tr key={row.productId} className="hover:bg-base/50 transition-colors">
+                                    <tr key={row.productId} className="hover:bg-panel/50 transition-colors">
                                         <td className="px-4 sm:px-6 py-4 min-w-[220px]">
                                             <Link
                                                 href={`/product/${row.slug || row.productId}`}
                                                 target="_blank"
                                                 className="flex items-center gap-3 group"
                                             >
-                                                <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg border border-border-soft bg-base">
+                                                <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg border border-border-soft bg-panel">
                                                     {row.image ? (
                                                         <Image src={row.image} alt="" fill className="object-contain" unoptimized />
                                                     ) : null}

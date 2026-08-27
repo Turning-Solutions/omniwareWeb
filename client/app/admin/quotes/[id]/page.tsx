@@ -88,7 +88,7 @@ export default function AdminQuotationDetailsPage() {
             <div className="admin-card rounded-xl overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="w-full text-left">
-                        <thead className="bg-base text-sub uppercase text-xs">
+                        <thead className="bg-panel text-sub uppercase text-xs">
                             <tr>
                                 <th className="px-4 sm:px-6 py-4">#</th>
                                 <th className="px-4 sm:px-6 py-4">Product</th>

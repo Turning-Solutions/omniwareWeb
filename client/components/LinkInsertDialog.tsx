@@ -43,7 +43,7 @@ export default function LinkInsertDialog({ open, initialLabel, onCancel, onInser
                 </div>
 
                 <div className="space-y-4 px-5 py-4">
-                    <div className="rounded-lg border border-border-soft bg-base/60 px-3 py-2.5 text-xs leading-relaxed text-sub">
+                    <div className="rounded-lg border border-border-soft bg-panel/60 px-3 py-2.5 text-xs leading-relaxed text-sub">
                         Only the <span className="text-main">text to display</span> becomes clickable, customers see that word or
                         phrase, never the raw URL. For example, display text{" "}
                         <span className="text-main">&quot;warranty terms&quot;</span> linking to your policy page shows only
@@ -61,7 +61,7 @@ export default function LinkInsertDialog({ open, initialLabel, onCancel, onInser
                             onChange={(e) => setLabel(e.target.value)}
                             onKeyDown={(e) => e.key === "Enter" && submit()}
                             placeholder="e.g. warranty terms"
-                            className="w-full rounded-lg border border-border-soft bg-base px-3 py-2 text-sm text-main focus:border-accent focus:outline-none"
+                            className="w-full rounded-lg border border-border-soft bg-panel px-3 py-2 text-sm text-main focus:border-accent focus:outline-none"
                         />
                     </div>
 
@@ -73,7 +73,7 @@ export default function LinkInsertDialog({ open, initialLabel, onCancel, onInser
                             onChange={(e) => setUrl(e.target.value)}
                             onKeyDown={(e) => e.key === "Enter" && submit()}
                             placeholder="https://example.com/page"
-                            className="w-full rounded-lg border border-border-soft bg-base px-3 py-2 text-sm text-main focus:border-accent focus:outline-none"
+                            className="w-full rounded-lg border border-border-soft bg-panel px-3 py-2 text-sm text-main focus:border-accent focus:outline-none"
                         />
                     </div>
                 </div>
@@ -82,7 +82,7 @@ export default function LinkInsertDialog({ open, initialLabel, onCancel, onInser
                     <button
                         type="button"
                         onClick={onCancel}
-                        className="rounded-lg border border-border-soft px-4 py-2 text-sm text-main transition-colors hover:bg-base"
+                        className="rounded-lg border border-border-soft px-4 py-2 text-sm text-main transition-colors hover:bg-panel"
                     >
                         Cancel
                     </button>

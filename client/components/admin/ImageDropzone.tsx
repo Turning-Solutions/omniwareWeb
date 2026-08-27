@@ -44,7 +44,7 @@ export default function ImageDropzone({
         <div>
             <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-sub">{label}</label>
             {value ? (
-                <div className={`relative mb-2 w-full ${height} overflow-hidden rounded-xl border border-border-soft ${previewAspect === "contain" ? "bg-base" : ""}`}>
+                <div className={`relative mb-2 w-full ${height} overflow-hidden rounded-xl border border-border-soft ${previewAspect === "contain" ? "bg-panel" : ""}`}>
                     <Image
                         src={value}
                         alt="Preview"
@@ -62,7 +62,7 @@ export default function ImageDropzone({
                 </div>
             ) : (
                 <label
-                    className={`mb-2 flex ${height} w-full cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-border-soft bg-base transition-colors hover:border-accent ${
+                    className={`mb-2 flex ${height} w-full cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-border-soft bg-panel transition-colors hover:border-accent ${
                         disabled ? "pointer-events-none opacity-60" : ""
                     }`}
                 >
@@ -91,7 +91,7 @@ export default function ImageDropzone({
                     placeholder={urlPlaceholder}
                     value={value}
                     onChange={(e) => onUrlChange(e.target.value)}
-                    className="flex-1 rounded-lg border border-border-soft bg-base px-3 py-1.5 text-sm text-main placeholder:text-sub focus:outline-none focus:border-accent"
+                    className="flex-1 rounded-lg border border-border-soft bg-panel px-3 py-1.5 text-sm text-main placeholder:text-sub focus:outline-none focus:border-accent"
                 />
             </div>
         </div>

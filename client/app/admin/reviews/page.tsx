@@ -176,7 +176,7 @@ export default function AdminReviewsPage() {
                     <select
                         value={statusFilter}
                         onChange={(e) => setStatusFilter(e.target.value)}
-                        className="rounded-lg border border-border-soft bg-base px-3 py-2 text-sm text-main focus:border-accent focus:outline-none"
+                        className="rounded-lg border border-border-soft bg-panel px-3 py-2 text-sm text-main focus:border-accent focus:outline-none"
                     >
                         <option value="all">All</option>
                         <option value="approved">Approved</option>
@@ -189,7 +189,7 @@ export default function AdminReviewsPage() {
                     <select
                         value={kindFilter}
                         onChange={(e) => setKindFilter(e.target.value)}
-                        className="rounded-lg border border-border-soft bg-base px-3 py-2 text-sm text-main focus:border-accent focus:outline-none"
+                        className="rounded-lg border border-border-soft bg-panel px-3 py-2 text-sm text-main focus:border-accent focus:outline-none"
                     >
                         <option value="all">Shop & product</option>
                         <option value="product">Product only</option>
@@ -252,7 +252,7 @@ export default function AdminReviewsPage() {
                                                     type="button"
                                                     disabled={busy}
                                                     onClick={() => setViewing(row)}
-                                                    className="inline-flex items-center gap-1 rounded-lg border border-border-soft bg-base px-2 py-1 text-xs text-main hover:bg-white/5 disabled:opacity-50"
+                                                    className="inline-flex items-center gap-1 rounded-lg border border-border-soft bg-panel px-2 py-1 text-xs text-main hover:bg-white/5 disabled:opacity-50"
                                                     title="View full review"
                                                 >
                                                     <Eye className="h-3.5 w-3.5" />
@@ -373,7 +373,7 @@ export default function AdminReviewsPage() {
                             ) : null}
                             <div>
                                 <dt className="text-xs uppercase tracking-wide text-sub">Comment</dt>
-                                <dd className="mt-1 whitespace-pre-wrap rounded-lg border border-border-soft bg-base p-3 text-main leading-relaxed">
+                                <dd className="mt-1 whitespace-pre-wrap rounded-lg border border-border-soft bg-panel p-3 text-main leading-relaxed">
                                     {viewing.comment}
                                 </dd>
                             </div>

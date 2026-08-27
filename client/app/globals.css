@@ -62,7 +62,12 @@
     --color-main: var(--admin-main, #171717);
     --color-sub: var(--admin-sub, #525252);
     --color-surface: var(--admin-surface, #f4f4f5);
-    --color-base: var(--admin-base, #f1f1f1);
+    /* Named "panel" (not "base") on purpose: Tailwind's own type-scale already
+       reserves the key "base" for text-base (font-size: 1rem). A --color-base
+       token here would silently hijack every `text-base`/`sm:text-base` usage
+       sitewide into a color utility instead, which is exactly the bug that
+       caused "invisible" small text this token rename fixes. */
+    --color-panel: var(--admin-base, #f1f1f1);
     --color-border-soft: var(--admin-border, #e4e4e7);
     --color-accent: var(--store-accent);
     --color-primary: var(--store-accent);

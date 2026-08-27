@@ -205,7 +205,7 @@ export default function AdminOrderDetailsPage({ params }: PageProps) {
                                     className="absolute left-0 top-full z-[100] mt-1 w-full min-w-[260px] max-w-[min(100vw-2rem,320px)] origin-top overflow-hidden rounded-xl border border-border-soft bg-surface shadow-2xl ring-1 ring-black/40 md:left-auto md:right-0"
                                     role="listbox"
                                 >
-                                    <div className="border-b border-border-soft bg-base/80 px-3 py-2">
+                                    <div className="border-b border-border-soft bg-panel/80 px-3 py-2">
                                         <p className="text-[10px] font-semibold uppercase tracking-wider text-sub">Current</p>
                                         <p className="flex items-center gap-2 text-sm font-medium text-main mt-0.5">
                                             <Check className="h-4 w-4 shrink-0 text-accent" aria-hidden />
@@ -257,7 +257,7 @@ export default function AdminOrderDetailsPage({ params }: PageProps) {
                         <div className="space-y-4">
                             {order.orderItems.map((item, idx) => (
                                 <div key={idx} className="flex items-center gap-4 py-4 border-b border-border-soft last:border-0">
-                                    <div className="relative h-16 w-16 bg-base rounded-lg overflow-hidden flex-shrink-0">
+                                    <div className="relative h-16 w-16 bg-panel rounded-lg overflow-hidden flex-shrink-0">
                                         <Image src={item.image} alt={item.name} fill className="object-cover" sizes="64px" />
                                     </div>
                                     <div className="flex-1">
@@ -355,7 +355,7 @@ export default function AdminOrderDetailsPage({ params }: PageProps) {
                                 </span>
                             </div>
                             {order.paymentMethod === "bank_transfer" && (
-                                <div className="mt-4 rounded-lg border border-border-soft bg-base/40 p-3">
+                                <div className="mt-4 rounded-lg border border-border-soft bg-panel/40 p-3">
                                     <p className="text-xs text-sub uppercase mb-2">Receipt Verification</p>
                                     {order.bankTransferReceipt?.url ? (
                                         <div className="space-y-2">
@@ -368,11 +368,11 @@ export default function AdminOrderDetailsPage({ params }: PageProps) {
                                                 View uploaded receipt
                                             </a>
                                             {isPdfReceipt ? (
-                                                <div className="rounded border border-border-soft bg-base p-3 text-sm text-sub">
+                                                <div className="rounded border border-border-soft bg-panel p-3 text-sm text-sub">
                                                     PDF receipt uploaded. Click View uploaded receipt to open it.
                                                 </div>
                                             ) : (
-                                                <div className="relative h-60 w-full rounded border border-border-soft bg-base">
+                                                <div className="relative h-60 w-full rounded border border-border-soft bg-panel">
                                                     <Image
                                                         src={receiptUrl}
                                                         alt="Bank transfer receipt"

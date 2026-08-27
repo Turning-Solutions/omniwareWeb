@@ -95,13 +95,13 @@ export default function AdminOrdersPage() {
                         <input
                             type="text"
                             placeholder="Search ID..."
-                            className="w-full bg-base border border-border-soft rounded-lg pl-10 pr-4 py-2 text-main text-sm focus:outline-none focus:border-accent"
+                            className="w-full bg-panel border border-border-soft rounded-lg pl-10 pr-4 py-2 text-main text-sm focus:outline-none focus:border-accent"
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                         />
                     </div>
                     <select
-                        className="bg-base border border-border-soft rounded-lg px-4 py-2 text-main text-sm focus:outline-none focus:border-accent [&>option]:text-white"
+                        className="bg-panel border border-border-soft rounded-lg px-4 py-2 text-main text-sm focus:outline-none focus:border-accent [&>option]:text-white"
                         value={status}
                         onChange={(e) => setStatus(e.target.value)}
                     >
@@ -115,7 +115,7 @@ export default function AdminOrdersPage() {
                         <option value="waiting_confirmation">Waiting Confirmation</option>
                     </select>
                     <select
-                        className="bg-base border border-border-soft rounded-lg px-4 py-2 text-main text-sm focus:outline-none focus:border-accent [&>option]:text-white"
+                        className="bg-panel border border-border-soft rounded-lg px-4 py-2 text-main text-sm focus:outline-none focus:border-accent [&>option]:text-white"
                         value={sort}
                         onChange={(e) => setSort(e.target.value)}
                     >
@@ -130,7 +130,7 @@ export default function AdminOrdersPage() {
             <div className="admin-card rounded-xl overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="w-full text-left">
-                        <thead className="bg-base text-sub uppercase text-xs">
+                        <thead className="bg-panel text-sub uppercase text-xs">
                             <tr>
                                 <th className="px-4 sm:px-6 py-4">Order No</th>
                                 <th className="px-4 sm:px-6 py-4">Customer</th>
@@ -147,7 +147,7 @@ export default function AdminOrdersPage() {
                                 <tr><td colSpan={6} className="px-6 py-8 text-center text-sub">No orders found</td></tr>
                             ) : (
                                 orders.map((order) => (
-                                    <tr key={order._id} className="hover:bg-base/50 transition-colors">
+                                    <tr key={order._id} className="hover:bg-panel/50 transition-colors">
                                         <td className="px-4 sm:px-6 py-4 font-mono text-xs whitespace-nowrap">
                                             {formatOrderNumber(order._id)}
                                         </td>
@@ -167,7 +167,7 @@ export default function AdminOrdersPage() {
                                             </StatusBadge>
                                         </td>
                                         <td className="px-4 sm:px-6 py-4 text-right">
-                                            <Link href={`/admin/orders/${order._id}`} className="inline-flex items-center justify-center p-2 hover:bg-base rounded-lg text-accent transition-colors">
+                                            <Link href={`/admin/orders/${order._id}`} className="inline-flex items-center justify-center p-2 hover:bg-panel rounded-lg text-accent transition-colors">
                                                 <Eye className="h-4 w-4" />
                                             </Link>
                                         </td>

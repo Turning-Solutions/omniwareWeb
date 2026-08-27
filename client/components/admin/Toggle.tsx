@@ -15,7 +15,7 @@ function Switch({ checked, disabled }: { checked: boolean; disabled?: boolean })
     return (
         <div
             className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
-                checked ? "bg-accent" : "bg-base border border-border-soft"
+                checked ? "bg-accent" : "bg-panel border border-border-soft"
             } ${disabled ? "opacity-60" : ""}`}
         >
             <span

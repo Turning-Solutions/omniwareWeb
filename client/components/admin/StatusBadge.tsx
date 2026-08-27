@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 export type StatusTone = "neutral" | "success" | "warning" | "danger" | "info";
 
 const toneClasses: Record<StatusTone, string> = {
-    neutral: "bg-base text-sub border-border-soft",
+    neutral: "bg-panel text-sub border-border-soft",
     success: "bg-success/15 text-success border-success/30",
     warning: "bg-warning/15 text-warning border-warning/30",
     danger: "bg-danger/15 text-danger border-danger/30",

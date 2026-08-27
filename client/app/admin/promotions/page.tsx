@@ -60,7 +60,7 @@ const toneButtonClasses: Record<StatusTone, string> = {
     warning: "bg-warning/15 text-warning hover:bg-warning/25",
     danger: "bg-danger/15 text-danger hover:bg-danger/25",
     info: "bg-info/15 text-info hover:bg-info/25",
-    neutral: "bg-base text-sub hover:bg-white/5",
+    neutral: "bg-panel text-sub hover:bg-white/5",
 };
 
 export default function PromotionsPage() {
@@ -232,7 +232,7 @@ export default function PromotionsPage() {
                                     type="text"
                                     value={form.title}
                                     onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
-                                    className="w-full bg-base border border-border-soft rounded-lg px-3 py-2 text-main placeholder:text-sub focus:outline-none focus:border-accent"
+                                    className="w-full bg-panel border border-border-soft rounded-lg px-3 py-2 text-main placeholder:text-sub focus:outline-none focus:border-accent"
                                     placeholder="e.g. End of Season Sale"
                                 />
                             </div>
@@ -243,7 +243,7 @@ export default function PromotionsPage() {
                                     rows={2}
                                     value={form.description}
                                     onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-                                    className="w-full bg-base border border-border-soft rounded-lg px-3 py-2 text-main placeholder:text-sub focus:outline-none focus:border-accent resize-none"
+                                    className="w-full bg-panel border border-border-soft rounded-lg px-3 py-2 text-main placeholder:text-sub focus:outline-none focus:border-accent resize-none"
                                     placeholder="Short description shown on the card"
                                 />
                             </div>
@@ -255,7 +255,7 @@ export default function PromotionsPage() {
                                         type="text"
                                         value={form.badgeText}
                                         onChange={e => setForm(f => ({ ...f, badgeText: e.target.value }))}
-                                        className="w-full bg-base border border-border-soft rounded-lg px-3 py-2 text-main placeholder:text-sub focus:outline-none focus:border-accent"
+                                        className="w-full bg-panel border border-border-soft rounded-lg px-3 py-2 text-main placeholder:text-sub focus:outline-none focus:border-accent"
                                         placeholder="e.g. 20% OFF"
                                     />
                                 </div>
@@ -265,7 +265,7 @@ export default function PromotionsPage() {
                                         type="number"
                                         value={form.sortOrder}
                                         onChange={e => setForm(f => ({ ...f, sortOrder: Number(e.target.value) }))}
-                                        className="w-full bg-base border border-border-soft rounded-lg px-3 py-2 text-main placeholder:text-sub focus:outline-none focus:border-accent"
+                                        className="w-full bg-panel border border-border-soft rounded-lg px-3 py-2 text-main placeholder:text-sub focus:outline-none focus:border-accent"
                                     />
                                 </div>
                             </div>
@@ -276,7 +276,7 @@ export default function PromotionsPage() {
                                     type="text"
                                     value={form.link}
                                     onChange={e => setForm(f => ({ ...f, link: e.target.value }))}
-                                    className="w-full bg-base border border-border-soft rounded-lg px-3 py-2 text-main placeholder:text-sub focus:outline-none focus:border-accent"
+                                    className="w-full bg-panel border border-border-soft rounded-lg px-3 py-2 text-main placeholder:text-sub focus:outline-none focus:border-accent"
                                     placeholder="e.g. /shop?tag=sale (optional)"
                                 />
                             </div>
@@ -288,7 +288,7 @@ export default function PromotionsPage() {
                                         type="datetime-local"
                                         value={form.validFrom}
                                         onChange={e => setForm(f => ({ ...f, validFrom: e.target.value }))}
-                                        className="w-full bg-base border border-border-soft rounded-lg px-3 py-2 text-main focus:outline-none focus:border-accent [color-scheme:dark]"
+                                        className="w-full bg-panel border border-border-soft rounded-lg px-3 py-2 text-main focus:outline-none focus:border-accent [color-scheme:dark]"
                                     />
                                 </div>
                                 <div>
@@ -297,7 +297,7 @@ export default function PromotionsPage() {
                                         type="datetime-local"
                                         value={form.validTo}
                                         onChange={e => setForm(f => ({ ...f, validTo: e.target.value }))}
-                                        className="w-full bg-base border border-border-soft rounded-lg px-3 py-2 text-main focus:outline-none focus:border-accent [color-scheme:dark]"
+                                        className="w-full bg-panel border border-border-soft rounded-lg px-3 py-2 text-main focus:outline-none focus:border-accent [color-scheme:dark]"
                                     />
                                 </div>
                             </div>
@@ -347,7 +347,7 @@ export default function PromotionsPage() {
                 ) : (
                     <div className="overflow-x-auto">
                         <table className="w-full text-left">
-                            <thead className="bg-base text-sub uppercase text-xs">
+                            <thead className="bg-panel text-sub uppercase text-xs">
                                 <tr>
                                     <th className="px-5 py-4 w-16">Image</th>
                                     <th className="px-5 py-4">Title</th>
@@ -360,14 +360,14 @@ export default function PromotionsPage() {
                             </thead>
                             <tbody className="divide-y divide-border-soft text-main">
                                 {promotions.map(promo => (
-                                    <tr key={promo._id} className="hover:bg-base/50 transition-colors">
+                                    <tr key={promo._id} className="hover:bg-panel/50 transition-colors">
                                         <td className="px-5 py-3">
                                             {promo.imageUrl ? (
-                                                <div className="relative h-10 w-16 rounded-md overflow-hidden bg-base shrink-0">
+                                                <div className="relative h-10 w-16 rounded-md overflow-hidden bg-panel shrink-0">
                                                     <Image src={promo.imageUrl} alt={promo.title} fill className="object-cover" sizes="64px" />
                                                 </div>
                                             ) : (
-                                                <div className="flex h-10 w-16 items-center justify-center rounded-md bg-base">
+                                                <div className="flex h-10 w-16 items-center justify-center rounded-md bg-panel">
                                                     <ImageIcon className="h-4 w-4 text-sub/50" />
                                                 </div>
                                             )}
@@ -401,13 +401,13 @@ export default function PromotionsPage() {
                                             <div className="flex justify-end gap-2">
                                                 <button
                                                     onClick={() => openEdit(promo)}
-                                                    className="p-2 hover:bg-base rounded-lg text-accent transition-colors"
+                                                    className="p-2 hover:bg-panel rounded-lg text-accent transition-colors"
                                                 >
                                                     <Edit2 className="h-4 w-4" />
                                                 </button>
                                                 <button
                                                     onClick={() => setPromotionToDeleteId(promo._id)}
-                                                    className="p-2 hover:bg-base rounded-lg text-danger transition-colors"
+                                                    className="p-2 hover:bg-panel rounded-lg text-danger transition-colors"
                                                 >
                                                     <Trash2 className="h-4 w-4" />
                                                 </button>

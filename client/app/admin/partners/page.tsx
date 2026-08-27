@@ -172,7 +172,7 @@ export default function PartnersPage() {
                                     type="text"
                                     value={form.name}
                                     onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                                    className="w-full bg-base border border-border-soft rounded-lg px-3 py-2 text-main placeholder:text-sub focus:outline-none focus:border-accent"
+                                    className="w-full bg-panel border border-border-soft rounded-lg px-3 py-2 text-main placeholder:text-sub focus:outline-none focus:border-accent"
                                     placeholder="e.g. AMD"
                                 />
                             </div>
@@ -195,7 +195,7 @@ export default function PartnersPage() {
                                     type="number"
                                     value={form.sortOrder}
                                     onChange={(e) => setForm((f) => ({ ...f, sortOrder: Number(e.target.value) }))}
-                                    className="w-full bg-base border border-border-soft rounded-lg px-3 py-2 text-main placeholder:text-sub focus:outline-none focus:border-accent"
+                                    className="w-full bg-panel border border-border-soft rounded-lg px-3 py-2 text-main placeholder:text-sub focus:outline-none focus:border-accent"
                                 />
                             </div>
 
@@ -235,7 +235,7 @@ export default function PartnersPage() {
                 ) : (
                     <div className="overflow-x-auto">
                         <table className="w-full text-left">
-                            <thead className="bg-base text-sub uppercase text-xs">
+                            <thead className="bg-panel text-sub uppercase text-xs">
                                 <tr>
                                     <th className="px-5 py-4">Name</th>
                                     <th className="px-5 py-4">Logo</th>
@@ -246,7 +246,7 @@ export default function PartnersPage() {
                             </thead>
                             <tbody className="divide-y divide-border-soft text-main">
                                 {partners.map((partner) => (
-                                    <tr key={partner._id} className="hover:bg-base/50 transition-colors">
+                                    <tr key={partner._id} className="hover:bg-panel/50 transition-colors">
                                         <td className="px-5 py-3 font-medium">{partner.name}</td>
                                         <td className="px-5 py-3 text-sm text-sub">
                                             {partner.logoUrl ? (
@@ -269,13 +269,13 @@ export default function PartnersPage() {
                                             <div className="flex justify-end gap-2">
                                                 <button
                                                     onClick={() => openEdit(partner)}
-                                                    className="p-2 hover:bg-base rounded-lg text-accent transition-colors"
+                                                    className="p-2 hover:bg-panel rounded-lg text-accent transition-colors"
                                                 >
                                                     <Edit2 className="h-4 w-4" />
                                                 </button>
                                                 <button
                                                     onClick={() => setPartnerToDeleteId(partner._id)}
-                                                    className="p-2 hover:bg-base rounded-lg text-danger transition-colors"
+                                                    className="p-2 hover:bg-panel rounded-lg text-danger transition-colors"
                                                 >
                                                     <Trash2 className="h-4 w-4" />
                                                 </button>

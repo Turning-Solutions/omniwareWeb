@@ -83,7 +83,7 @@ export default function AdminPage() {
                         Sales and store activity for {rangeLabel.toLowerCase()}.
                     </p>
                 </div>
-                <div className="grid w-full grid-cols-3 gap-1 rounded-lg border border-border-soft bg-base p-1 sm:flex sm:w-auto sm:gap-1">
+                <div className="grid w-full grid-cols-3 gap-1 rounded-lg border border-border-soft bg-panel p-1 sm:flex sm:w-auto sm:gap-1">
                     {['today', '7d', '30d'].map((r) => (
                         <button
                             key={r}
@@ -155,7 +155,7 @@ export default function AdminPage() {
                     </div>
                     <div className="-mx-px flex-1 overflow-x-auto sm:mx-0">
                         <table className="w-full min-w-[28rem] text-left text-sm">
-                            <thead className="bg-base text-xs uppercase tracking-wide text-sub">
+                            <thead className="bg-panel text-xs uppercase tracking-wide text-sub">
                                 <tr>
                                     <th className="whitespace-nowrap px-3 py-3 sm:px-6 sm:py-4">ID</th>
                                     <th className="px-3 py-3 sm:px-6 sm:py-4">Customer</th>
@@ -172,7 +172,7 @@ export default function AdminPage() {
                                     </tr>
                                 ) : (
                                     recentOrders.map((order: RecentOrder) => (
-                                        <tr key={order.id} className="hover:bg-base/50">
+                                        <tr key={order.id} className="hover:bg-panel/50">
                                             <td className="whitespace-nowrap px-3 py-3 font-mono text-xs sm:px-6 sm:py-4">
                                                 {order.id.slice(-6)}
                                             </td>
@@ -201,7 +201,7 @@ export default function AdminPage() {
                     </div>
                     <div className="-mx-px flex-1 overflow-x-auto sm:mx-0">
                         <table className="w-full min-w-[22rem] text-left text-sm">
-                            <thead className="bg-base text-xs uppercase tracking-wide text-sub">
+                            <thead className="bg-panel text-xs uppercase tracking-wide text-sub">
                                 <tr>
                                     <th className="px-3 py-3 sm:px-6 sm:py-4">Product</th>
                                     <th className="whitespace-nowrap px-3 py-3 text-right sm:px-6 sm:py-4">Views</th>
@@ -217,7 +217,7 @@ export default function AdminPage() {
                                     </tr>
                                 ) : (
                                     summary.topProducts.map((p) => (
-                                        <tr key={p.productId} className="hover:bg-base/50">
+                                        <tr key={p.productId} className="hover:bg-panel/50">
                                             <td className="max-w-[11rem] px-3 py-3 sm:max-w-[16rem] sm:px-6 sm:py-4" title={p.title}>
                                                 <span className="line-clamp-2 break-words">{p.title}</span>
                                             </td>

@@ -73,7 +73,7 @@ export default function AdminQuotesPage() {
                         <input
                             type="text"
                             placeholder="Search by product title..."
-                            className="w-full bg-base border border-border-soft rounded-lg pl-10 pr-4 py-2 text-main text-sm focus:outline-none focus:border-accent"
+                            className="w-full bg-panel border border-border-soft rounded-lg pl-10 pr-4 py-2 text-main text-sm focus:outline-none focus:border-accent"
                             value={search}
                             onChange={(e) => {
                                 setPage(1);
@@ -94,7 +94,7 @@ export default function AdminQuotesPage() {
             <div className="admin-card rounded-xl overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="w-full text-left">
-                        <thead className="bg-base text-sub uppercase text-xs">
+                        <thead className="bg-panel text-sub uppercase text-xs">
                             <tr>
                                 <th className="px-4 sm:px-6 py-4">Date/Time</th>
                                 <th className="px-4 sm:px-6 py-4">Quote ID</th>
@@ -118,7 +118,7 @@ export default function AdminQuotesPage() {
                                 </tr>
                             ) : (
                                 quotes.map((quote) => (
-                                    <tr key={quote._id} className="hover:bg-base/50 transition-colors">
+                                    <tr key={quote._id} className="hover:bg-panel/50 transition-colors">
                                         <td className="px-4 sm:px-6 py-4 text-sm whitespace-nowrap">{new Date(quote.createdAt).toLocaleString()}</td>
                                         <td className="px-4 sm:px-6 py-4 font-mono text-xs whitespace-nowrap">
                                             {quote._id.slice(-8).toUpperCase()}
@@ -132,7 +132,7 @@ export default function AdminQuotesPage() {
                                         <td className="px-4 sm:px-6 py-4 text-right">
                                             <Link
                                                 href={`/admin/quotes/${quote._id}`}
-                                                className="inline-flex items-center justify-center p-2 hover:bg-base rounded-lg text-accent transition-colors"
+                                                className="inline-flex items-center justify-center p-2 hover:bg-panel rounded-lg text-accent transition-colors"
                                                 aria-label={`View quotation ${quote._id}`}
                                             >
                                                 <Eye className="h-4 w-4" />

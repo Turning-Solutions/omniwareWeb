@@ -48,7 +48,7 @@ export default function Pagination({
                             className={`min-w-9 rounded-lg border px-3 py-2 text-sm transition-colors ${
                                 pageNum === page
                                     ? "border-accent bg-accent/20 text-main"
-                                    : "border-border-soft text-main hover:bg-base"
+                                    : "border-border-soft text-main hover:bg-panel"
                             } disabled:opacity-60`}
                         >
                             {pageNum}
@@ -74,7 +74,7 @@ export default function Pagination({
                 type="button"
                 onClick={() => onPageChange(Math.max(1, page - 1))}
                 disabled={page <= 1 || disabled}
-                className="rounded bg-base px-3 py-1 text-sm text-main hover:bg-base/80 disabled:opacity-50"
+                className="rounded bg-panel px-3 py-1 text-sm text-main hover:bg-panel/80 disabled:opacity-50"
             >
                 Prev
             </button>
@@ -85,7 +85,7 @@ export default function Pagination({
                 type="button"
                 onClick={() => onPageChange(Math.min(safeTotalPages, page + 1))}
                 disabled={page >= safeTotalPages || disabled}
-                className="rounded bg-base px-3 py-1 text-sm text-main hover:bg-base/80 disabled:opacity-50"
+                className="rounded bg-panel px-3 py-1 text-sm text-main hover:bg-panel/80 disabled:opacity-50"
             >
                 Next
             </button>

@@ -204,7 +204,7 @@ export default function CategoryManagerPage() {
                                 type="text"
                                 value={newName}
                                 onChange={(e) => setNewName(e.target.value)}
-                                className="w-full rounded-lg border border-border-soft bg-base px-4 py-2 text-main focus:border-accent focus:outline-none"
+                                className="w-full rounded-lg border border-border-soft bg-panel px-4 py-2 text-main focus:border-accent focus:outline-none"
                                 placeholder="e.g. Motherboards"
                                 required
                             />
@@ -214,7 +214,7 @@ export default function CategoryManagerPage() {
                             <select
                                 value={newParentId}
                                 onChange={(e) => setNewParentId(e.target.value)}
-                                className="w-full rounded-lg border border-border-soft bg-base px-4 py-2 text-main focus:border-accent focus:outline-none [&>option]:text-white"
+                                className="w-full rounded-lg border border-border-soft bg-panel px-4 py-2 text-main focus:border-accent focus:outline-none [&>option]:text-white"
                             >
                                 <option value="">No parent (main category)</option>
                                 {mainCategories.map((category) => (
@@ -246,7 +246,7 @@ export default function CategoryManagerPage() {
                             <select
                                 value={selectedEditId}
                                 onChange={(e) => setSelectedEditId(e.target.value)}
-                                className="w-full rounded-lg border border-border-soft bg-base px-4 py-2 text-main focus:border-accent focus:outline-none [&>option]:text-white"
+                                className="w-full rounded-lg border border-border-soft bg-panel px-4 py-2 text-main focus:border-accent focus:outline-none [&>option]:text-white"
                             >
                                 <option value="">Choose category...</option>
                                 <optgroup label="Main Categories">
@@ -279,7 +279,7 @@ export default function CategoryManagerPage() {
                                 value={editName}
                                 onChange={(e) => setEditName(e.target.value)}
                                 disabled={!selectedEditId}
-                                className="w-full rounded-lg border border-border-soft bg-base px-4 py-2 text-main focus:border-accent focus:outline-none disabled:opacity-60"
+                                className="w-full rounded-lg border border-border-soft bg-panel px-4 py-2 text-main focus:border-accent focus:outline-none disabled:opacity-60"
                                 required={Boolean(selectedEditId)}
                             />
                         </div>
@@ -290,7 +290,7 @@ export default function CategoryManagerPage() {
                                 value={editParentId}
                                 onChange={(e) => setEditParentId(e.target.value)}
                                 disabled={!selectedEditId}
-                                className="w-full rounded-lg border border-border-soft bg-base px-4 py-2 text-main focus:border-accent focus:outline-none [&>option]:text-white disabled:opacity-60"
+                                className="w-full rounded-lg border border-border-soft bg-panel px-4 py-2 text-main focus:border-accent focus:outline-none [&>option]:text-white disabled:opacity-60"
                             >
                                 <option value="">No parent (main category)</option>
                                 {mainCategories
@@ -306,7 +306,7 @@ export default function CategoryManagerPage() {
                         <button
                             type="submit"
                             disabled={!selectedEditId || savingEdit}
-                            className="inline-flex items-center gap-2 rounded-lg border border-border-soft px-4 py-2 text-main hover:bg-base disabled:opacity-50"
+                            className="inline-flex items-center gap-2 rounded-lg border border-border-soft px-4 py-2 text-main hover:bg-panel disabled:opacity-50"
                         >
                             <Save className="h-4 w-4" />
                             {savingEdit ? "Updating..." : "Update"}
@@ -339,7 +339,7 @@ export default function CategoryManagerPage() {
                         {mainCategories.map((mainCategory) => {
                             const subs = subcategoriesByParent.get(mainCategory._id) || [];
                             return (
-                                <div key={mainCategory._id} className="rounded-lg border border-border-soft bg-base/40 p-3">
+                                <div key={mainCategory._id} className="rounded-lg border border-border-soft bg-panel/40 p-3">
                                     <p className="font-medium text-main">{mainCategory.name}</p>
                                     {subs.length === 0 ? (
                                         <p className="mt-1 text-sm text-sub">No subcategories</p>

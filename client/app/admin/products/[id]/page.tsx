@@ -1089,7 +1089,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
 
     if (initialLoading && !isNew) return <div className="p-10 text-center text-main">Loading...</div>;
 
-    const sectionClass = "rounded-xl border border-border-soft bg-base/30 p-4 sm:p-6";
+    const sectionClass = "rounded-xl border border-border-soft bg-panel/30 p-4 sm:p-6";
     const warrantyValueExists = WARRANTY_OPTIONS.includes(formData.warranty as (typeof WARRANTY_OPTIONS)[number]);
     const extendedWarrantyValueExists = WARRANTY_OPTIONS.includes(
         formData.extendedWarranty.duration as (typeof WARRANTY_OPTIONS)[number]
@@ -1099,7 +1099,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
         <div className="mx-auto w-full max-w-[1500px] px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
             <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
-                    <Link href={returnToPath} className="rounded-lg border border-border-soft p-2 text-main transition-colors hover:bg-base">
+                    <Link href={returnToPath} className="rounded-lg border border-border-soft p-2 text-main transition-colors hover:bg-panel">
                         <ArrowLeft className="h-5 w-5" />
                     </Link>
                     <div>
@@ -1107,7 +1107,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                         <h1 className="text-3xl font-bold text-main">{isNew ? "Create product" : "Edit product"}</h1>
                     </div>
                 </div>
-                <span className="rounded-full border border-border-soft bg-base px-3 py-1 text-xs text-sub">
+                <span className="rounded-full border border-border-soft bg-panel px-3 py-1 text-xs text-sub">
                     {isNew ? "Draft mode" : "Update mode"}
                 </span>
             </div>
@@ -1127,7 +1127,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                             <input
                                 type="text"
                                 required
-                                className="w-full bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent"
+                                className="w-full bg-panel border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent"
                                 value={formData.title}
                                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                             />
@@ -1136,7 +1136,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                             <label className="text-sub text-sm">SKU (Optional)</label>
                             <input
                                 type="text"
-                                className="w-full bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent"
+                                className="w-full bg-panel border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent"
                                 value={formData.sku}
                                 onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
                             />
@@ -1147,7 +1147,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                                 type="number"
                                 min={0}
                                 step={0.01}
-                                className="w-full bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent"
+                                className="w-full bg-panel border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent"
                                 value={formData.dealerPrice}
                                 onChange={(e) => setFormData({ ...formData, dealerPrice: e.target.value })}
                                 placeholder="Optional"
@@ -1158,7 +1158,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                             <input
                                 type="number"
                                 required
-                                className="w-full bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent"
+                                className="w-full bg-panel border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent"
                                 value={formData.price}
                                 onChange={(e) => setFormData({ ...formData, price: e.target.value })}
                             />
@@ -1167,7 +1167,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                             <label className="text-sub text-sm">Slug (Optional/Auto)</label>
                             <input
                                 type="text"
-                                className="w-full bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent"
+                                className="w-full bg-panel border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent"
                                 value={formData.slug}
                                 onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
                             />
@@ -1177,7 +1177,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                             <input
                                 type="number"
                                 required
-                                className="w-full bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent"
+                                className="w-full bg-panel border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent"
                                 value={formData.stock}
                                 onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
                             />
@@ -1185,7 +1185,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                         <div className="space-y-2">
                             <label className="text-sub text-sm">Warranty (Optional)</label>
                             <select
-                                className="w-full bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent"
+                                className="w-full bg-panel border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent"
                                 value={formData.warranty}
                                 onChange={(e) => setFormData({ ...formData, warranty: e.target.value })}
                             >
@@ -1206,7 +1206,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                         <div className="space-y-2">
                             <label className="text-sub text-sm">Extended Warranty (Optional)</label>
                             <select
-                                className="w-full bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent"
+                                className="w-full bg-panel border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent"
                                 value={formData.extendedWarranty.duration}
                                 onChange={(e) =>
                                     setFormData({
@@ -1237,7 +1237,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                                 <label className="text-sub text-sm">Extended Warranty Description (Optional)</label>
                                 <textarea
                                     rows={2}
-                                    className="w-full bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent"
+                                    className="w-full bg-panel border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent"
                                     value={formData.extendedWarranty.description}
                                     onChange={(e) =>
                                         setFormData({
@@ -1253,7 +1253,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                         <div className="space-y-2">
                             <label className="text-sub text-sm">Availability Status</label>
                             <select
-                                className="w-full bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent [&>option]:text-white"
+                                className="w-full bg-panel border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent [&>option]:text-white"
                                 value={formData.availability}
                                 onChange={(e) => setFormData({ ...formData, availability: e.target.value as typeof formData.availability })}
                             >
@@ -1273,7 +1273,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                                 </div>
                             </label>
                             <select
-                                className="w-full bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent [&>option]:text-white"
+                                className="w-full bg-panel border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent [&>option]:text-white"
                                 value={formData.brandId}
                                 onChange={(e) => setFormData({ ...formData, brandId: e.target.value })}
                             >
@@ -1293,7 +1293,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                                 </div>
                             </label>
                             <select
-                                className="w-full bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent [&>option]:text-white"
+                                className="w-full bg-panel border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent [&>option]:text-white"
                                 value={mainCategoryId}
                                 onChange={(e) => {
                                     const nextMainCategoryId = e.target.value;
@@ -1319,7 +1319,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                         <div className="space-y-2">
                             <label className="text-sub text-sm">Sub category (optional)</label>
                             <select
-                                className="w-full bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent [&>option]:text-white disabled:opacity-60"
+                                className="w-full bg-panel border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent [&>option]:text-white disabled:opacity-60"
                                 value={subCategoryId}
                                 disabled={!mainCategoryId}
                                 onChange={(e) => {
@@ -1345,7 +1345,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                     </div>
 
                         {!isNew && (
-                        <div className="rounded-xl border border-border-soft bg-base/20 p-4">
+                        <div className="rounded-xl border border-border-soft bg-panel/20 p-4">
                             <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
                                 <div>
                                     <h2 className="text-lg font-bold text-main">Shop page preview</h2>
@@ -1392,7 +1392,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                                 type="number"
                                 min={0}
                                 step={0.01}
-                                className="w-full bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent"
+                                className="w-full bg-panel border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent"
                                 value={formData.discountPercent}
                                 onChange={(e) => setFormData({ ...formData, discountPercent: e.target.value })}
                                 placeholder="e.g. 1000"
@@ -1406,7 +1406,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                                 type="number"
                                 min={0}
                                 step={0.01}
-                                className="w-full bg-base border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent disabled:opacity-60"
+                                className="w-full bg-panel border border-border-soft rounded-lg px-4 py-2 text-main focus:outline-none focus:border-accent disabled:opacity-60"
                                 value={formData.categoryDiscountPercent}
                                 onChange={(e) => setFormData({ ...formData, categoryDiscountPercent: e.target.value })}
                                 placeholder="e.g. 1500"
@@ -1435,7 +1435,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                     </div>
                     <textarea
                         id="product-description"
-                        className="mt-2 h-32 w-full rounded-lg border border-border-soft bg-base px-4 py-2 text-main focus:outline-none focus:border-accent"
+                        className="mt-2 h-32 w-full rounded-lg border border-border-soft bg-panel px-4 py-2 text-main focus:outline-none focus:border-accent"
                         value={formData.description}
                         onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                     ></textarea>
@@ -1462,7 +1462,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                                 <input
                                     type="text"
                                     maxLength={70}
-                                    className="w-full rounded-lg border border-border-soft bg-base px-4 py-2 text-main focus:outline-none focus:border-accent"
+                                    className="w-full rounded-lg border border-border-soft bg-panel px-4 py-2 text-main focus:outline-none focus:border-accent"
                                     value={formData.seo.title}
                                     onChange={(e) => setFormData({
                                         ...formData,
@@ -1482,7 +1482,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                                 </label>
                                 <textarea
                                     maxLength={160}
-                                    className="h-28 w-full rounded-lg border border-border-soft bg-base px-4 py-2 text-main focus:outline-none focus:border-accent"
+                                    className="h-28 w-full rounded-lg border border-border-soft bg-panel px-4 py-2 text-main focus:outline-none focus:border-accent"
                                     value={formData.seo.description}
                                     onChange={(e) => setFormData({
                                         ...formData,
@@ -1499,7 +1499,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                                 <label className="text-sm text-sub">Keywords (comma separated)</label>
                                 <input
                                     type="text"
-                                    className="w-full rounded-lg border border-border-soft bg-base px-4 py-2 text-main focus:outline-none focus:border-accent"
+                                    className="w-full rounded-lg border border-border-soft bg-panel px-4 py-2 text-main focus:outline-none focus:border-accent"
                                     value={formData.seo.keywords}
                                     onChange={(e) => setFormData({
                                         ...formData,
@@ -1514,7 +1514,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                                     <label className="text-sm text-sub">Social image override</label>
                                     <input
                                         type="url"
-                                        className="w-full rounded-lg border border-border-soft bg-base px-4 py-2 text-main focus:outline-none focus:border-accent"
+                                        className="w-full rounded-lg border border-border-soft bg-panel px-4 py-2 text-main focus:outline-none focus:border-accent"
                                         value={formData.seo.image}
                                         onChange={(e) => setFormData({
                                             ...formData,
@@ -1528,7 +1528,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                                     <input
                                         type="text"
                                         maxLength={180}
-                                        className="w-full rounded-lg border border-border-soft bg-base px-4 py-2 text-main focus:outline-none focus:border-accent"
+                                        className="w-full rounded-lg border border-border-soft bg-panel px-4 py-2 text-main focus:outline-none focus:border-accent"
                                         value={formData.seo.imageAlt}
                                         onChange={(e) => setFormData({
                                             ...formData,
@@ -1539,7 +1539,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                                 </div>
                             </div>
 
-                            <label className="flex items-start gap-3 rounded-lg border border-border-soft bg-base/60 p-4">
+                            <label className="flex items-start gap-3 rounded-lg border border-border-soft bg-panel/60 p-4">
                                 <input
                                     type="checkbox"
                                     className="mt-1 h-4 w-4 accent-red-600"
@@ -1592,24 +1592,24 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                     )}
                     <div className="space-y-3">
                         {formData.colorVariants.map((variant, index) => (
-                            <div key={index} className="grid grid-cols-1 md:grid-cols-6 gap-3 bg-base border border-border-soft rounded-lg p-3">
+                            <div key={index} className="grid grid-cols-1 md:grid-cols-6 gap-3 bg-panel border border-border-soft rounded-lg p-3">
                                 <input
                                     type="text"
                                     placeholder="Color name (e.g. Black)"
-                                    className="bg-base border border-border-soft rounded-lg px-3 py-2 text-main focus:outline-none focus:border-accent"
+                                    className="bg-panel border border-border-soft rounded-lg px-3 py-2 text-main focus:outline-none focus:border-accent"
                                     value={variant.name}
                                     onChange={(e) => updateColorVariant(index, "name", e.target.value)}
                                 />
                                 <input
                                     type="text"
                                     placeholder="#000000"
-                                    className="bg-base border border-border-soft rounded-lg px-3 py-2 text-main focus:outline-none focus:border-accent"
+                                    className="bg-panel border border-border-soft rounded-lg px-3 py-2 text-main focus:outline-none focus:border-accent"
                                     value={variant.hex}
                                     onChange={(e) => updateColorVariant(index, "hex", e.target.value)}
                                 />
                                 <input
                                     type="color"
-                                    className="h-[42px] w-full cursor-pointer rounded-lg border border-border-soft bg-base px-1 py-1"
+                                    className="h-[42px] w-full cursor-pointer rounded-lg border border-border-soft bg-panel px-1 py-1"
                                     value={variant.hex && /^#[0-9A-Fa-f]{6}$/.test(variant.hex) ? variant.hex : "#000000"}
                                     onChange={(e) => updateColorVariant(index, "hex", e.target.value.toUpperCase())}
                                     title="Pick color"
@@ -1617,7 +1617,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                                 <input
                                     type="number"
                                     placeholder="Variant price (optional)"
-                                    className="bg-base border border-border-soft rounded-lg px-3 py-2 text-main focus:outline-none focus:border-accent"
+                                    className="bg-panel border border-border-soft rounded-lg px-3 py-2 text-main focus:outline-none focus:border-accent"
                                     value={variant.price}
                                     onChange={(e) => updateColorVariant(index, "price", e.target.value)}
                                 />
@@ -1633,7 +1633,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                                             <ImagePlus className="h-4 w-4" />
                                         </div>
                                     )}
-                                    <label className="cursor-pointer rounded border border-border-soft px-2 py-1 text-xs text-sub hover:text-main hover:bg-base">
+                                    <label className="cursor-pointer rounded border border-border-soft px-2 py-1 text-xs text-sub hover:text-main hover:bg-panel">
                                         {variant.image ? "Replace" : "Image"}
                                         <input
                                             type="file"
@@ -1676,7 +1676,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                     <div className="flex flex-wrap gap-4">
                         {formData.images.map((url, index) => (
                             <div key={index} className="relative group">
-                                <div className="w-28 h-28 rounded-lg border border-border-soft bg-base overflow-hidden flex items-center justify-center">
+                                <div className="w-28 h-28 rounded-lg border border-border-soft bg-panel overflow-hidden flex items-center justify-center">
                                     {imageUploading === index ? (
                                         <Loader2 className="w-8 h-8 text-accent animate-spin" />
                                     ) : (
@@ -1705,7 +1705,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                                 </div>
                             </div>
                         ))}
-                        <label className="w-28 h-28 rounded-lg border-2 border-dashed border-border-soft bg-base flex items-center justify-center cursor-pointer hover:border-accent hover:bg-accent/5 transition-colors">
+                        <label className="w-28 h-28 rounded-lg border-2 border-dashed border-border-soft bg-panel flex items-center justify-center cursor-pointer hover:border-accent hover:bg-accent/5 transition-colors">
                             {imageUploading === "add" ? (
                                 <Loader2 className="w-8 h-8 text-accent animate-spin" />
                             ) : (
@@ -1731,13 +1731,13 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                         </div>
                         {featuredSpecKeys.length > 0 && (
                             <div className="flex flex-wrap items-center gap-2">
-                                <span className="text-xs rounded-full border border-border-soft bg-base px-2.5 py-1 text-sub">
+                                <span className="text-xs rounded-full border border-border-soft bg-panel px-2.5 py-1 text-sub">
                                     {formData.filterSpecs.filter((s) => featuredSpecKeys.includes(s.key)).length}/{featuredSpecKeys.length} filled
                                 </span>
                                 <button
                                     type="button"
                                     onClick={clearAllFilterSpecValues}
-                                    className="text-xs rounded-lg border border-border-soft px-3 py-1.5 text-sub hover:text-main hover:bg-base transition-colors"
+                                    className="text-xs rounded-lg border border-border-soft px-3 py-1.5 text-sub hover:text-main hover:bg-panel transition-colors"
                                 >
                                     Clear all values
                                 </button>
@@ -1767,7 +1767,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                                 return (
                                     <div
                                         key={specKey}
-                                        className={`rounded-lg border p-3 transition-colors ${hasValue ? "border-accent/40 bg-accent/5" : "border-border-soft bg-base/60"}`}
+                                        className={`rounded-lg border p-3 transition-colors ${hasValue ? "border-accent/40 bg-accent/5" : "border-border-soft bg-panel/60"}`}
                                     >
                                         <div className="flex items-center justify-between gap-3 mb-2">
                                             <div>
@@ -1777,7 +1777,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                                             {hasValue ? (
                                                 <span className="text-[11px] rounded-full bg-accent/20 text-accent px-2 py-0.5">Filled</span>
                                             ) : (
-                                                <span className="text-[11px] rounded-full bg-base text-sub border border-border-soft px-2 py-0.5">Empty</span>
+                                                <span className="text-[11px] rounded-full bg-panel text-sub border border-border-soft px-2 py-0.5">Empty</span>
                                             )}
                                         </div>
                                         <div className="flex items-center gap-2">
@@ -1785,7 +1785,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                                                 <input
                                                     type="text"
                                                     placeholder={`Enter ${formatSpecLabel(specKey).toLowerCase()}`}
-                                                    className="w-full bg-base border border-border-soft rounded-lg px-3 py-2 text-main text-sm focus:outline-none focus:border-accent"
+                                                    className="w-full bg-panel border border-border-soft rounded-lg px-3 py-2 text-main text-sm focus:outline-none focus:border-accent"
                                                     value={specValue}
                                                     onFocus={() => setActiveSpecKey(specKey)}
                                                     onBlur={() => setTimeout(() => setActiveSpecKey(null), 150)}
@@ -1859,7 +1859,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                             </span>
                             <select
                                 id="move-target-category"
-                                className="bg-base border border-border-soft rounded-lg px-3 py-1.5 text-sm text-main focus:outline-none focus:border-accent [&>option]:text-white"
+                                className="bg-panel border border-border-soft rounded-lg px-3 py-1.5 text-sm text-main focus:outline-none focus:border-accent [&>option]:text-white"
                             >
                                 <option value="">Move to category…</option>
                                 {sortedAttributeGroupTargets.map((target) => (
@@ -1892,7 +1892,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
 
                     <div className="space-y-4">
                         {formData.attributeGroups.map((group, groupIndex) => (
-                            <div key={groupIndex} className="rounded-xl border border-border-soft bg-base/60 p-4">
+                            <div key={groupIndex} className="rounded-xl border border-border-soft bg-panel/60 p-4">
                                 <div className="mb-3 flex flex-wrap items-center gap-2">
                                     <div className="flex w-12 shrink-0 flex-col gap-0.5">
                                         <button
@@ -1917,7 +1917,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                                     <input
                                         type="text"
                                         placeholder="Category name (e.g. General, Cable Specs)"
-                                        className="min-w-[220px] flex-1 rounded-lg border border-border-soft bg-base px-3 py-2 text-main font-medium focus:border-accent focus:outline-none"
+                                        className="min-w-[220px] flex-1 rounded-lg border border-border-soft bg-panel px-3 py-2 text-main font-medium focus:border-accent focus:outline-none"
                                         value={group.category}
                                         onChange={(e) => updateGroupCategory(groupIndex, e.target.value)}
                                     />
@@ -1967,7 +1967,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                                     {group.attributes.map((attr, attrIndex) => (
                                         <div
                                             key={attrIndex}
-                                            className={`grid grid-cols-1 items-start gap-2 rounded-lg border border-border-soft p-2 lg:grid-cols-[auto_auto_1fr_1fr_auto_auto] ${isAttributeSelected(groupIndex, attrIndex) ? "border-accent/50 bg-accent/10" : "bg-base/40"}`}
+                                            className={`grid grid-cols-1 items-start gap-2 rounded-lg border border-border-soft p-2 lg:grid-cols-[auto_auto_1fr_1fr_auto_auto] ${isAttributeSelected(groupIndex, attrIndex) ? "border-accent/50 bg-accent/10" : "bg-panel/40"}`}
                                         >
                                             <div className="flex items-center justify-between lg:hidden">
                                                 <span className="text-xs font-medium text-sub">Attribute {attrIndex + 1}</span>
@@ -2003,7 +2003,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                                             <input
                                                 type="text"
                                                 placeholder="Name (e.g. Color)"
-                                                className="flex-1 bg-base border border-border-soft rounded-lg px-3 py-2 text-main text-sm focus:outline-none focus:border-accent min-w-0"
+                                                className="flex-1 bg-panel border border-border-soft rounded-lg px-3 py-2 text-main text-sm focus:outline-none focus:border-accent min-w-0"
                                                 value={attr.name ?? ''}
                                                 onChange={(e) => updateAttribute(groupIndex, attrIndex, "name", e.target.value)}
                                             />
@@ -2011,7 +2011,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                                                 id={`attr-value-${groupIndex}-${attrIndex}`}
                                                 placeholder="Value (e.g. Red, or multiple lines for a longer spec)"
                                                 rows={2}
-                                                className="flex-1 resize-y bg-base border border-border-soft rounded-lg px-3 py-2 text-main text-sm focus:outline-none focus:border-accent min-w-0"
+                                                className="flex-1 resize-y bg-panel border border-border-soft rounded-lg px-3 py-2 text-main text-sm focus:outline-none focus:border-accent min-w-0"
                                                 value={attr.value ?? ''}
                                                 onChange={(e) => updateAttribute(groupIndex, attrIndex, "value", e.target.value)}
                                             />
@@ -2051,7 +2051,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                 </section>
 
                 <section className="fixed inset-x-0 bottom-0 z-50 border-t border-border-soft bg-surface/95 px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] shadow-[0_-12px_30px_rgba(0,0,0,0.35)] backdrop-blur lg:left-64 sm:px-6">
-                    <div className="mx-auto flex w-full max-w-[1500px] flex-wrap items-center justify-between gap-4 rounded-lg bg-base/20 p-3 sm:p-4">
+                    <div className="mx-auto flex w-full max-w-[1500px] flex-wrap items-center justify-between gap-4 rounded-lg bg-panel/20 p-3 sm:p-4">
                         <label htmlFor="isActive" className="flex items-center gap-2 text-main">
                             <input
                                 type="checkbox"
