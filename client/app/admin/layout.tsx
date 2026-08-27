@@ -114,7 +114,7 @@ export default function AdminLayout({
 
             {/* Main Content */}
             <main className="flex-1 overflow-y-auto pb-[env(safe-area-inset-bottom,0px)]">
-                <header className="sticky top-0 z-30 border-b border-border-soft bg-surface/90 pt-[env(safe-area-inset-top,0px)] backdrop-blur supports-[backdrop-filter]:bg-surface/70">
+                <header className="sticky top-0 z-30 border-b border-border-soft bg-surface pt-[env(safe-area-inset-top,0px)]">
                     <div className="flex items-center justify-between gap-2 px-3 py-2.5 sm:gap-3 sm:px-6 lg:px-8 sm:py-3">
                         <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
                             <button

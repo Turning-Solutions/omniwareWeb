@@ -7,7 +7,7 @@
     --store-accent: #d12b28;
 }
 
-/* Admin: "Indigo Slate" dark theme — applied via .admin-theme wrapper */
+/* Admin: dark theme — applied via .admin-theme wrapper */
 :root {
     --admin-bg: #0b0c10;
     --admin-surface: #131417;
@@ -15,10 +15,10 @@
     --admin-border: #2a2c32;
     --admin-main: #edeef1;
     --admin-sub: #94969e;
-    --admin-accent: #6d6af6;
-    --admin-accent-soft: #4b48c4;
+    --admin-accent: #12b981;
+    --admin-accent-soft: #0d8f66;
     /* Semantic status tones — shared by every status pill/badge across admin pages */
-    --admin-success: #34b978;
+    --admin-success: var(--admin-accent);
     --admin-warning: #d9a441;
     --admin-danger: #ea5a4f;
     --admin-info: #4f8ff7;
@@ -33,13 +33,13 @@
     --admin-surface: #131417;
     --admin-base: #1a1c20;
     --admin-border: #2a2c32;
-    --admin-accent: #6d6af6;
-    --admin-success: #34b978;
+    --admin-accent: #12b981;
+    --admin-success: #12b981;
     --admin-warning: #d9a441;
     --admin-danger: #ea5a4f;
     --admin-info: #4f8ff7;
     --admin-neutral: #94969e;
-    /* Inside admin, accent + primary utilities use the indigo brand accent */
+    /* Inside admin, accent + primary utilities use the emerald brand accent */
     --store-accent: var(--admin-accent);
 }
 
@@ -66,7 +66,7 @@
     --color-border-soft: var(--admin-border, #e4e4e7);
     --color-accent: var(--store-accent);
     --color-primary: var(--store-accent);
-    --color-success: var(--admin-success, #34b978);
+    --color-success: var(--admin-success, #12b981);
     --color-warning: var(--admin-warning, #d9a441);
     --color-danger: var(--admin-danger, #ea5a4f);
     --color-info: var(--admin-info, #4f8ff7);

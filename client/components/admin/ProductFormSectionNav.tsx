@@ -46,7 +46,7 @@ export default function ProductFormSectionNav({ sections }: ProductFormSectionNa
     };
 
     return (
-        <div className="sticky top-[57px] z-20 mb-6 overflow-x-auto rounded-xl border border-border-soft bg-surface/90 backdrop-blur supports-[backdrop-filter]:bg-surface/70 sm:top-[65px]">
+        <div className="sticky top-[57px] z-20 mb-6 overflow-x-auto rounded-xl border border-border-soft bg-surface sm:top-[65px]">
             <nav className="flex min-w-max gap-1 p-2">
                 {sections.map((section) => (
                     <button
