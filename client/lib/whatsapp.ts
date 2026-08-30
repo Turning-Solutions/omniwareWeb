@@ -1,3 +1,5 @@
+import { getSiteUrl } from "@/lib/seo/productSeo";
+
 const DEFAULT_WHATSAPP_PHONE = "94740523439";
 
 function normalizePhone(raw?: string): string {
@@ -16,7 +18,7 @@ export function buildProductWhatsAppUrl(input: {
     quantity?: number;
 }) {
     const phone = normalizePhone(input.customPhone ?? process.env.NEXT_PUBLIC_WHATSAPP_NUMBER);
-    const productUrl = input.productPath;
+    const productUrl = `${getSiteUrl()}${input.productPath}`;
 
     const intent = input.intent ?? "inquiry";
     const message =

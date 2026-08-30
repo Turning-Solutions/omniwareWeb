@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { cache } from "react";
 import {
     absoluteUrl,
     DEFAULT_OG_IMAGE,
@@ -28,12 +29,26 @@ export function titleFromSlug(slug: string): string {
         .join(" ");
 }
 
-async function fetchCategorySeoBySlug(slug: string): Promise<CategorySeoDocument | null> {
+/** Cached per-request: the layout's existence check and generateMetadata both need this. */
+const fetchCategorySeoBySlug = cache(async (slug: string): Promise<CategorySeoDocument | null> => {
     await ensureDb();
     const category = await Category.findOne({ slug, isActive: true })
         .select("name slug updatedAt")
         .lean();
     return category as CategorySeoDocument | null;
+});
+
+/**
+ * True when `categorySlug` matches a real, active category. Any other slug
+ * (typo, removed category, or a bot probing random paths) rendered as a
+ * normal 200 "0 products" listing — the same soft-404 shape that made
+ * missing products invisible to Google. Route layouts call this and
+ * `notFound()` when it's false, before any part of the page streams.
+ */
+export async function categoryExists(categorySlug: string): Promise<boolean> {
+    const normalizedSlug = normalizeCategorySlug(categorySlug);
+    const category = await fetchCategorySeoBySlug(normalizedSlug);
+    return category != null;
 }
 
 /**

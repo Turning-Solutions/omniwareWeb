@@ -8,6 +8,7 @@ import { adminRateLimit } from '../middleware/adminRateLimit';
 import { createAuditLog } from '../utils/audit';
 import { clearFeaturedSpecsCache, invalidateFacetCaches } from '../controllers/productController';
 import { triggerRevalidation } from '../utils/revalidate';
+import { normalizeSpecKey } from '../utils/normalizeSpecKey';
 import {
     backfillProductSlugs,
     createUniqueProductSlug,
@@ -235,6 +236,130 @@ router.patch('/:id', async (req: Request, res: Response) => {
         });
 
         res.json(updated);
+    } catch (error) {
+        res.status(400).json({ message: (error as Error).message });
+    }
+});
+
+interface AttributeValueChange {
+    field: 'spec' | 'attribute';
+    key: string;
+    groupName?: string;
+    oldValue: string;
+    newValue: string;
+}
+
+/**
+ * Builds the Mongo filter/update for propagating one corrected spec or attribute
+ * value to other products. Scoped to products sharing a category with the source
+ * product, and always excludes the source product itself (it's saved separately
+ * via the normal PATCH /:id flow).
+ */
+function buildAttributeChangeQuery(change: AttributeValueChange, categoryIds: string[], excludeId: string) {
+    const baseFilter: Record<string, unknown> = {
+        _id: { $ne: excludeId },
+        categoryIds: { $in: categoryIds },
+    };
+
+    if (change.field === 'spec') {
+        const specKey = normalizeSpecKey(change.key);
+        return {
+            filter: { ...baseFilter, [`specs.${specKey}`]: change.oldValue },
+            update: { $set: { [`specs.${specKey}`]: change.newValue } },
+            options: undefined as Record<string, unknown> | undefined,
+        };
+    }
+
+    const groupName = (change.groupName || '').trim();
+    const attrName = change.key.trim();
+    return {
+        filter: {
+            ...baseFilter,
+            attributeGroups: {
+                $elemMatch: {
+                    category: groupName,
+                    attributes: { $elemMatch: { name: attrName, value: change.oldValue } },
+                },
+            },
+        },
+        update: { $set: { 'attributeGroups.$[grp].attributes.$[attr].value': change.newValue } },
+        options: {
+            arrayFilters: [
+                { 'grp.category': groupName },
+                { 'attr.name': attrName, 'attr.value': change.oldValue },
+            ],
+        },
+    };
+}
+
+function parseAttributeValueChanges(rawChanges: unknown): AttributeValueChange[] {
+    if (!Array.isArray(rawChanges)) return [];
+    const changes: AttributeValueChange[] = [];
+    for (const raw of rawChanges.slice(0, 50)) {
+        const field = (raw as { field?: unknown })?.field;
+        const key = typeof (raw as { key?: unknown })?.key === 'string' ? (raw as { key: string }).key.trim() : '';
+        const groupName =
+            typeof (raw as { groupName?: unknown })?.groupName === 'string'
+                ? (raw as { groupName: string }).groupName.trim()
+                : '';
+        const oldValue =
+            typeof (raw as { oldValue?: unknown })?.oldValue === 'string' ? (raw as { oldValue: string }).oldValue.trim() : '';
+        const newValue =
+            typeof (raw as { newValue?: unknown })?.newValue === 'string' ? (raw as { newValue: string }).newValue.trim() : '';
+
+        if (field !== 'spec' && field !== 'attribute') continue;
+        if (!key || !oldValue || !newValue || oldValue === newValue) continue;
+        if (field === 'attribute' && !groupName) continue;
+
+        changes.push({ field, key, groupName: field === 'attribute' ? groupName : undefined, oldValue, newValue });
+    }
+    return changes;
+}
+
+// POST /api/v1/admin/products/:id/propagate-attribute-changes
+// After correcting a spec/attribute value on this product, checks (dryRun: true) or applies
+// (dryRun: false) the same correction on other products in the same category(ies) that still
+// carry the old, mistaken value — so a typo fixed on one item can be fixed everywhere at once.
+router.post('/:id/propagate-attribute-changes', async (req: Request, res: Response) => {
+    try {
+        const product = await Product.findById(req.params.id).select('categoryIds').lean();
+        if (!product) return res.status(404).json({ message: 'Product not found' });
+
+        const dryRun = req.body?.dryRun === true;
+        const changes = parseAttributeValueChanges(req.body?.changes);
+        if (changes.length === 0) {
+            return res.status(400).json({ message: 'No valid changes provided' });
+        }
+
+        const categoryIds = (product.categoryIds || []).map((catId: unknown) => String(catId));
+        const excludeId = String(req.params.id);
+        const results: Array<AttributeValueChange & { matchedCount: number; modifiedCount: number }> = [];
+        let anyModified = false;
+
+        for (const change of changes) {
+            const { filter, update, options } = buildAttributeChangeQuery(change, categoryIds, excludeId);
+            if (dryRun) {
+                const matchedCount = await Product.countDocuments(filter);
+                results.push({ ...change, matchedCount, modifiedCount: 0 });
+            } else {
+                const result = await Product.updateMany(filter, update, options);
+                if (result.modifiedCount > 0) anyModified = true;
+                results.push({ ...change, matchedCount: result.matchedCount, modifiedCount: result.modifiedCount });
+            }
+        }
+
+        if (!dryRun && anyModified) {
+            invalidateFacetCaches();
+            await triggerRevalidation(['/', '/shop']);
+            await createAuditLog(req, {
+                action: 'BULK_UPDATE_ATTRIBUTE_VALUE',
+                entityType: 'Product',
+                entityId: excludeId,
+                after: results,
+            });
+        }
+
+        res.json({ results });
     } catch (error) {
         res.status(400).json({ message: (error as Error).message });
     }

@@ -10,6 +10,7 @@ import toast from "react-hot-toast";
 import { buildProductSeo, type SeoProduct } from "@/lib/seo/productSeo";
 import LinkInsertDialog from "@/components/LinkInsertDialog";
 import ProductFormSectionNav from "@/components/admin/ProductFormSectionNav";
+import PropagateAttributeDialog, { type AttributeValueChangeUsage } from "@/components/admin/PropagateAttributeDialog";
 
 const PRODUCT_FORM_SECTIONS = [
     { id: "basic-info", label: "Basic Info" },
@@ -48,6 +49,15 @@ interface AttributeGroup {
 interface FilterSpec {
     key: string;
     value: string;
+}
+
+/** A corrected spec/attribute value, eligible to be propagated to other products that share the old value. */
+interface AttributeValueChange {
+    field: "spec" | "attribute";
+    key: string;
+    groupName?: string;
+    oldValue: string;
+    newValue: string;
 }
 
 interface ColorVariant {
@@ -142,6 +152,30 @@ function formatSpecLabel(specKey: string): string {
     return specKey.replace(/_/g, " ");
 }
 
+/** Builds a lookup of last-saved values, keyed so a value can be found again even if rows are reordered. */
+function snapshotAttributeValues(
+    filterSpecs: FilterSpec[],
+    attributeGroups: AttributeGroup[]
+): { specs: Record<string, string>; attributes: Record<string, string> } {
+    const specs: Record<string, string> = {};
+    filterSpecs.forEach(({ key, value }) => {
+        const k = key.trim();
+        if (k) specs[k] = value.trim();
+    });
+
+    const attributes: Record<string, string> = {};
+    attributeGroups.forEach((group) => {
+        const groupName = group.category.trim();
+        if (!groupName) return;
+        group.attributes.forEach((attr) => {
+            const name = attr.name.trim();
+            if (name) attributes[`${groupName}::${name}`] = attr.value.trim();
+        });
+    });
+
+    return { specs, attributes };
+}
+
 /** Keep admin-entered category slugs consistent for names like "M.2 NVMe". */
 function normalizeCategorySlugInput(value: string): string {
     return value
@@ -205,6 +239,16 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
     const [featuredSpecsLoading, setFeaturedSpecsLoading] = useState(false);
     const [specSuggestions, setSpecSuggestions] = useState<Record<string, string[]>>({});
     const [activeSpecKey, setActiveSpecKey] = useState<string | null>(null);
+    /** Snapshot of last-saved spec/attribute values, used to detect corrections worth offering to propagate. */
+    const [originalAttributeValues, setOriginalAttributeValues] = useState<{
+        specs: Record<string, string>;
+        attributes: Record<string, string>;
+    }>({ specs: {}, attributes: {} });
+    const [propagateDialog, setPropagateDialog] = useState<{
+        items: AttributeValueChangeUsage[];
+        selectedIndexes: Set<number>;
+    } | null>(null);
+    const [propagateLoading, setPropagateLoading] = useState(false);
     const [loading, setLoading] = useState(false);
     const [initialLoading, setInitialLoading] = useState(true);
     const [imageUploading, setImageUploading] = useState<string | number | null>(null); // 'add' or index when replacing
@@ -213,6 +257,8 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
     const [initialCategoryDiscountPercent, setInitialCategoryDiscountPercent] = useState<string>("");
     // Selected attributes for "move to category": Set of "groupIndex-attrIndex"
     const [selectedAttributeKeys, setSelectedAttributeKeys] = useState<Set<string>>(new Set());
+    // How many new empty property rows to add at once, per group index
+    const [attributeAddCounts, setAttributeAddCounts] = useState<Record<number, number>>({});
     const [linkDialog, setLinkDialog] = useState<{
         fieldId: string;
         start: number;
@@ -462,6 +508,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                     isActive: typeof data.isActive === "boolean" ? data.isActive : true,
                 });
                 setSelectedAttributeKeys(new Set());
+                setOriginalAttributeValues(snapshotAttributeValues(filterSpecs, attributeGroups));
             } catch (err) {
                 console.error(err);
             }
@@ -652,12 +699,114 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                 toast.success("Product saved successfully");
                 notifyProductsListUpdated(id);
                 setPreviewRefreshKey((prev) => prev + 1);
+
+                // Detect corrections (a value that changed from what was previously saved) and offer
+                // to apply the same fix to other products in this category that still have the old value.
+                const attributeChanges = buildAttributeValueChanges();
+                setOriginalAttributeValues(snapshotAttributeValues(formData.filterSpecs, formData.attributeGroups));
+                if (attributeChanges.length > 0) {
+                    void checkAttributePropagation(attributeChanges);
+                }
             }
         } catch (error) {
             console.error("Error saving product", error);
             toast.error(getApiErrorMessage(error));
         } finally {
             setLoading(false);
+        }
+    };
+
+    /** Compares current spec/attribute values against the last-saved snapshot to find corrected values. */
+    const buildAttributeValueChanges = (): AttributeValueChange[] => {
+        const changes: AttributeValueChange[] = [];
+
+        formData.filterSpecs.forEach(({ key, value }) => {
+            const k = key.trim();
+            const newValue = value.trim();
+            if (!k || !newValue || !featuredSpecKeys.includes(k)) return;
+            const oldValue = originalAttributeValues.specs[k];
+            if (oldValue && oldValue !== newValue) {
+                changes.push({ field: "spec", key: k, oldValue, newValue });
+            }
+        });
+
+        formData.attributeGroups.forEach((group) => {
+            const groupName = group.category.trim();
+            if (!groupName) return;
+            group.attributes.forEach((attr) => {
+                const name = attr.name.trim();
+                const newValue = attr.value.trim();
+                if (!name || !newValue) return;
+                const oldValue = originalAttributeValues.attributes[`${groupName}::${name}`];
+                if (oldValue && oldValue !== newValue) {
+                    changes.push({ field: "attribute", key: name, groupName, oldValue, newValue });
+                }
+            });
+        });
+
+        return changes;
+    };
+
+    /** Silently checks how many other products still carry the old value; only opens the dialog if any do. */
+    const checkAttributePropagation = async (changes: AttributeValueChange[]) => {
+        try {
+            const { data } = await api.post(`/admin/products/${id}/propagate-attribute-changes`, {
+                dryRun: true,
+                changes,
+            });
+            const items: AttributeValueChangeUsage[] = (data?.results || []).filter(
+                (item: AttributeValueChangeUsage) => item.matchedCount > 0
+            );
+            if (items.length === 0) return;
+            setPropagateDialog({ items, selectedIndexes: new Set(items.map((_, i) => i)) });
+        } catch (err) {
+            console.error("Failed to check other products for this value", err);
+        }
+    };
+
+    const togglePropagateItem = (index: number) => {
+        setPropagateDialog((prev) => {
+            if (!prev) return prev;
+            const next = new Set(prev.selectedIndexes);
+            if (next.has(index)) next.delete(index);
+            else next.add(index);
+            return { ...prev, selectedIndexes: next };
+        });
+    };
+
+    const handleSkipPropagate = () => setPropagateDialog(null);
+
+    const handleConfirmPropagate = async () => {
+        if (!propagateDialog) return;
+        const selected = propagateDialog.items.filter((_, i) => propagateDialog.selectedIndexes.has(i));
+        if (selected.length === 0) {
+            setPropagateDialog(null);
+            return;
+        }
+        setPropagateLoading(true);
+        try {
+            const { data } = await api.post(`/admin/products/${id}/propagate-attribute-changes`, {
+                dryRun: false,
+                changes: selected.map(({ field, key, groupName, oldValue, newValue }) => ({
+                    field,
+                    key,
+                    groupName,
+                    oldValue,
+                    newValue,
+                })),
+            });
+            const totalModified = (data?.results || []).reduce(
+                (sum: number, r: { modifiedCount?: number }) => sum + (r.modifiedCount || 0),
+                0
+            );
+            toast.success(`Updated ${totalModified} other product${totalModified === 1 ? "" : "s"}.`);
+            notifyProductsListUpdated(id);
+        } catch (err) {
+            console.error("Failed to update other products", err);
+            toast.error(getApiErrorMessage(err));
+        } finally {
+            setPropagateLoading(false);
+            setPropagateDialog(null);
         }
     };
 
@@ -711,11 +860,19 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
         setFormData({ ...formData, attributeGroups: newGroups });
     };
 
-    const addAttributeToGroup = (groupIndex: number) => {
+    const addAttributeToGroup = (groupIndex: number, count = 1) => {
+        const newAttributes = Array.from({ length: count }, () => ({ name: "", value: "" }));
         const newGroups = formData.attributeGroups.map((g, i) =>
-            i === groupIndex ? { ...g, attributes: [...g.attributes, { name: "", value: "" }] } : g
+            i === groupIndex ? { ...g, attributes: [...g.attributes, ...newAttributes] } : g
         );
         setFormData({ ...formData, attributeGroups: newGroups });
+    };
+
+    const getAttributeAddCount = (groupIndex: number) => attributeAddCounts[groupIndex] ?? 1;
+
+    const setAttributeAddCount = (groupIndex: number, value: number) => {
+        const clamped = Number.isFinite(value) ? Math.max(1, Math.min(50, Math.floor(value))) : 1;
+        setAttributeAddCounts((prev) => ({ ...prev, [groupIndex]: clamped }));
     };
 
     const removeAttribute = (groupIndex: number, attrIndex: number) => {
@@ -2036,14 +2193,38 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                                             </button>
                                         </div>
                                     ))}
-                                    <button
-                                        type="button"
-                                        onClick={() => addAttributeToGroup(groupIndex)}
-                                        className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm text-accent transition-colors hover:bg-accent/10"
-                                    >
-                                        <Plus className="h-4 w-4" />
-                                        Add property
-                                    </button>
+                                    <div className="flex flex-wrap items-center gap-2 pt-1">
+                                        <button
+                                            type="button"
+                                            onClick={() => addAttributeToGroup(groupIndex, getAttributeAddCount(groupIndex))}
+                                            className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm text-accent transition-colors hover:bg-accent/10"
+                                        >
+                                            <Plus className="h-4 w-4" />
+                                            Add {getAttributeAddCount(groupIndex) > 1 ? `${getAttributeAddCount(groupIndex)} properties` : "property"}
+                                        </button>
+                                        <input
+                                            type="number"
+                                            min={1}
+                                            max={50}
+                                            value={getAttributeAddCount(groupIndex)}
+                                            onChange={(e) => setAttributeAddCount(groupIndex, parseInt(e.target.value, 10))}
+                                            title="Number of empty properties to add"
+                                            className="w-16 rounded-lg border border-border-soft bg-panel px-2 py-1.5 text-sm text-main focus:border-accent focus:outline-none"
+                                        />
+                                        <div className="flex items-center gap-1">
+                                            {[5, 10].map((n) => (
+                                                <button
+                                                    key={n}
+                                                    type="button"
+                                                    onClick={() => addAttributeToGroup(groupIndex, n)}
+                                                    className="rounded-lg border border-border-soft px-2 py-1 text-xs text-sub transition-colors hover:border-accent/50 hover:text-accent"
+                                                    title={`Add ${n} empty properties`}
+                                                >
+                                                    +{n}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         ))}
@@ -2079,6 +2260,15 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                 initialLabel={linkDialog ? linkDialog.currentValue.slice(linkDialog.start, linkDialog.end) : ""}
                 onCancel={() => setLinkDialog(null)}
                 onInsert={handleInsertLink}
+            />
+            <PropagateAttributeDialog
+                open={!!propagateDialog}
+                items={propagateDialog?.items ?? []}
+                selectedIndexes={propagateDialog?.selectedIndexes ?? new Set()}
+                onToggle={togglePropagateItem}
+                onConfirm={handleConfirmPropagate}
+                onSkip={handleSkipPropagate}
+                loading={propagateLoading}
             />
         </div>
     );
