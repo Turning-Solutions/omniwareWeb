@@ -8,6 +8,7 @@ import {
 import { SHOP_PRODUCTS_PER_PAGE } from "@/lib/shopConstants";
 import { fetchShopProductsDirect } from "@/lib/server/shopProductsDirect";
 import { fetchShopFacetsDirect } from "@/lib/server/shopFacetsDirect";
+import { fetchShopCategoryTreeDirect } from "@/lib/server/shopCategoriesDirect";
 
 export async function fetchShopProductsJson(options: UseProductsOptions): Promise<ProductsResponse> {
     // In-process controller call — no HTTP loopback. Fetching our own public URL
@@ -88,6 +89,25 @@ export async function prefetchShopFacets(queryClient: QueryClient, options: UseP
         console.error("[shop] SSR facets prefetch failed:", error);
     } finally {
         if (timer) clearTimeout(timer);
+    }
+}
+
+/**
+ * Hydrate the sidebar's Category/Subcategory tree from SSR. This query key
+ * (`shop-category-tree`) is read by `DynamicFilterSidebar`'s own `useQuery` —
+ * without prefetching it here, that tree has no data until the client makes
+ * its own round trip after hydration, so it visibly lags behind the rest of
+ * the (already-hydrated) sidebar and the product grid.
+ */
+export async function prefetchShopCategoryTree(queryClient: QueryClient) {
+    try {
+        await queryClient.prefetchQuery({
+            queryKey: ["shop-category-tree"],
+            queryFn: () => fetchShopCategoryTreeDirect(),
+            staleTime: 5 * 60 * 1000,
+        });
+    } catch (error) {
+        console.error("[shop] SSR category tree prefetch failed:", error);
     }
 }
 

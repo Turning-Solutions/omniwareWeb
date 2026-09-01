@@ -2,6 +2,7 @@ import { dehydrate, HydrationBoundary, QueryClient } from "@tanstack/react-query
 import ShopPageClient from "./ShopPageClient";
 import { shopTitle, shopUrl } from "./shopMetadata";
 import {
+    prefetchShopCategoryTree,
     prefetchShopFacets,
     prefetchShopProductsList,
     shopProductsListQueryOptionsForHydration,
@@ -26,12 +27,14 @@ export default async function ShopLanding({
 }) {
     const queryClient = new QueryClient();
     const listOptions = shopProductsListQueryOptionsForHydration(filters);
-    // Hydrate the grid AND the filter sidebar. Both run in parallel, so SSR costs
-    // roughly the slower of the two rather than their sum; `prefetchShopFacets`
-    // gives up after its own budget so facets can never stall the product grid.
+    // Hydrate the grid AND the filter sidebar (facets + category tree). All run
+    // in parallel, so SSR costs roughly the slowest of the three rather than
+    // their sum; `prefetchShopFacets` gives up after its own budget so a slow
+    // facets aggregation can never stall the product grid.
     const [listData] = await Promise.all([
         prefetchShopProductsList(queryClient, listOptions),
         prefetchShopFacets(queryClient, shopFacetsOptions(buildShopFilters(filters))),
+        prefetchShopCategoryTree(queryClient),
     ]);
 
     const itemList = listData?.products?.length

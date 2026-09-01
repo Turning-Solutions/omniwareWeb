@@ -160,6 +160,19 @@ function withDiscountInfo(product: any): any {
  */
 const PUBLIC_LISTING_CACHE_CONTROL = 'public, s-maxage=60, stale-while-revalidate=300';
 
+/**
+ * In-memory result cache for the single "lite" facets query (the plain,
+ * unfiltered `/shop` view — see `hasShopFacetNarrowing`). The `Cache-Control`
+ * header above is a no-op on the SSR path, which calls this controller
+ * in-process rather than over HTTP, so without this the full facets
+ * aggregation (including the category ancestor rollup) reran from scratch on
+ * every single hit to the default shop view. TTL mirrors the advertised
+ * `s-maxage=60` so behavior matches what the header already promises callers
+ * that do go through HTTP/CDN caching.
+ */
+const LITE_FACETS_CACHE_TTL_MS = 60_000;
+let liteFacetsCache: { payload: unknown; expiresAt: number } | null = null;
+
 export const getProducts = async (req: Request, res: Response) => {
     try {
         res.set('Cache-Control', PUBLIC_LISTING_CACHE_CONTROL);
@@ -327,6 +340,12 @@ export const getProductFacets = async (req: Request, res: Response) => {
     try {
         res.set('Cache-Control', PUBLIC_LISTING_CACHE_CONTROL);
 
+        const isLiteMode = req.query.mode === 'lite';
+        if (isLiteMode && liteFacetsCache && liteFacetsCache.expiresAt > Date.now()) {
+            res.json(liteFacetsCache.payload);
+            return;
+        }
+
         const { search, minPrice, maxPrice, brand, category, ...dynamicFilters } = req.query;
 
         const lookupCache: MatchStageCache = {};
@@ -407,12 +426,18 @@ export const getProductFacets = async (req: Request, res: Response) => {
             specs: specsFacet
         };
 
-        res.json({
+        const responsePayload = {
             categoryKey: categoryKeyForSpecsFacets ?? (typeof category === 'string' ? category : null),
             featuredMode,
             featuredSpecKeys,
             facets: finalFacets
-        });
+        };
+
+        if (isLiteMode) {
+            liteFacetsCache = { payload: responsePayload, expiresAt: Date.now() + LITE_FACETS_CACHE_TTL_MS };
+        }
+
+        res.json(responsePayload);
 
     } catch (error) {
         res.status(500).json({ message: (error as Error).message });
