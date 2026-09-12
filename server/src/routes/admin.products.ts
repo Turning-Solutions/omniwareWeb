@@ -2,6 +2,7 @@ import express, { Request, Response } from 'express';
 import Product from '../models/Product';
 import Brand from '../models/Brand';
 import Category from '../models/Category';
+import { Event } from '../models/Event';
 import { requireAuth } from '../middleware/requireAuth';
 import { requireAdmin } from '../middleware/requireAdmin';
 import { adminRateLimit } from '../middleware/adminRateLimit';
@@ -123,6 +124,27 @@ router.delete('/:id', async (req: Request, res: Response) => {
     });
 
     res.status(204).send();
+});
+
+// POST /api/v1/admin/products/:id/reset-views
+// Clears the recorded "product_view" events for this product, resetting the
+// live view-count aggregation (server/src/controllers/analyticsController.ts
+// getProductViewStats) back to 0. Historical events are deleted, not just
+// hidden — nothing else in the codebase reads them once gone.
+router.post('/:id/reset-views', async (req: Request, res: Response) => {
+    const product = await Product.findById(req.params.id).lean();
+    if (!product) return res.status(404).json({ message: 'Product not found' });
+
+    const { deletedCount } = await Event.deleteMany({ type: 'product_view', productId: req.params.id });
+
+    await createAuditLog(req, {
+        action: 'RESET_PRODUCT_VIEWS',
+        entityType: 'Product',
+        entityId: req.params.id as string,
+        before: { viewsDeleted: deletedCount },
+    });
+
+    res.json({ success: true, deletedCount });
 });
 
 // --- Brands CRUD ---

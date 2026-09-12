@@ -1,8 +1,10 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
+import jwt from 'jsonwebtoken';
 import { Event } from '../models/Event';
 import { AnalyticsDaily } from '../models/AnalyticsDaily';
 import Order from '../models/Order';
+import User from '../models/User';
 import mongoose from 'mongoose';
 
 // --- Validation Schemas ---
@@ -60,6 +62,28 @@ setInterval(() => {
     }
 }, RATE_LIMIT_WINDOW);
 
+/**
+ * Best-effort decode of whatever auth token rode along with the request
+ * (cookie or Bearer), without ever failing the request if it's missing or
+ * invalid — anonymous shoppers send no token at all, and that's fine here.
+ */
+async function getRequesterRole(req: Request): Promise<'customer' | 'admin' | null> {
+    try {
+        const authHeader = req.headers.authorization;
+        const bearerToken =
+            authHeader && authHeader.startsWith('Bearer') ? authHeader.split(' ')[1] : undefined;
+        const cookieToken = (req as any).cookies?.accessToken as string | undefined;
+        const token = cookieToken || bearerToken;
+        if (!token) return null;
+
+        const decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET || 'changeme_access') as { id: string };
+        const user = await User.findById(decoded.id).select('role').lean();
+        return (user?.role as 'customer' | 'admin' | undefined) ?? null;
+    } catch {
+        return null;
+    }
+}
+
 // --- Controllers ---
 
 /**
@@ -76,6 +100,16 @@ export const trackEvent = async (req: Request, res: Response) => {
 
     try {
         const validated = eventSchema.parse(req.body);
+
+        // Admins browsing the storefront (e.g. previewing their own edits) shouldn't
+        // inflate customer-facing metrics like product view counts.
+        if (validated.type === 'product_view') {
+            const role = await getRequesterRole(req);
+            if (role === 'admin') {
+                res.status(201).json({ success: true, skipped: true });
+                return;
+            }
+        }
 
         const event = new Event({
             ...validated,
