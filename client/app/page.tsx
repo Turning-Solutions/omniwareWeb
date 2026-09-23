@@ -1,9 +1,7 @@
 import { dehydrate, HydrationBoundary, QueryClient } from "@tanstack/react-query";
 import type { Metadata } from "next";
-import { notFound, redirect } from "next/navigation";
 import HomePageClient from "./HomePageClient";
 import {
-    countActiveProductsBySearchDirect,
     fetchPromotionsDirect,
     fetchPartnersDirect,
     fetchHomeSettingsDirect,
@@ -23,17 +21,17 @@ import {
     getSiteUrl,
     SITE_BRAND_ICON,
 } from "@/lib/seo/productSeo";
-import {
-    getSearchQueryFromParams,
-    hasLegacySearchParam,
-    withSearchPageRobots,
-    type SearchParamsRecord,
-} from "@/lib/seo/searchPageSeo";
 
 /**
  * ISR: serve a cached static page and revalidate in the background at most
  * every 60 s.  Admin mutations call /api/internal/revalidate for instant refresh.
+ *
+ * This page must not touch `searchParams` (or any other request-time API): doing
+ * so forces dynamic rendering, `revalidate` is silently ignored, and every visitor
+ * waits on five MongoDB queries. Legacy `/?s=` spam URLs never reach this page —
+ * `proxy.ts` answers them with 410 Gone.
  */
+export const dynamic = "force-static";
 export const revalidate = 60;
 
 const homeTitle = "Omniware.lk | Custom PC Builds & Components in Sri Lanka";
@@ -42,7 +40,7 @@ const homeDescription =
 const homeUrl = absoluteUrl("/");
 const homeImageUrl = absoluteUrl(DEFAULT_OG_IMAGE);
 
-const baseHomeMetadata: Metadata = {
+export const metadata: Metadata = {
     title: homeTitle,
     description: homeDescription,
     keywords: [
@@ -77,18 +75,6 @@ const baseHomeMetadata: Metadata = {
     },
 };
 
-interface HomePageProps {
-    searchParams?: Promise<SearchParamsRecord>;
-}
-
-export async function generateMetadata({ searchParams }: HomePageProps): Promise<Metadata> {
-    const sp = searchParams ? await searchParams : {};
-    if (hasLegacySearchParam(sp)) {
-        return withSearchPageRobots(baseHomeMetadata);
-    }
-    return baseHomeMetadata;
-}
-
 function buildHomeStructuredData() {
     const siteUrl = getSiteUrl();
     const logoUrl = absoluteUrl(SITE_BRAND_ICON);
@@ -122,18 +108,7 @@ function buildHomeStructuredData() {
     ];
 }
 
-export default async function HomePage({ searchParams }: HomePageProps) {
-    const sp = searchParams ? await searchParams : {};
-    if (hasLegacySearchParam(sp)) {
-        const query = getSearchQueryFromParams(sp);
-        if (!query) notFound();
-
-        const total = await countActiveProductsBySearchDirect(query);
-        if (total === 0) notFound();
-
-        redirect(`/shop?search=${encodeURIComponent(query)}`);
-    }
-
+export default async function HomePage() {
     const queryClient = new QueryClient();
 
     // All 5 queries run in parallel — direct MongoDB, no HTTP loopback.
