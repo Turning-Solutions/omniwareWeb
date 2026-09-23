@@ -1,7 +1,15 @@
 import type { ReactNode } from "react";
 
-const MARKDOWN_LINK_RE = /\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/g;
+// URL part requires a dot (so `[footnote](1)` isn't mistaken for a link) but the
+// scheme is optional — admins routinely type/paste bare domains like
+// "www.nzxt.com" into the "Insert Link" dialog without an http(s):// prefix.
+const MARKDOWN_LINK_RE = /\[([^\]\n]+)\]\(((?:https?:\/\/)?[^\s()]+\.[^\s()]+)\)/g;
 const BARE_URL_RE = /(https?:\/\/[^\s<>()]+)/g;
+
+/** Adds `https://` to a matched URL that was written without a scheme. */
+function normalizeHref(url: string): string {
+    return /^https?:\/\//i.test(url) ? url : `https://${url}`;
+}
 
 /**
  * Renders plain text that may contain `[label](url)` markdown-style links and/or
@@ -37,7 +45,7 @@ export function renderRichText(text: string | undefined | null, linkClassName = 
     while ((match = MARKDOWN_LINK_RE.exec(text))) {
         pushPlainWithBareLinks(text.slice(lastIndex, match.index));
         nodes.push(
-            <a key={`l${key++}`} href={match[2]} target="_blank" rel="noopener noreferrer" className={linkClassName}>
+            <a key={`l${key++}`} href={normalizeHref(match[2])} target="_blank" rel="noopener noreferrer" className={linkClassName}>
                 {match[1]}
             </a>
         );
