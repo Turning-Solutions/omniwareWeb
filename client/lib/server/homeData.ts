@@ -32,6 +32,7 @@ import {
     stripAdminOnlyProductFields,
     normalizeProductAttributeGroups,
 } from '@/server/src/utils/discountHelpers';
+import { DISCOUNT_ONLY_STAGES } from '@/server/src/utils/productAggregation';
 
 /**
  * Mongoose `.lean()` documents still contain BSON ObjectId instances
@@ -154,6 +155,8 @@ interface ProductFetchOptions {
     sort?: string;
     isFeatured?: boolean;
     includeFacets?: boolean;
+    /** Only return products with a positive effective discount (product-level override or category-wide). */
+    hasDiscount?: boolean;
 }
 
 function buildSortStage(sort: string): Record<string, 1 | -1> {
@@ -173,10 +176,16 @@ export async function fetchProductsDirect(options: ProductFetchOptions): Promise
     if (options.isFeatured != null) match.isFeatured = options.isFeatured;
 
     const sortStage = buildSortStage(options.sort ?? 'newest');
+    // Filter by discount at the query level rather than sampling the newest
+    // page and discarding non-discounted rows afterwards — that sampling
+    // approach misses older products whose discount comes from a category-wide
+    // discount rather than their own createdAt (see DISCOUNT_ONLY_STAGES).
+    const discountStages = options.hasDiscount ? DISCOUNT_ONLY_STAGES : [];
 
     const [products, total] = await Promise.all([
         Product.aggregate([
             { $match: match },
+            ...discountStages,
             { $sort: sortStage },
             { $limit: limit },
             {
@@ -197,7 +206,11 @@ export async function fetchProductsDirect(options: ProductFetchOptions): Promise
                 },
             },
         ]),
-        Product.countDocuments(match),
+        options.hasDiscount
+            ? Product.aggregate([{ $match: match }, ...discountStages, { $count: 'count' }]).then(
+                  (r) => r[0]?.count ?? 0
+              )
+            : Product.countDocuments(match),
     ]);
 
     const processed = products

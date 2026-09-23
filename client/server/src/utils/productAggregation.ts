@@ -177,3 +177,49 @@ export const buildProductMatchStage = async (
 
     return matchStage;
 };
+
+/**
+ * Extra pipeline stages that keep only products with a positive effective
+ * discount — either their own `discountPercent` override, or (when that's
+ * unset) their first category's `discountPercent`. Mirrors the resolution
+ * order in `withDiscountInfo`/`computeEffectiveDiscountAmount` in
+ * `../utils/discountHelpers`, but as aggregation expressions so "discounted
+ * products" queries can filter by discount at the DB level instead of
+ * sampling a page of products and discarding the non-discounted ones
+ * afterwards (which misses older products that only carry a category-wide
+ * discount, since it never even fetches them).
+ *
+ * Kept in sync with the identical helper in server/src/utils/productAggregation.ts
+ * — this file is a separate copy used for in-process SSR (see shopProductsDirect.ts).
+ */
+export const DISCOUNT_ONLY_STAGES = [
+    { $lookup: { from: 'categories', localField: 'categoryIds', foreignField: '_id', as: '_discountCats' } },
+    {
+        $addFields: {
+            _effectiveDiscount: {
+                $cond: [
+                    { $gt: [{ $ifNull: ['$discountPercent', 0] }, 0] },
+                    '$discountPercent',
+                    {
+                        $let: {
+                            vars: {
+                                firstCat: {
+                                    $first: {
+                                        $filter: {
+                                            input: '$_discountCats',
+                                            as: 'c',
+                                            cond: { $eq: ['$$c._id', { $arrayElemAt: ['$categoryIds', 0] }] },
+                                        },
+                                    },
+                                },
+                            },
+                            in: { $ifNull: ['$$firstCat.discountPercent', 0] },
+                        },
+                    },
+                ],
+            },
+        },
+    },
+    { $match: { _effectiveDiscount: { $gt: 0 } } },
+    { $project: { _discountCats: 0, _effectiveDiscount: 0 } },
+] as const;

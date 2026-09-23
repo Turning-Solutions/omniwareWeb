@@ -6,6 +6,7 @@ import CategoryFeaturedSpecs from '../models/CategoryFeaturedSpecs';
 import {
     buildProductMatchStage,
     SPECS_OBJECT_TO_ARRAY_PROJECT,
+    DISCOUNT_ONLY_STAGES,
     type MatchStageCache,
 } from '../utils/productAggregation';
 import { normalizeSpecKey } from '../utils/normalizeSpecKey';
@@ -187,9 +188,12 @@ export const getProducts = async (req: Request, res: Response) => {
         if (!includeFacets) {
             const lookupCache: MatchStageCache = {};
             const matchStage = await buildProductMatchStage(req, [], lookupCache);
+            const wantsDiscountOnly = String(req.query.hasDiscount ?? '').toLowerCase() === 'true';
+            const discountStages = wantsDiscountOnly ? DISCOUNT_ONLY_STAGES : [];
             const [products, total] = await Promise.all([
                 Product.aggregate([
                     { $match: matchStage },
+                    ...discountStages,
                     { $sort: sortStage },
                     { $skip: skip },
                     { $limit: limitNum },
@@ -197,7 +201,11 @@ export const getProducts = async (req: Request, res: Response) => {
                     { $unwind: { path: '$brand', preserveNullAndEmptyArrays: true } },
                     { $lookup: { from: 'categories', localField: 'categoryIds', foreignField: '_id', as: 'categories' } },
                 ]),
-                Product.countDocuments(matchStage),
+                wantsDiscountOnly
+                    ? Product.aggregate([{ $match: matchStage }, ...discountStages, { $count: 'count' }]).then(
+                          (r) => r[0]?.count ?? 0
+                      )
+                    : Product.countDocuments(matchStage),
             ]);
 
             return res.json({

@@ -19,6 +19,8 @@ export interface UseProductsOptions {
     availability?: string;
     inStock?: string;
     isFeatured?: boolean;
+    /** Only return products with a positive effective discount (product-level override or category-wide). */
+    hasDiscount?: boolean;
     includeFacets?: boolean;
     facetMode?: 'full' | 'lite';
     enabled?: boolean;
@@ -147,6 +149,7 @@ export function buildProductsQueryString(options: UseProductsOptions): string {
     if (options.availability) params.append('availability', options.availability);
     if (options.inStock) params.append('inStock', options.inStock);
     if (options.isFeatured != null) params.append('isFeatured', String(options.isFeatured));
+    if (options.hasDiscount) params.append('hasDiscount', 'true');
     if (options.includeFacets === false) params.append('facets', 'false');
     // Spec filters: API expects spec[key]=value (e.g. spec[vram]=16GB)
     if (options.spec && typeof options.spec === 'object') {
