@@ -132,6 +132,8 @@ export function ShopContent({
         [queryClient, prefetchShopListState]
     );
 
+    // Must mirror DynamicFilterSidebar's handleCategoryChange exactly (brand kept, subcategories
+    // + spec cleared), otherwise the prefetched query key never matches the click's real filters.
     const prefetchCategoryHover = useCallback(
         (facetValue: string) => {
             const cur = filtersRef.current;
@@ -139,32 +141,32 @@ export function ShopContent({
             if (cur.category === facetValue) {
                 next = { ...cur, page: 1 };
                 delete next.category;
-                delete next.subcategories;
-                delete next.brand;
-                delete next.spec;
             } else {
                 next = { ...cur, category: facetValue, page: 1 };
-                delete next.subcategories;
-                delete next.brand;
-                delete next.spec;
             }
+            delete next.subcategories;
+            delete next.spec;
             scheduleHoverPrefetch(`cat:${facetValue}:${cur.category === facetValue ? "toggle-off" : "toggle-on"}`, next);
         },
         [scheduleHoverPrefetch]
     );
 
+    // Must mirror DynamicFilterSidebar's handleSubcategoryToggle (real multi-select), otherwise the
+    // prefetched query key never matches the click's real filters.
     const prefetchSubcategoryHover = useCallback(
         (value: string) => {
             const cur = filtersRef.current;
             const raw = typeof cur.subcategories === "string" ? cur.subcategories : "";
-            const current = raw.split(",").filter(Boolean)[0];
+            const current = raw.split(",").filter(Boolean);
+            const isSelected = current.includes(value);
+            const updated = isSelected ? current.filter((v) => v !== value) : [...current, value];
             const next: Filters = { ...cur, page: 1 };
-            if (current === value) {
-                delete next.subcategories;
+            if (updated.length > 0) {
+                next.subcategories = updated.join(",");
             } else {
-                next.subcategories = value;
+                delete next.subcategories;
             }
-            scheduleHoverPrefetch(`sub:${value}:${current === value ? "toggle-off" : "toggle-on"}`, next);
+            scheduleHoverPrefetch(`sub:${value}:${isSelected ? "toggle-off" : "toggle-on"}`, next);
         },
         [scheduleHoverPrefetch]
     );
@@ -395,14 +397,14 @@ export function ShopContent({
     const hasMountedRef = useRef(false);
     const prevNonPageFiltersRef = useRef<string>("");
 
-    // Reset specs and brands when category changes
+    // Reset specs and subcategories when category changes. Brand is deliberately kept — it's
+    // orthogonal to category (see DynamicFilterSidebar's handleCategoryChange for the rationale).
     useEffect(() => {
         if (prevCategoryRef.current !== filters.category) {
             // eslint-disable-next-line react-hooks/set-state-in-effect -- derived reset when department changes
             setFilters((prev) => {
                 const next = { ...prev, page: 1 };
                 delete next.spec;
-                delete next.brand;
                 delete next.subcategories;
                 return next;
             });
@@ -563,6 +565,7 @@ export function ShopContent({
     const shopProductCardProps = {
         showWhatsAppButton: false,
         showOrderNowButton: true,
+        showCompareButton: true,
         onNavigateToProduct: rememberCurrentShopState,
     } as const;
     const visibleProducts = products.slice(0, Math.min(visibleProductsCount, products.length));

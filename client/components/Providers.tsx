@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Toaster } from 'react-hot-toast';
 import { CartProvider } from "@/context/CartContext";
+import { CompareProvider } from "@/context/CompareContext";
 import { getProductsQueryOptions, getProductFacetsQueryOptions } from '@/hooks/useProducts';
 import { SHOP_PRODUCTS_PER_PAGE } from '@/lib/shopConstants';
 import api from '@/lib/api';
@@ -140,14 +141,16 @@ export default function Providers({ children }: { children: React.ReactNode }) {
         <QueryClientProvider client={queryClient}>
             <ShopProductsPreloader queryClient={queryClient} />
             <CartProvider>
-                {children}
-                <Toaster position="bottom-right" toastOptions={{
-                    style: {
-                        background: '#1E1E1E',
-                        color: '#fff',
-                        border: '1px solid #333'
-                    }
-                }} />
+                <CompareProvider>
+                    {children}
+                    <Toaster position="bottom-right" toastOptions={{
+                        style: {
+                            background: '#1E1E1E',
+                            color: '#fff',
+                            border: '1px solid #333'
+                        }
+                    }} />
+                </CompareProvider>
             </CartProvider>
         </QueryClientProvider>
     );

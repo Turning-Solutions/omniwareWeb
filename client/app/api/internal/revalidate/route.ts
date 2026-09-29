@@ -17,7 +17,9 @@ export async function POST(req: NextRequest) {
 
     if (Array.isArray(paths)) {
         for (const path of paths) {
-            revalidatePath(path);
+            // Route patterns like `/product/[slug]` refresh every page of that route.
+            if (path.includes('[')) revalidatePath(path, 'page');
+            else revalidatePath(path);
             revalidated.push(path);
         }
     }

@@ -24,7 +24,7 @@ import {
 
 /**
  * ISR: serve a cached static page and revalidate in the background at most
- * every 60 s.  Admin mutations call /api/internal/revalidate for instant refresh.
+ * every 15 min.  Admin mutations call /api/internal/revalidate for instant refresh.
  *
  * This page must not touch `searchParams` (or any other request-time API): doing
  * so forces dynamic rendering, `revalidate` is silently ignored, and every visitor
@@ -32,7 +32,7 @@ import {
  * `proxy.ts` answers them with 410 Gone.
  */
 export const dynamic = "force-static";
-export const revalidate = 60;
+export const revalidate = 900;
 
 const homeTitle = "Omniware.lk | Custom PC Builds & Components in Sri Lanka";
 const homeDescription =

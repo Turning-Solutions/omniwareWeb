@@ -1,6 +1,20 @@
 import { Request, Response } from "express";
 import mongoose from "mongoose";
 import Review from "../models/Review";
+import Product from "../models/Product";
+import { triggerRevalidation } from "../utils/revalidate";
+
+/** Product pages embed approved reviews (and their rating in structured data), so moderation must refresh them. */
+async function revalidateReviewPages(productId: unknown): Promise<void> {
+    const id =
+        productId && typeof productId === "object" && "_id" in productId
+            ? String((productId as { _id: unknown })._id)
+            : productId ? String(productId) : "";
+    const product = mongoose.Types.ObjectId.isValid(id)
+        ? await Product.findById(id).select("slug").lean<{ slug?: string }>()
+        : null;
+    await triggerRevalidation(["/", ...(product?.slug ? [`/product/${product.slug}`] : [])]);
+}
 
 function paramId(raw: string | string[] | undefined): string {
     if (raw == null) return "";
@@ -87,6 +101,7 @@ export async function updateReviewStatus(req: Request, res: Response) {
             res.status(404).json({ message: "Review not found" });
             return;
         }
+        await revalidateReviewPages(updated.productId);
         res.json({ review: updated });
     } catch (e) {
         console.error(e);
@@ -106,6 +121,7 @@ export async function deleteAdminReview(req: Request, res: Response) {
             res.status(404).json({ message: "Review not found" });
             return;
         }
+        await revalidateReviewPages(deleted.productId);
         res.json({ ok: true });
     } catch (e) {
         console.error(e);

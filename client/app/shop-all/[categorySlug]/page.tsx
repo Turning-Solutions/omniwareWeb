@@ -16,7 +16,7 @@ import { parseShopFiltersFromRouter } from "@/lib/shopUrlFilters";
  * handles every filtered URL. Metadata is the genuine `/shop/{slug}` metadata,
  * canonical included, because this HTML is what gets served at `/shop/{slug}`.
  */
-export const revalidate = 60;
+export const revalidate = 900;
 
 interface CategoryLandingProps {
     params: Promise<{ categorySlug: string }>;

@@ -10,6 +10,16 @@
  */
 import { getSiteUrl } from "../../../lib/seo/productSeo";
 
+/**
+ * Every ISR-cached page that lists products. `/shop` and `/shop/{slug}` are
+ * dynamic; `proxy.ts` rewrites their unfiltered hits to the prerendered
+ * `/shop-all` routes, so those are what must be refreshed.
+ */
+export const CATALOG_LISTING_PATHS = ['/', '/shop-all', '/shop-all/[categorySlug]'];
+
+/** Refreshes every product detail page — for changes that touch many products at once. */
+export const ALL_PRODUCT_PAGES = '/product/[slug]';
+
 export async function triggerRevalidation(paths: string[] = ['/'], tags: string[] = []): Promise<void> {
     const secret = process.env.REVALIDATION_SECRET;
     if (!secret) {

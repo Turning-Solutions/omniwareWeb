@@ -260,7 +260,7 @@ export type ProductReviewSummary = {
     }[];
 };
 
-/** Rolling 30-day price commitment; product pages revalidate every 2 minutes. */
+/** Rolling 30-day price commitment; product pages revalidate hourly. */
 function priceValidUntil(): string {
     return new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }

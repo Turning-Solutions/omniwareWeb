@@ -9,14 +9,14 @@ import { baseShopMetadata } from "@/app/shop/shopMetadata";
  * `/shop` itself cannot be cached: it awaits `searchParams`, which forces dynamic
  * rendering, so Next sends `Cache-Control: private, no-cache, no-store` and every
  * visitor pays a full server render. This route touches no request-time API, so it
- * prerenders and Vercel serves it from the edge, revalidating every 60s.
+ * prerenders and Vercel serves it from the edge, revalidating every 15 min (admin edits refresh it instantly).
  *
  * It is a real URL, so its metadata must be the genuine `/shop` metadata: the HTML
  * built here is what visitors and crawlers get at `/shop`. The canonical points at
  * `/shop`, which is what keeps `/shop-all` from being indexed as a duplicate.
  */
 export const dynamic = "force-static";
-export const revalidate = 60;
+export const revalidate = 900;
 
 export const metadata: Metadata = baseShopMetadata;
 

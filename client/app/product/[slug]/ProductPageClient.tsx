@@ -15,6 +15,7 @@ import { renderRichText } from "@/lib/richText";
 import { getCombinedWarrantyLabel, getWarrantyBreakdownLabel, hasExtendedWarranty } from "@/lib/warranty";
 import LoadingAnimation from "@/components/LoadingAnimation";
 import WhatsAppLogo from "@/components/WhatsAppLogo";
+import CompareButton from "@/components/CompareButton";
 import FlowSectionHeader from "@/components/FlowSectionHeader";
 
 interface ProductVariant {
@@ -549,6 +550,8 @@ function ProductPageInner({ slug }: { slug: string }) {
                             <WhatsAppLogo size={availability === "pre_order" ? 24 : 20} />
                             WhatsApp inquiry
                         </a>
+
+                        <CompareButton product={product} variant="page" />
                     </div>
 
                     {/* Specs Map (filter specs) — key specs sit above the prose description. */}

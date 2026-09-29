@@ -185,9 +185,16 @@ function listingQueryStringFromFilters(filters: Record<string, unknown>): URLSea
             ? filters.category.trim().toLowerCase()
             : "";
     const subRaw = typeof filters.subcategories === "string" ? filters.subcategories : "";
-    const subFirst = subRaw.split(",").filter(Boolean)[0]?.trim().toLowerCase() ?? "";
-    if (subFirst && cat) {
-        next.set("sub", subFirst);
+    const subAll = Array.from(
+        new Set(
+            subRaw
+                .split(",")
+                .map((s) => s.trim().toLowerCase())
+                .filter(Boolean)
+        )
+    ).join(",");
+    if (subAll && cat) {
+        next.set("sub", subAll);
     }
 
     const search = typeof filters.search === "string" ? filters.search.trim() : "";

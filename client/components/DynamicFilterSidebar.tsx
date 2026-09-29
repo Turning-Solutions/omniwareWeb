@@ -172,11 +172,12 @@ function FilterCheckbox({
     return (
         <label
             onPointerEnter={onPrefetchPointerEnter}
-            className={`group flex cursor-pointer items-center gap-2.5 rounded-lg py-1.5 px-2 transition-all duration-150 ${
+            className={`group flex cursor-pointer items-center gap-2.5 rounded-lg py-1.5 px-2 transition-all duration-150 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent has-[:focus-visible]:ring-offset-1 has-[:focus-visible]:ring-offset-zinc-900 ${
             checked
                 ? "bg-accent/10 ring-1 ring-accent/20"
                 : "hover:bg-white/[0.05] ring-1 ring-transparent"
         }`}>
+            <input type="checkbox" checked={checked} onChange={onChange} className="sr-only" />
             <span className={`relative flex h-4 w-4 shrink-0 items-center justify-center rounded-[4px] border-2 transition-all duration-150 ${
                 checked
                     ? "border-accent bg-accent"
@@ -184,7 +185,6 @@ function FilterCheckbox({
             }`}>
                 {checked ? <Check className="h-2.5 w-2.5 text-white" strokeWidth={3.5} /> : null}
             </span>
-            <input type="checkbox" checked={checked} onChange={onChange} className="sr-only" tabIndex={-1} />
             <span className={`min-w-0 flex-1 truncate text-sm transition-colors ${
                 checked ? "font-medium text-white" : "text-zinc-300 group-hover:text-zinc-100"
             }`}>
@@ -222,11 +222,19 @@ function FilterRadio({
     return (
         <label
             onPointerEnter={onPrefetchPointerEnter}
-            className={`group flex cursor-pointer items-center gap-2.5 rounded-lg py-1.5 px-2 transition-all duration-150 ${
+            className={`group flex cursor-pointer items-center gap-2.5 rounded-lg py-1.5 px-2 transition-all duration-150 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent has-[:focus-visible]:ring-offset-1 has-[:focus-visible]:ring-offset-zinc-900 ${
             checked
                 ? "bg-accent/10 ring-1 ring-accent/25"
                 : "hover:bg-white/[0.05] ring-1 ring-transparent"
         }`}>
+            <input
+                type="radio"
+                name={name}
+                checked={checked}
+                onChange={onChange}
+                onClick={onClick}
+                className="sr-only"
+            />
             <span className={`relative flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 transition-all duration-150 ${
                 checked
                     ? "border-accent"
@@ -236,15 +244,6 @@ function FilterRadio({
                     <span className="h-1.5 w-1.5 rounded-full bg-accent" />
                 ) : null}
             </span>
-            <input
-                type="radio"
-                name={name}
-                checked={checked}
-                onChange={onChange}
-                onClick={onClick}
-                className="sr-only"
-                tabIndex={-1}
-            />
             <span className={`min-w-0 flex-1 truncate text-sm transition-colors ${
                 checked ? "font-medium text-white" : "text-zinc-300 group-hover:text-zinc-100"
             }`}>
@@ -788,8 +787,16 @@ export default function DynamicFilterSidebar({
         }
     }, [facets.price, filters.minPrice, filters.maxPrice]);
 
-    const applyPriceFilter = () =>
+    const priceRangeInvalid = priceRange.min > priceRange.max;
+
+    const priceRangeDirty =
+        priceRange.min !== Number(filters.minPrice ?? facets.price?.min ?? priceRange.min) ||
+        priceRange.max !== Number(filters.maxPrice ?? facets.price?.max ?? priceRange.max);
+
+    const applyPriceFilter = () => {
+        if (priceRangeInvalid) return;
         setFilters({ ...filters, minPrice: priceRange.min, maxPrice: priceRange.max, page: 1 });
+    };
 
     const resetPriceFilter = () => {
         if (!facets.price) return;
@@ -825,37 +832,38 @@ export default function DynamicFilterSidebar({
         setFilters(updated);
     };
 
+    // Brand is orthogonal to category (e.g. "ASUS" applies across departments), so it survives a
+    // category switch. Subcategories and specs are tied to the *old* category's tree/spec keys and
+    // almost never apply to the new one, so those are always cleared.
     const handleCategoryChange = (value: string) => {
         const next = { ...filters, page: 1 };
         if (filters.category === value) {
             delete next.category;
-            delete next.subcategories;
-            delete next.brand;
-            delete next.spec;
         } else {
             next.category = value;
-            delete next.subcategories;
-            delete next.brand;
-            delete next.spec;
         }
+        delete next.subcategories;
+        delete next.spec;
         setFilters(next);
     };
 
-    const selectedSubcategories = () => {
-        const raw = typeof filters.subcategories === "string" ? filters.subcategories : "";
-        const first = raw.split(",").filter(Boolean)[0];
-        return first ? [first] : [];
+    const selectedSubcategories = (): string[] => {
+        const raw: string = typeof filters.subcategories === "string" ? filters.subcategories : "";
+        return raw.split(",").map((s: string) => s.trim()).filter(Boolean);
     };
 
     const isSubcategorySelected = (value: string) => selectedSubcategories().includes(value);
 
     const handleSubcategoryToggle = (value: string) => {
-        const isCurrent = isSubcategorySelected(value);
+        const current = selectedSubcategories();
+        const updated = current.includes(value)
+            ? current.filter((v: string) => v !== value)
+            : [...current, value];
         const next = { ...filters, page: 1 };
-        if (isCurrent) {
-            delete next.subcategories;
+        if (updated.length > 0) {
+            next.subcategories = updated.join(",");
         } else {
-            next.subcategories = value;
+            delete next.subcategories;
         }
         setFilters(next);
     };
@@ -895,7 +903,6 @@ export default function DynamicFilterSidebar({
                     const next = { ...filters, page: 1 };
                     delete next.category;
                     delete next.subcategories;
-                    delete next.brand;
                     delete next.spec;
                     setFilters(next);
                 },
@@ -1268,11 +1275,22 @@ export default function DynamicFilterSidebar({
                                         </label>
                                     </div>
 
+                                    {priceRangeInvalid ? (
+                                        <p className="text-xs font-medium text-red-400">
+                                            Min price can&apos;t be more than max price.
+                                        </p>
+                                    ) : priceRangeDirty ? (
+                                        <p className="text-xs text-zinc-500">
+                                            Press Apply to update results.
+                                        </p>
+                                    ) : null}
+
                                     <div className="flex gap-2">
                                         <button
                                             type="button"
                                             onClick={applyPriceFilter}
-                                            className="flex-1 rounded-lg bg-accent py-2 text-sm font-semibold text-white transition-colors hover:bg-accent/90 active:scale-[0.98]"
+                                            disabled={priceRangeInvalid}
+                                            className="flex-1 rounded-lg bg-accent py-2 text-sm font-semibold text-white transition-colors hover:bg-accent/90 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-accent"
                                         >
                                             Apply
                                         </button>

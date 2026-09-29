@@ -7,7 +7,7 @@ import { requireAdmin } from '../middleware/requireAdmin';
 import { adminRateLimit } from '../middleware/adminRateLimit';
 import { createAuditLog } from '../utils/audit';
 import { clearFeaturedSpecsCache, invalidateFacetCaches } from '../controllers/productController';
-import { triggerRevalidation } from '../utils/revalidate';
+import { ALL_PRODUCT_PAGES, CATALOG_LISTING_PATHS, triggerRevalidation } from '../utils/revalidate';
 import { normalizeSpecKey } from '../utils/normalizeSpecKey';
 import {
     backfillProductSlugs,
@@ -97,7 +97,7 @@ router.post('/backfill-slugs', async (req: Request, res: Response) => {
 
         if (!dryRun && result.updated > 0) {
             invalidateFacetCaches();
-            await triggerRevalidation(['/', '/shop', '/sitemap.xml']);
+            await triggerRevalidation([...CATALOG_LISTING_PATHS, ALL_PRODUCT_PAGES, '/sitemap.xml']);
         }
 
         await createAuditLog(req, {
@@ -179,7 +179,7 @@ router.post('/', async (req: Request, res: Response) => {
         normalizedBody.slug = await createUniqueProductSlug(normalizedBody.slug || normalizedBody.title);
         const product = await Product.create(normalizedBody);
         invalidateFacetCaches();
-        await triggerRevalidation(['/', '/shop', '/sitemap.xml']);
+        await triggerRevalidation([...CATALOG_LISTING_PATHS, '/sitemap.xml']);
 
         await createAuditLog(req, {
             action: 'CREATE_PRODUCT',
@@ -220,8 +220,7 @@ router.patch('/:id', async (req: Request, res: Response) => {
         const productSlug = getProductSlug(updated);
         const previousSlug = getProductSlug(before);
         await triggerRevalidation([
-            '/',
-            '/shop',
+            ...CATALOG_LISTING_PATHS,
             '/sitemap.xml',
             ...(previousSlug ? [`/product/${previousSlug}`] : []),
             ...(productSlug ? [`/product/${productSlug}`] : []),
@@ -350,7 +349,7 @@ router.post('/:id/propagate-attribute-changes', async (req: Request, res: Respon
 
         if (!dryRun && anyModified) {
             invalidateFacetCaches();
-            await triggerRevalidation(['/', '/shop']);
+            await triggerRevalidation([...CATALOG_LISTING_PATHS, ALL_PRODUCT_PAGES]);
             await createAuditLog(req, {
                 action: 'BULK_UPDATE_ATTRIBUTE_VALUE',
                 entityType: 'Product',
@@ -373,7 +372,7 @@ router.delete('/:id', async (req: Request, res: Response) => {
     await Product.findByIdAndDelete(req.params.id);
     invalidateFacetCaches();
     const productSlug = getProductSlug(before);
-    await triggerRevalidation(['/', '/shop', '/sitemap.xml', ...(productSlug ? [`/product/${productSlug}`] : [])]);
+    await triggerRevalidation([...CATALOG_LISTING_PATHS, '/sitemap.xml', ...(productSlug ? [`/product/${productSlug}`] : [])]);
 
     await createAuditLog(req, {
         action: 'DELETE_PRODUCT',
@@ -400,6 +399,7 @@ router.put('/brands/:id', async (req: Request, res: Response) => {
     try {
         const brand = await Brand.findByIdAndUpdate(req.params.id, req.body, { returnDocument: 'after' });
         if (!brand) return res.status(404).json({ message: 'Brand not found' });
+        await triggerRevalidation([...CATALOG_LISTING_PATHS, ALL_PRODUCT_PAGES]);
         res.json(brand);
     } catch (error) {
         res.status(400).json({ message: (error as Error).message });
@@ -419,7 +419,7 @@ router.post('/categories', async (req: Request, res: Response) => {
             isActive: true,
         });
         invalidateFacetCaches();
-        await triggerRevalidation(['/', '/shop']);
+        await triggerRevalidation([...CATALOG_LISTING_PATHS, ALL_PRODUCT_PAGES]);
         res.status(201).json(category);
     } catch (error) {
         res.status(400).json({ message: (error as Error).message });
@@ -449,7 +449,7 @@ router.put('/categories/:id', async (req: Request, res: Response) => {
 
         const category = await Category.findByIdAndUpdate(categoryId, update, { returnDocument: 'after' });
         invalidateFacetCaches();
-        await triggerRevalidation(['/', '/shop']);
+        await triggerRevalidation([...CATALOG_LISTING_PATHS, ALL_PRODUCT_PAGES]);
         clearFeaturedSpecsCache(existingCategory.slug);
         if (category) {
             clearFeaturedSpecsCache(category.slug);
@@ -488,7 +488,7 @@ router.delete('/categories/:id', async (req: Request, res: Response) => {
         await Category.findByIdAndDelete(categoryId);
         invalidateFacetCaches();
         clearFeaturedSpecsCache(category.slug);
-        await triggerRevalidation(['/', '/shop']);
+        await triggerRevalidation([...CATALOG_LISTING_PATHS, ALL_PRODUCT_PAGES]);
         res.status(204).send();
     } catch (error) {
         res.status(400).json({ message: (error as Error).message });
@@ -524,7 +524,7 @@ router.put('/categories/:id/discount', async (req: Request, res: Response) => {
             { returnDocument: 'after' }
         ).lean();
         invalidateFacetCaches();
-        await triggerRevalidation(['/', '/shop']);
+        await triggerRevalidation([...CATALOG_LISTING_PATHS, ALL_PRODUCT_PAGES]);
 
         await createAuditLog(req, {
             action: 'UPDATE_CATEGORY_DISCOUNT',

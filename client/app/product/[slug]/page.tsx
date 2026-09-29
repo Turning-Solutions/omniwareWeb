@@ -13,10 +13,10 @@ import {
 import { fetchProductReviewSummary } from "@/lib/server/productReviewSummary";
 
 /**
- * ISR: product pages are statically cached and revalidated every 2 minutes,
+ * ISR: product pages are statically cached and revalidated every hour,
  * or instantly when admin edits the product via on-demand revalidation.
  */
-export const revalidate = 120;
+export const revalidate = 3600;
 
 interface ProductPageProps {
     params: Promise<{ slug: string }>;
