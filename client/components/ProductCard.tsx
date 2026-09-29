@@ -202,14 +202,11 @@ export default function ProductCard({
             <div className="relative z-10 space-y-2 border-t border-transparent bg-[#1a1a1a] p-4 transition-colors duration-500 ease-in-out group-hover:border-[#D12B28]/20 group-hover:bg-[#252220]">
                 <div className="flex justify-between items-start gap-2">
                     <div className="min-w-0 flex-1">
-                        <div className="mb-1 flex min-h-[1.25rem] items-center justify-between gap-2">
-                            <p className="min-w-0 truncate text-xs text-[#8E8E8E]">
-                                {typeof product.brand === 'object' && product.brand !== null
-                                    ? (product.brand as any).name
-                                    : product.brand}
-                            </p>
-                            {showCompareButton ? <CompareButton product={product} /> : null}
-                        </div>
+                        <p className="mb-1 text-xs text-[#8E8E8E]">
+                            {typeof product.brand === 'object' && product.brand !== null
+                                ? (product.brand as any).name
+                                : product.brand}
+                        </p>
                         <h3 className="text-[14px] font-semibold leading-snug text-[#C8C8C8] transition-colors duration-500 ease-in-out group-hover:text-[#E6E6E6] sm:text-[15px] min-h-[2.9rem] sm:min-h-[3.1rem]">
                             <Link
                                 href={`/product/${product.slug || product._id}`}
@@ -276,6 +273,7 @@ export default function ProductCard({
                                 </Link>
                             )
                         ) : null}
+                        {showCompareButton ? <CompareButton product={product} /> : null}
                         {showWhatsAppButton ? (
                             <a
                                 href={whatsappUrl}

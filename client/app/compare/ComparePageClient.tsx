@@ -239,7 +239,7 @@ export default function ComparePageClient() {
     const colCount = columns.length;
 
     return (
-        <div className="mx-auto max-w-7xl px-4 py-8">
+        <div className="mx-auto w-full max-w-[1920px] px-4 py-8 sm:px-6 lg:px-10">
             <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
                 <div>
                     <h1 className="text-2xl font-bold tracking-tight text-[#F1F1F1] sm:text-3xl">Product Comparison</h1>
@@ -288,7 +288,7 @@ export default function ComparePageClient() {
             </div>
 
             <div className="overflow-x-auto rounded-2xl border border-white/[0.08] bg-[#121212]">
-                <table className="w-full border-collapse text-sm">
+                <table className="w-full border-collapse text-sm xl:table-fixed">
                     <thead>
                         <tr className="align-top">
                             <th className="sticky left-0 z-20 w-32 min-w-[8rem] border-b border-r border-white/[0.08] bg-[#161616] p-3 text-left text-xs font-semibold uppercase tracking-wide text-[#8E8E8E] sm:w-52 sm:min-w-[13rem]">

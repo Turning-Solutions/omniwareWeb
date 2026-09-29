@@ -4,7 +4,7 @@ import type { MouseEvent } from "react";
 import { useState } from "react";
 import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
-import { Check, GitCompareArrows, Plus } from "lucide-react";
+import { Check, GitCompareArrows } from "lucide-react";
 import toast from "react-hot-toast";
 import type { Product } from "@/hooks/useProducts";
 import type { CategoryTreeItem } from "@/hooks/useCategoryTree";
@@ -154,14 +154,14 @@ export default function CompareButton({ product, variant = "card", className = "
             disabled={busy}
             aria-pressed={selected}
             title={selected ? "Remove from compare" : "Add to compare"}
-            className={`relative z-10 inline-flex shrink-0 items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-semibold transition-colors disabled:opacity-60 ${
+            className={`relative z-10 inline-flex w-full min-w-0 items-center justify-center gap-1.5 rounded-full border px-3 py-2 text-xs font-semibold transition-colors disabled:opacity-60 ${
                 selected
                     ? "border-emerald-500/60 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25"
-                    : "border-[#D12B28]/50 bg-[#D12B28]/10 text-[#F1F1F1] hover:border-[#D12B28] hover:bg-[#D12B28]/25"
+                    : "border-[#D12B28]/60 bg-transparent text-[#F1F1F1] hover:border-[#D12B28] hover:bg-[#D12B28]/15"
             } ${className}`}
         >
-            {selected ? <Check className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5 text-[#E55451]" />}
-            {selected ? "Comparing" : "Compare"}
+            {selected ? <Check className="h-3.5 w-3.5" /> : <GitCompareArrows className="h-3.5 w-3.5" />}
+            {selected ? "Added to compare" : "Compare"}
         </button>
     );
 }
