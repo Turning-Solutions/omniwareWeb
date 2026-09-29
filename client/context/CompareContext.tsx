@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
 const STORAGE_KEY = "compareProducts";
+export const MAX_COMPARE_ITEMS = 5;
 
 export interface CompareItem {
     _id: string;
@@ -18,7 +19,8 @@ export interface CompareItem {
 
 export type AddToCompareResult =
     | { ok: true }
-    | { ok: false; reason: "category_mismatch"; currentCategoryName: string };
+    | { ok: false; reason: "category_mismatch"; currentCategoryName: string }
+    | { ok: false; reason: "limit" };
 
 interface CompareContextType {
     compareItems: CompareItem[];
@@ -41,7 +43,7 @@ export function CompareProvider({ children }: { children: React.ReactNode }) {
             const saved = localStorage.getItem(STORAGE_KEY);
             const parsed = saved ? JSON.parse(saved) : [];
             // eslint-disable-next-line react-hooks/set-state-in-effect
-            if (Array.isArray(parsed)) setCompareItems(parsed);
+            if (Array.isArray(parsed)) setCompareItems(parsed.slice(0, MAX_COMPARE_ITEMS));
         } catch {
             // ignore corrupt storage
         }
@@ -63,7 +65,7 @@ export function CompareProvider({ children }: { children: React.ReactNode }) {
             if (e.key !== STORAGE_KEY) return;
             try {
                 const parsed = e.newValue ? JSON.parse(e.newValue) : [];
-                if (Array.isArray(parsed)) setCompareItems(parsed);
+                if (Array.isArray(parsed)) setCompareItems(parsed.slice(0, MAX_COMPARE_ITEMS));
             } catch {
                 // ignore
             }
@@ -80,7 +82,12 @@ export function CompareProvider({ children }: { children: React.ReactNode }) {
             if (current && current.categoryId !== item.categoryId) {
                 return { ok: false, reason: "category_mismatch", currentCategoryName: current.categoryName };
             }
-            setCompareItems((prev) => (prev.some((x) => x._id === item._id) ? prev : [...prev, item]));
+            if (compareItems.length >= MAX_COMPARE_ITEMS && !compareItems.some((x) => x._id === item._id)) {
+                return { ok: false, reason: "limit" };
+            }
+            setCompareItems((prev) =>
+                prev.some((x) => x._id === item._id) ? prev : [...prev, item].slice(0, MAX_COMPARE_ITEMS)
+            );
             return { ok: true };
         },
         [compareItems]
