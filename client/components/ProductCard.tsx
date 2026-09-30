@@ -187,6 +187,13 @@ export default function ProductCard({
                     className="absolute inset-0 z-[5]"
                     aria-label={`View ${product.title}`}
                 />
+                {showCompareButton ? (
+                    <CompareButton
+                        product={product}
+                        variant="icon"
+                        className="pointer-events-auto absolute bottom-4 right-[4.25rem] z-20"
+                    />
+                ) : null}
                 <button
                     type="button"
                     disabled={!canAddToCart}
@@ -273,7 +280,6 @@ export default function ProductCard({
                                 </Link>
                             )
                         ) : null}
-                        {showCompareButton ? <CompareButton product={product} /> : null}
                         {showWhatsAppButton ? (
                             <a
                                 href={whatsappUrl}
