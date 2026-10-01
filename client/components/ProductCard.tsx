@@ -191,7 +191,7 @@ export default function ProductCard({
                     <CompareButton
                         product={product}
                         variant="icon"
-                        className="pointer-events-auto absolute bottom-4 right-[4.25rem] z-20"
+                        className="pointer-events-auto absolute bottom-4 left-4 z-20"
                     />
                 ) : null}
                 <button

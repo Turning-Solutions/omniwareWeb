@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useQueries } from "@tanstack/react-query";
-import { Check, GitCompareArrows, Plus, ShoppingCart, Trash2, X } from "lucide-react";
+import { Check, GitCompareArrows, Plus, ShoppingCart, Star, Trash2, X } from "lucide-react";
 import toast from "react-hot-toast";
 import api from "@/lib/api";
 import type { Product } from "@/hooks/useProducts";
@@ -25,7 +25,10 @@ type Row = {
     render?: (index: number) => ReactNode;
 };
 
-type Section = { title: string; rows: Row[] };
+/** "key" = filterable spec map (shown first, emphasised); "detail" = other product attributes. */
+type SectionVariant = "key" | "overview" | "detail";
+
+type Section = { title: string; rows: Row[]; variant: SectionVariant };
 
 type DecoratedRow = Row & { differs: boolean; best: Set<number> };
 
@@ -141,11 +144,12 @@ function buildSections(products: Product[]): Section[] {
         }
     });
 
-    const sections: Section[] = [{ title: "Overview", rows: overview }];
-    if (specRows.length) sections.push({ title: "Specifications", rows: specRows });
+    const sections: Section[] = [];
+    if (specRows.length) sections.push({ title: "Key Specifications", rows: specRows, variant: "key" });
+    sections.push({ title: "Overview", rows: overview, variant: "overview" });
     for (const [groupKey, group] of groups) {
         const rows = Array.from(group.rows, ([norm, row]) => ({ key: `attr:${groupKey}:${norm}`, ...row }));
-        if (rows.length) sections.push({ title: group.title, rows });
+        if (rows.length) sections.push({ title: group.title, rows, variant: "detail" });
     }
     return sections;
 }
@@ -358,8 +362,16 @@ export default function ComparePageClient() {
                                 </td>
                             </tr>
                         ) : (
-                            decoratedSections.map((section) => (
-                                <SectionRows key={section.title} section={section} colCount={colCount} />
+                            decoratedSections.map((section, index) => (
+                                <SectionRows
+                                    key={`${section.variant}:${section.title}`}
+                                    section={section}
+                                    colCount={colCount}
+                                    isFirstDetail={
+                                        section.variant === "detail" &&
+                                        decoratedSections.findIndex((s) => s.variant === "detail") === index
+                                    }
+                                />
                             ))
                         )}
                         {!isLoading && differencesOnly && decoratedSections.length === 0 && (
@@ -379,23 +391,52 @@ export default function ComparePageClient() {
 function SectionRows({
     section,
     colCount,
+    isFirstDetail,
 }: {
-    section: { title: string; rows: DecoratedRow[] };
+    section: { title: string; rows: DecoratedRow[]; variant: SectionVariant };
     colCount: number;
+    isFirstDetail: boolean;
 }) {
+    const isKey = section.variant === "key";
+    const headerCellClass = isKey
+        ? "border-b border-[#D12B28]/30 bg-gradient-to-r from-[#D12B28]/25 to-[#D12B28]/5"
+        : "border-b border-white/[0.08] bg-[#1a1a1a]";
+
     return (
         <>
+            {isFirstDetail && (
+                <tr>
+                    <td colSpan={colCount + 1} className="border-b border-white/[0.08] bg-[#0e0e0e] px-3 pb-2 pt-6 sm:px-4">
+                        <span className="sticky left-4 text-xs font-semibold uppercase tracking-wide text-[#8E8E8E]">
+                            Other details
+                        </span>
+                    </td>
+                </tr>
+            )}
             <tr>
-                <td className="sticky left-0 z-10 border-b border-white/[0.08] bg-[#1a1a1a] px-3 py-2.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#D12B28]/90 sm:px-4">
-                    {section.title}
+                <td
+                    className={`sticky left-0 z-10 px-3 sm:px-4 ${headerCellClass} ${
+                        isKey
+                            ? "py-3 text-xs font-bold uppercase tracking-[0.15em] text-[#F1F1F1]"
+                            : "py-2.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#D12B28]/90"
+                    }`}
+                >
+                    <span className="inline-flex items-center gap-2">
+                        {isKey && <Star className="h-3.5 w-3.5 fill-[#D12B28] text-[#D12B28]" aria-hidden />}
+                        {section.title}
+                    </span>
                 </td>
-                <td colSpan={colCount} className="border-b border-white/[0.08] bg-[#1a1a1a]" />
+                <td colSpan={colCount} className={headerCellClass} />
             </tr>
             {section.rows.map((row) => (
-                <tr key={row.key} className="group align-top hover:bg-white/[0.02]">
+                <tr key={row.key} className={`group align-top ${isKey ? "bg-[#D12B28]/[0.03]" : ""} hover:bg-white/[0.02]`}>
                     <th
                         scope="row"
-                        className="sticky left-0 z-10 border-b border-r border-white/[0.06] bg-[#141414] px-3 py-3 text-left text-xs font-medium text-[#8E8E8E] group-hover:bg-[#181818] sm:px-4 sm:text-sm"
+                        className={`sticky left-0 z-10 border-b border-r px-3 py-3 text-left sm:px-4 ${
+                            isKey
+                                ? "border-white/[0.08] border-l-2 border-l-[#D12B28] bg-[#1a1514] text-xs font-semibold text-[#E6E6E6] group-hover:bg-[#1f1918] sm:text-sm"
+                                : "border-white/[0.06] bg-[#141414] text-xs font-medium text-[#8E8E8E] group-hover:bg-[#181818] sm:text-sm"
+                        }`}
                     >
                         <span className="inline-flex items-start gap-1.5">
                             {row.differs && colCount > 1 && (
@@ -409,10 +450,12 @@ function SectionRows({
                         return (
                             <td
                                 key={i}
-                                className={`border-b border-white/[0.06] px-3 py-3 whitespace-pre-line break-words sm:px-4 ${
+                                className={`border-b px-3 whitespace-pre-line break-words sm:px-4 ${
+                                    isKey ? "border-white/[0.08] py-3.5 text-[15px]" : "border-white/[0.06] py-3"
+                                } ${
                                     isBest
                                         ? "bg-emerald-500/10 font-semibold text-emerald-300"
-                                        : row.differs
+                                        : row.differs || isKey
                                           ? "text-[#E6E6E6]"
                                           : "text-[#A8A8A8]"
                                 }`}
