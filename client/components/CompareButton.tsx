@@ -156,10 +156,10 @@ export default function CompareButton({ product, variant = "card", className = "
                 aria-pressed={selected}
                 title={selected ? "Remove from compare" : "Add to compare"}
                 aria-label={selected ? `Remove ${product.title} from compare` : `Add ${product.title} to compare`}
-                className={`rounded-full px-4 py-3 text-sm font-semibold leading-5 shadow-lg transition-all duration-300 disabled:opacity-60 ${
+                className={`translate-y-4 rounded-full px-3 py-1.5 text-xs font-semibold leading-4 opacity-0 shadow-md transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100 disabled:opacity-60 ${
                     selected
-                        ? "translate-y-0 bg-emerald-600 text-white opacity-100 hover:bg-emerald-500"
-                        : "translate-y-4 bg-[#D12B28] text-[#F1F1F1] opacity-0 hover:bg-[#E53A36] group-hover:translate-y-0 group-hover:opacity-100"
+                        ? "bg-emerald-600 text-white hover:bg-emerald-500"
+                        : "bg-[#D12B28] text-[#F1F1F1] hover:bg-[#E53A36]"
                 } ${className}`}
             >
                 {selected ? "Added to compare" : "Compare"}

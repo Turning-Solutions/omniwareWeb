@@ -1,11 +1,11 @@
 "use client";
 
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useQueries } from "@tanstack/react-query";
-import { Check, GitCompareArrows, Plus, ShoppingCart, Star, Trash2, X } from "lucide-react";
+import { Check, GitCompareArrows, Plus, ShoppingCart, Trash2, X } from "lucide-react";
 import toast from "react-hot-toast";
 import api from "@/lib/api";
 import type { Product } from "@/hooks/useProducts";
@@ -241,227 +241,300 @@ export default function ComparePageClient() {
     }
 
     const colCount = columns.length;
+    // Every block uses the same column template so product cards, spec tiles and detail rows line up.
+    const gridStyle: CSSProperties = {
+        gridTemplateColumns: `minmax(8.5rem, 13rem) repeat(${Math.max(colCount, 1)}, minmax(12rem, 1fr))`,
+    };
+    const keyRows = decoratedSections.filter((s) => s.variant === "key").flatMap((s) => s.rows);
+    const detailSections = decoratedSections.filter((s) => s.variant !== "key");
 
     return (
-        <div className="mx-auto w-full max-w-[1920px] px-4 py-8 sm:px-6 lg:px-10">
-            <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+        <div className="mx-auto w-full max-w-[1920px] px-4 py-8 sm:px-6 sm:py-10 lg:px-10">
+            {/* Page header — same eyebrow/title treatment as FlowSectionHeader */}
+            <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold tracking-tight text-[#F1F1F1] sm:text-3xl">Product Comparison</h1>
-                    <p className="mt-1 text-sm text-[#8E8E8E]">
-                        {categoryName ? `${categoryName} · ` : ""}
+                    <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.22em] text-[#D12B28]/80">
+                        Compare{categoryName ? ` · ${categoryName}` : ""}
+                    </span>
+                    <h1 className="mt-2 text-xl font-bold leading-snug tracking-tight text-[#F1F1F1] sm:text-3xl lg:text-4xl">
+                        Product Comparison
+                    </h1>
+                    <p className="mt-2 text-[13px] text-[#B0B0B0] sm:text-base">
                         {colCount} product{colCount === 1 ? "" : "s"}
-                        {!isLoading && colCount > 1 ? ` · ${differenceCount} difference${differenceCount === 1 ? "" : "s"}` : ""}
+                        {!isLoading && colCount > 1
+                            ? ` · ${differenceCount} difference${differenceCount === 1 ? "" : "s"}`
+                            : ""}
                     </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                    <label className="inline-flex cursor-pointer select-none items-center gap-2 rounded-lg border border-white/10 bg-[#161616] px-3 py-2 text-sm text-[#D4D4D4]">
+                    <label className="inline-flex cursor-pointer select-none items-center gap-2 rounded-full border border-white/[0.1] bg-[#161616] px-4 py-2 text-sm text-[#D4D4D4] transition-colors hover:border-white/20">
                         <input
                             type="checkbox"
                             checked={differencesOnly}
                             onChange={(e) => setDifferencesOnly(e.target.checked)}
                             className="h-4 w-4 accent-[#D12B28]"
                         />
-                        Show differences only
+                        Differences only
                     </label>
                     <Link
                         href={addMoreHref}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-[#161616] px-3 py-2 text-sm text-[#D4D4D4] hover:border-white/20 hover:text-white"
+                        className="inline-flex items-center gap-1.5 rounded-full border border-white/[0.1] bg-[#161616] px-4 py-2 text-sm text-[#D4D4D4] transition-colors hover:border-[#D12B28]/40 hover:text-white"
                     >
                         <Plus className="h-4 w-4" /> Add products
                     </Link>
                     <button
                         type="button"
                         onClick={clearCompare}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-[#161616] px-3 py-2 text-sm text-[#D4D4D4] hover:border-[#D12B28]/40 hover:text-white"
+                        className="inline-flex items-center gap-1.5 rounded-full border border-white/[0.1] bg-[#161616] px-4 py-2 text-sm text-[#D4D4D4] transition-colors hover:border-[#D12B28]/40 hover:text-white"
                     >
                         <Trash2 className="h-4 w-4" /> Clear all
                     </button>
                 </div>
             </div>
 
-            <div className="mb-3 flex flex-wrap items-center gap-4 text-xs text-[#8E8E8E]">
-                <span className="inline-flex items-center gap-1.5">
-                    <span className="inline-block h-3 w-3 rounded-sm border border-emerald-500/50 bg-emerald-500/20" />
-                    Better spec
-                </span>
-                <span className="inline-flex items-center gap-1.5">
-                    <span className="inline-block h-2 w-2 rounded-full bg-amber-400" />
-                    Values differ
-                </span>
-                {compareItems.length < 2 && <span className="text-amber-300">Add at least one more product to compare.</span>}
-            </div>
+            <div className="overflow-x-auto pb-2">
+                <div className="min-w-fit space-y-10">
+                    {/* Product cards */}
+                    <div className="grid gap-3 sm:gap-4" style={gridStyle}>
+                        <div className="sticky left-0 z-10 flex flex-col justify-end gap-3 rounded-2xl border border-white/[0.07] bg-[#121212] p-4 text-xs text-[#8E8E8E]">
+                            <span className="inline-flex items-center gap-2">
+                                <span className="inline-block h-3 w-3 rounded-sm border border-emerald-500/60 bg-emerald-500/20" />
+                                Better spec
+                            </span>
+                            <span className="inline-flex items-center gap-2">
+                                <span className="inline-block h-2 w-2 rounded-full bg-amber-400" />
+                                Values differ
+                            </span>
+                            {compareItems.length < 2 && (
+                                <span className="text-amber-300">Add at least one more product to compare.</span>
+                            )}
+                        </div>
+                        {columns.map(({ item, product }) => (
+                            <CompareProductCard
+                                key={item._id}
+                                product={product}
+                                href={`/product/${item.slug || item._id}`}
+                                onRemove={() => removeFromCompare(item._id)}
+                                onAddToCart={() => {
+                                    addToCart(
+                                        { ...product, price: getEffectivePrice(product), availability: getAvailability(product) },
+                                        1
+                                    );
+                                    toast.success("Added to cart");
+                                }}
+                            />
+                        ))}
+                    </div>
 
-            <div className="overflow-x-auto rounded-2xl border border-white/[0.08] bg-[#121212]">
-                <table className="w-full border-collapse text-sm xl:table-fixed">
-                    <thead>
-                        <tr className="align-top">
-                            <th className="sticky left-0 z-20 w-32 min-w-[8rem] border-b border-r border-white/[0.08] bg-[#161616] p-3 text-left text-xs font-semibold uppercase tracking-wide text-[#8E8E8E] sm:w-52 sm:min-w-[13rem]">
-                                Product
-                            </th>
-                            {columns.map(({ item, product }) => {
-                                const availability = getAvailability(product);
-                                const canAddToCart = availability === "in_stock" || availability === "pre_order";
-                                return (
-                                    <th
-                                        key={item._id}
-                                        className="min-w-[13rem] border-b border-white/[0.08] p-3 text-left font-normal sm:min-w-[15rem]"
-                                    >
-                                        <div className="relative flex flex-col gap-2">
-                                            <button
-                                                type="button"
-                                                onClick={() => removeFromCompare(item._id)}
-                                                className="absolute right-0 top-0 z-10 rounded-full bg-black/60 p-1 text-[#8E8E8E] hover:bg-[#D12B28] hover:text-white"
-                                                aria-label={`Remove ${item.title} from comparison`}
+                    {isLoading ? (
+                        <p className="rounded-2xl border border-white/[0.07] bg-[#121212]/90 p-10 text-center text-[#8E8E8E]">
+                            Loading specifications…
+                        </p>
+                    ) : (
+                        <>
+                            {/* Key specifications — tile layout, kept apart from the detail table */}
+                            {keyRows.length > 0 && (
+                                <section>
+                                    <BlockHeading eyebrow="At a glance" title="Key Specifications" accent />
+                                    <div className="space-y-2.5">
+                                        {keyRows.map((row) => (
+                                            <div
+                                                key={row.key}
+                                                className="grid items-stretch gap-3 rounded-2xl border border-white/[0.07] bg-gradient-to-r from-[#1c1716] to-[#141414] p-2.5 sm:gap-4"
+                                                style={gridStyle}
                                             >
-                                                <X className="h-4 w-4" />
-                                            </button>
-                                            <Link
-                                                href={`/product/${item.slug || item._id}`}
-                                                className="relative mx-auto block aspect-square w-full max-w-[10rem] overflow-hidden rounded-lg bg-[#0e0e0e]"
-                                            >
-                                                <Image
-                                                    src={product.images?.[0] || item.image || "/placeholder.svg"}
-                                                    alt={item.title}
-                                                    fill
-                                                    sizes="160px"
-                                                    className="object-cover"
-                                                />
-                                            </Link>
-                                            <Link
-                                                href={`/product/${item.slug || item._id}`}
-                                                className="line-clamp-3 text-sm font-semibold leading-snug text-[#E6E6E6] hover:text-white"
-                                            >
-                                                {product.title}
-                                            </Link>
-                                            <div className="text-sm font-bold tabular-nums text-[#F1F1F1]">
-                                                LKR {getEffectivePrice(product).toLocaleString()}
+                                                <div className="sticky left-0 z-10 flex items-center gap-2 rounded-xl bg-[#1c1716] px-3 py-2">
+                                                    {row.differs && colCount > 1 && (
+                                                        <span className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400" title="Values differ" />
+                                                    )}
+                                                    <span className="text-sm font-semibold text-[#E6E6E6]">{row.label}</span>
+                                                </div>
+                                                {row.values.map((value, i) => {
+                                                    const isBest = row.best.has(i);
+                                                    return (
+                                                        <div
+                                                            key={i}
+                                                            className={`relative flex min-h-[3.25rem] items-center justify-center rounded-xl border px-3 py-2.5 text-center text-sm font-semibold sm:text-[15px] ${
+                                                                isBest
+                                                                    ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-300"
+                                                                    : "border-white/[0.06] bg-[#121212] text-[#E6E6E6]"
+                                                            }`}
+                                                        >
+                                                            {isBest && (
+                                                                <Check className="absolute right-2 top-2 h-3.5 w-3.5 text-emerald-400" aria-label="Better" />
+                                                            )}
+                                                            {value == null || value === "" ? (
+                                                                <span className="font-normal text-[#5E5E5E]">—</span>
+                                                            ) : (
+                                                                <span className="whitespace-pre-line break-words">{value}</span>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
                                             </div>
-                                            <button
-                                                type="button"
-                                                disabled={!canAddToCart}
-                                                onClick={() => {
-                                                    addToCart({ ...product, price: getEffectivePrice(product), availability }, 1);
-                                                    toast.success("Added to cart");
-                                                }}
-                                                className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#D12B28] px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#B32522] disabled:cursor-not-allowed disabled:bg-[#3a3a3a] disabled:text-[#8E8E8E]"
-                                            >
-                                                <ShoppingCart className="h-3.5 w-3.5" />
-                                                {canAddToCart ? "Add to cart" : AVAILABILITY_LABELS[availability] ?? "Unavailable"}
-                                            </button>
-                                        </div>
-                                    </th>
-                                );
-                            })}
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {isLoading ? (
-                            <tr>
-                                <td colSpan={Math.max(colCount, 1) + 1} className="p-8 text-center text-[#8E8E8E]">
-                                    Loading specifications…
-                                </td>
-                            </tr>
-                        ) : (
-                            decoratedSections.map((section, index) => (
-                                <SectionRows
-                                    key={`${section.variant}:${section.title}`}
-                                    section={section}
-                                    colCount={colCount}
-                                    isFirstDetail={
-                                        section.variant === "detail" &&
-                                        decoratedSections.findIndex((s) => s.variant === "detail") === index
-                                    }
-                                />
-                            ))
-                        )}
-                        {!isLoading && differencesOnly && decoratedSections.length === 0 && (
-                            <tr>
-                                <td colSpan={colCount + 1} className="p-8 text-center text-[#8E8E8E]">
+                                        ))}
+                                    </div>
+                                </section>
+                            )}
+
+                            {/* Overview + other attributes — same look as the product page "Product details" band */}
+                            {detailSections.length > 0 && (
+                                <section>
+                                    <BlockHeading eyebrow="Full breakdown" title="Product Details" />
+                                    <div className="overflow-hidden rounded-2xl border border-white/[0.07] bg-[#121212]/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                                        {detailSections.map((section) => (
+                                            <DetailSection
+                                                key={`${section.variant}:${section.title}`}
+                                                section={section}
+                                                colCount={colCount}
+                                                gridStyle={gridStyle}
+                                            />
+                                        ))}
+                                    </div>
+                                </section>
+                            )}
+
+                            {differencesOnly && decoratedSections.length === 0 && (
+                                <p className="rounded-2xl border border-white/[0.07] bg-[#121212]/90 p-10 text-center text-[#8E8E8E]">
                                     These products have identical specifications.
-                                </td>
-                            </tr>
-                        )}
-                    </tbody>
-                </table>
+                                </p>
+                            )}
+                        </>
+                    )}
+                </div>
             </div>
         </div>
     );
 }
 
-function SectionRows({
-    section,
-    colCount,
-    isFirstDetail,
-}: {
-    section: { title: string; rows: DecoratedRow[]; variant: SectionVariant };
-    colCount: number;
-    isFirstDetail: boolean;
-}) {
-    const isKey = section.variant === "key";
-    const headerCellClass = isKey
-        ? "border-b border-[#D12B28]/30 bg-gradient-to-r from-[#D12B28]/25 to-[#D12B28]/5"
-        : "border-b border-white/[0.08] bg-[#1a1a1a]";
-
+function BlockHeading({ eyebrow, title, accent = false }: { eyebrow: string; title: string; accent?: boolean }) {
     return (
-        <>
-            {isFirstDetail && (
-                <tr>
-                    <td colSpan={colCount + 1} className="border-b border-white/[0.08] bg-[#0e0e0e] px-3 pb-2 pt-6 sm:px-4">
-                        <span className="sticky left-4 text-xs font-semibold uppercase tracking-wide text-[#8E8E8E]">
-                            Other details
-                        </span>
-                    </td>
-                </tr>
-            )}
-            <tr>
-                <td
-                    className={`sticky left-0 z-10 px-3 sm:px-4 ${headerCellClass} ${
-                        isKey
-                            ? "py-3 text-xs font-bold uppercase tracking-[0.15em] text-[#F1F1F1]"
-                            : "py-2.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#D12B28]/90"
+        <div className="sticky left-0 mb-4 flex w-fit items-center gap-3">
+            <span className={`h-8 w-1 rounded-full ${accent ? "bg-[#D12B28]" : "bg-white/20"}`} aria-hidden />
+            <div>
+                <span
+                    className={`font-mono text-[10px] font-semibold uppercase tracking-[0.22em] ${
+                        accent ? "text-[#D12B28]/80" : "text-[#8E8E8E]"
                     }`}
                 >
-                    <span className="inline-flex items-center gap-2">
-                        {isKey && <Star className="h-3.5 w-3.5 fill-[#D12B28] text-[#D12B28]" aria-hidden />}
-                        {section.title}
-                    </span>
-                </td>
-                <td colSpan={colCount} className={headerCellClass} />
-            </tr>
-            {section.rows.map((row) => (
-                <tr key={row.key} className={`group align-top ${isKey ? "bg-[#D12B28]/[0.03]" : ""} hover:bg-white/[0.02]`}>
-                    <th
-                        scope="row"
-                        className={`sticky left-0 z-10 border-b border-r px-3 py-3 text-left sm:px-4 ${
-                            isKey
-                                ? "border-white/[0.08] border-l-2 border-l-[#D12B28] bg-[#1a1514] text-xs font-semibold text-[#E6E6E6] group-hover:bg-[#1f1918] sm:text-sm"
-                                : "border-white/[0.06] bg-[#141414] text-xs font-medium text-[#8E8E8E] group-hover:bg-[#181818] sm:text-sm"
+                    {eyebrow}
+                </span>
+                <h2 className="text-lg font-bold tracking-tight text-[#F1F1F1] sm:text-xl">{title}</h2>
+            </div>
+        </div>
+    );
+}
+
+function CompareProductCard({
+    product,
+    href,
+    onRemove,
+    onAddToCart,
+}: {
+    product: Product;
+    href: string;
+    onRemove: () => void;
+    onAddToCart: () => void;
+}) {
+    const availability = getAvailability(product);
+    const canAddToCart = availability === "in_stock" || availability === "pre_order";
+    const hasDiscount = (product.effectiveDiscountPercent ?? 0) > 0;
+    const brand = getBrandName(product);
+
+    return (
+        <div className="group relative flex min-w-0 flex-col overflow-hidden rounded-2xl border border-[#5E5E5E]/30 bg-[#1a1a1a] transition-colors duration-300 hover:border-[#D12B28]/55">
+            <button
+                type="button"
+                onClick={onRemove}
+                className="absolute right-3 top-3 z-20 rounded-full border border-white/10 bg-black/60 p-1.5 text-[#B0B0B0] backdrop-blur transition-colors hover:border-[#D12B28] hover:bg-[#D12B28] hover:text-white"
+                aria-label={`Remove ${product.title} from comparison`}
+            >
+                <X className="h-3.5 w-3.5" />
+            </button>
+            <Link href={href} className="relative block aspect-[4/3] overflow-hidden bg-[#121212]/80">
+                <Image
+                    src={product.images?.[0] || "/placeholder.svg"}
+                    alt={product.title}
+                    fill
+                    sizes="(max-width: 1280px) 40vw, 20rem"
+                    className="object-cover transition-transform duration-500 group-hover:scale-[1.05]"
+                />
+            </Link>
+            <div className="flex flex-1 flex-col gap-2 p-4">
+                {brand && <p className="text-xs uppercase text-[#8E8E8E]">{brand}</p>}
+                <Link
+                    href={href}
+                    className="line-clamp-2 min-h-[2.6rem] text-[14px] font-semibold leading-snug text-[#C8C8C8] transition-colors hover:text-white sm:text-[15px]"
+                >
+                    {product.title}
+                </Link>
+                <div className="mt-auto border-t border-white/[0.06] pt-3">
+                    {hasDiscount && (
+                        <span className="block text-xs text-[#6a6a6a] line-through tabular-nums">
+                            LKR {(product.originalPrice ?? product.price).toLocaleString()}
+                        </span>
+                    )}
+                    <p
+                        className={`text-lg font-extrabold leading-none tracking-tight tabular-nums sm:text-xl ${
+                            hasDiscount ? "text-[#D12B28]" : "text-[#F1F1F1]"
                         }`}
                     >
-                        <span className="inline-flex items-start gap-1.5">
+                        LKR {getEffectivePrice(product).toLocaleString()}
+                    </p>
+                </div>
+                <button
+                    type="button"
+                    disabled={!canAddToCart}
+                    onClick={onAddToCart}
+                    className="mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-full bg-[#D12B28] px-3 py-2 text-xs font-semibold text-[#F1F1F1] transition-colors hover:bg-[#B32522] disabled:cursor-not-allowed disabled:bg-[#2a2a2a] disabled:text-[#8E8E8E]"
+                >
+                    <ShoppingCart className="h-3.5 w-3.5" />
+                    {canAddToCart ? "Add to cart" : AVAILABILITY_LABELS[availability] ?? "Unavailable"}
+                </button>
+            </div>
+        </div>
+    );
+}
+
+function DetailSection({
+    section,
+    colCount,
+    gridStyle,
+}: {
+    section: { title: string; rows: DecoratedRow[] };
+    colCount: number;
+    gridStyle: CSSProperties;
+}) {
+    return (
+        <div>
+            <div className="border-b border-white/[0.06] bg-white/[0.03] px-4 py-2.5 sm:px-5">
+                <span className="sticky left-5 font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-[#D12B28]/85">
+                    {section.title}
+                </span>
+            </div>
+            <div className="divide-y divide-white/[0.06] border-b border-white/[0.06]">
+                {section.rows.map((row) => (
+                    <div
+                        key={row.key}
+                        className="grid gap-3 px-4 py-3 text-sm transition-colors hover:bg-white/[0.02] sm:gap-4 sm:px-5"
+                        style={gridStyle}
+                    >
+                        <div className="sticky left-0 z-10 flex items-start gap-1.5 bg-[#121212] font-medium text-[#8E8E8E]">
                             {row.differs && colCount > 1 && (
                                 <span className="mt-1.5 inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400" title="Values differ" />
                             )}
                             {row.label}
-                        </span>
-                    </th>
-                    {row.values.map((value, i) => {
-                        const isBest = row.best.has(i);
-                        return (
-                            <td
-                                key={i}
-                                className={`border-b px-3 whitespace-pre-line break-words sm:px-4 ${
-                                    isKey ? "border-white/[0.08] py-3.5 text-[15px]" : "border-white/[0.06] py-3"
-                                } ${
-                                    isBest
-                                        ? "bg-emerald-500/10 font-semibold text-emerald-300"
-                                        : row.differs || isKey
-                                          ? "text-[#E6E6E6]"
-                                          : "text-[#A8A8A8]"
-                                }`}
-                            >
-                                <div className="flex items-start gap-1.5">
-                                    {isBest && <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-400" aria-label="Better" />}
+                        </div>
+                        {row.values.map((value, i) => {
+                            const isBest = row.best.has(i);
+                            return (
+                                <div
+                                    key={i}
+                                    className={`flex min-w-0 items-start gap-1.5 whitespace-pre-line break-words leading-relaxed ${
+                                        isBest ? "font-semibold text-emerald-300" : "text-[#D4D4D4]"
+                                    }`}
+                                >
+                                    {isBest && <Check className="mt-1 h-3.5 w-3.5 shrink-0 text-emerald-400" aria-label="Better" />}
                                     <div className="min-w-0">
                                         {value == null || value === "" ? (
                                             <span className="text-[#5E5E5E]">—</span>
@@ -472,11 +545,11 @@ function SectionRows({
                                         )}
                                     </div>
                                 </div>
-                            </td>
-                        );
-                    })}
-                </tr>
-            ))}
-        </>
+                            );
+                        })}
+                    </div>
+                ))}
+            </div>
+        </div>
     );
 }
