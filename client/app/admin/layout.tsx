@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, ShoppingBag, Package, Settings, Filter, Tag, ShieldCheck, ExternalLink, Menu, X, FileText, Star, Handshake, FolderTree, Eye } from "lucide-react";
+import { LayoutDashboard, ShoppingBag, Package, Settings, Filter, Tag, ShieldCheck, ExternalLink, Menu, X, FileText, Star, Handshake, FolderTree, Eye, Link2 } from "lucide-react";
 import AdminAuthGuard from "@/components/AdminAuthGuard";
 
 const navGroups = [
@@ -17,6 +17,7 @@ const navGroups = [
             { href: "/admin/products", label: "Products", icon: Package },
             { href: "/admin/category-manager", label: "Category Manager", icon: FolderTree },
             { href: "/admin/categories/spec-features", label: "Featured Specs", icon: Filter },
+            { href: "/admin/categories/attribute-mapping", label: "Attribute Mapping", icon: Link2 },
         ],
     },
     {

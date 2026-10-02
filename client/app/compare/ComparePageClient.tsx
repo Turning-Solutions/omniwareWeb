@@ -1,17 +1,17 @@
 "use client";
 
 import type { CSSProperties, ReactNode } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { useQueries } from "@tanstack/react-query";
+import { useQueries, useQuery } from "@tanstack/react-query";
 import { Check, GitCompareArrows, Plus, ShoppingCart, Trash2, X } from "lucide-react";
 import toast from "react-hot-toast";
 import api from "@/lib/api";
 import type { Product } from "@/hooks/useProducts";
 import { useCompare } from "@/context/CompareContext";
 import { useCart } from "@/context/CartContext";
-import { normalizeSpecKey } from "@/lib/normalizeSpecKey";
+import { buildAttributeResolver, type AttributeAliasGroup, type ResolvedAttribute } from "@/lib/attributeMatchKey";
 import { getCombinedWarrantyLabel } from "@/lib/warranty";
 import { getBestValueIndexes, valuesDiffer, type SpecDirection } from "@/lib/compareSpecs";
 
@@ -57,7 +57,10 @@ function getEffectivePrice(product: Product): number {
     return hasDiscount ? product.discountedPrice ?? product.price : product.price;
 }
 
-function buildSections(products: Product[]): Section[] {
+/** Attribute names already covered by the Overview rows. */
+const OVERVIEW_KEYS = ["price", "brand", "availability", "warranty"];
+
+function buildSections(products: Product[], resolve: (name: string) => ResolvedAttribute): Section[] {
     const overview: Row[] = [
         {
             key: "price",
@@ -94,32 +97,26 @@ function buildSections(products: Product[]): Section[] {
         },
     ];
 
-    // Key specs (filterable spec map) — union of keys, in first-seen order.
-    const specKeys: string[] = [];
-    const specLabels = new Map<string, string>();
-    for (const p of products) {
-        for (const key of Object.keys(p.specs ?? {})) {
-            const norm = normalizeSpecKey(key);
-            if (!specLabels.has(norm)) {
-                specLabels.set(norm, key);
-                specKeys.push(norm);
+    // Key specs (filterable spec map) — union of keys in first-seen order, with admin
+    // attribute mappings applied so differently-named specs land on one row.
+    const specRowsByKey = new Map<string, Row>();
+    products.forEach((p, productIndex) => {
+        for (const [name, raw] of Object.entries(p.specs ?? {})) {
+            const value = raw == null ? "" : String(raw).trim();
+            if (!value) continue;
+            const { key, label } = resolve(name);
+            if (!specRowsByKey.has(key)) {
+                specRowsByKey.set(key, { key: `spec:${key}`, label, values: products.map(() => null) });
             }
+            const row = specRowsByKey.get(key)!;
+            row.values[productIndex] = joinValue(row.values[productIndex], value);
         }
-    }
-    const specValue = (p: Product, norm: string): string | null => {
-        for (const [k, v] of Object.entries(p.specs ?? {})) {
-            if (normalizeSpecKey(k) === norm && v != null && String(v).trim()) return String(v);
-        }
-        return null;
-    };
-    const specRows: Row[] = specKeys.map((norm) => ({
-        key: `spec:${norm}`,
-        label: formatLabel(specLabels.get(norm) ?? norm),
-        values: products.map((p) => specValue(p, norm)),
-    }));
+    });
 
-    // Detailed attribute groups — merged by group name, then attribute name.
-    const groups = new Map<string, { title: string; rows: Map<string, { label: string; values: (string | null)[] }> }>();
+    // Other attributes — merged by (mapped) attribute name regardless of which group each
+    // product filed it under; a row is listed under the first group it was seen in.
+    const reservedKeys = new Set([...specRowsByKey.keys(), ...OVERVIEW_KEYS]);
+    const detailRowsByKey = new Map<string, Row & { group: string }>();
     products.forEach((p, productIndex) => {
         const productGroups = p.attributeGroups?.length
             ? p.attributeGroups
@@ -127,31 +124,45 @@ function buildSections(products: Product[]): Section[] {
               ? [{ category: "General", attributes: p.attributes }]
               : [];
         for (const group of productGroups) {
-            const groupKey = (group.category || "General").trim().toLowerCase();
-            if (!groups.has(groupKey)) groups.set(groupKey, { title: formatLabel(group.category || "General"), rows: new Map() });
-            const groupEntry = groups.get(groupKey)!;
             for (const attr of group.attributes ?? []) {
                 if (!attr.name?.trim() || !attr.value?.trim()) continue;
-                const norm = normalizeSpecKey(attr.name);
-                // Already shown under key specs.
-                if (specLabels.has(norm)) continue;
-                if (!groupEntry.rows.has(norm)) {
-                    groupEntry.rows.set(norm, { label: formatLabel(attr.name), values: products.map(() => null) });
+                const { key, label } = resolve(attr.name);
+                if (reservedKeys.has(key)) continue;
+                if (!detailRowsByKey.has(key)) {
+                    detailRowsByKey.set(key, {
+                        key: `attr:${key}`,
+                        label,
+                        group: formatLabel(group.category || "General"),
+                        values: products.map(() => null),
+                    });
                 }
-                const row = groupEntry.rows.get(norm)!;
-                if (row.values[productIndex] == null) row.values[productIndex] = attr.value;
+                const row = detailRowsByKey.get(key)!;
+                row.values[productIndex] = joinValue(row.values[productIndex], attr.value.trim());
             }
         }
     });
 
+    const detailSections = new Map<string, Row[]>();
+    for (const { group, ...row } of detailRowsByKey.values()) {
+        const groupKey = group.toLowerCase();
+        if (!detailSections.has(groupKey)) detailSections.set(groupKey, []);
+        detailSections.get(groupKey)!.push(row);
+    }
+    const groupTitles = new Map(Array.from(detailRowsByKey.values(), (r) => [r.group.toLowerCase(), r.group]));
+
     const sections: Section[] = [];
-    if (specRows.length) sections.push({ title: "Key Specifications", rows: specRows, variant: "key" });
+    if (specRowsByKey.size) sections.push({ title: "Key Specifications", rows: [...specRowsByKey.values()], variant: "key" });
     sections.push({ title: "Overview", rows: overview, variant: "overview" });
-    for (const [groupKey, group] of groups) {
-        const rows = Array.from(group.rows, ([norm, row]) => ({ key: `attr:${groupKey}:${norm}`, ...row }));
-        if (rows.length) sections.push({ title: group.title, rows, variant: "detail" });
+    for (const [groupKey, rows] of detailSections) {
+        sections.push({ title: groupTitles.get(groupKey) ?? groupKey, rows, variant: "detail" });
     }
     return sections;
+}
+
+/** Same attribute listed twice on one product (e.g. in two groups) — keep both distinct values. */
+function joinValue(existing: string | null, next: string): string {
+    if (!existing) return next;
+    return existing.split("\n").includes(next) ? existing : `${existing}\n${next}`;
 }
 
 export default function ComparePageClient() {
@@ -193,7 +204,19 @@ export default function ComparePageClient() {
         failedIds.split(",").forEach(removeFromCompare);
     }, [failedIds, removeFromCompare]);
 
-    const sections = useMemo(() => buildSections(products), [products]);
+    const mainCategoryId = compareItems[0]?.categoryId;
+    const { data: aliasGroups } = useQuery<AttributeAliasGroup[]>({
+        queryKey: ["attribute-aliases", mainCategoryId],
+        queryFn: async () => {
+            const { data } = await api.get(`/products/attribute-aliases/${mainCategoryId}`);
+            return Array.isArray(data?.groups) ? data.groups : [];
+        },
+        enabled: Boolean(mainCategoryId),
+        staleTime: 5 * 60 * 1000,
+    });
+    const resolveAttribute = useMemo(() => buildAttributeResolver(aliasGroups), [aliasGroups]);
+
+    const sections = useMemo(() => buildSections(products, resolveAttribute), [products, resolveAttribute]);
 
     const decoratedSections = useMemo(
         () =>
@@ -217,6 +240,37 @@ export default function ComparePageClient() {
         () => sections.reduce((n, s) => n + s.rows.filter((r) => valuesDiffer(r.values)).length, 0),
         [sections]
     );
+
+    // Compact product name/price bar that pins under the navbar once the product cards scroll away.
+    const productCardsRef = useRef<HTMLDivElement>(null);
+    const scrollRef = useRef<HTMLDivElement>(null);
+    const stickyInnerRef = useRef<HTMLDivElement>(null);
+    const [showStickyBar, setShowStickyBar] = useState(false);
+    const [navHeight, setNavHeight] = useState(0);
+
+    useEffect(() => {
+        const update = () => {
+            const nav = document.querySelector("nav");
+            const navBottom = nav ? nav.getBoundingClientRect().bottom : 0;
+            setNavHeight(Math.max(0, navBottom));
+            const cards = productCardsRef.current;
+            setShowStickyBar(Boolean(cards && cards.getBoundingClientRect().bottom < navBottom + 8));
+        };
+        update();
+        window.addEventListener("scroll", update, { passive: true });
+        window.addEventListener("resize", update);
+        return () => {
+            window.removeEventListener("scroll", update);
+            window.removeEventListener("resize", update);
+        };
+    }, [compareItems.length]);
+
+    // Match the bar's horizontal position to the table when it (re)appears.
+    useEffect(() => {
+        if (showStickyBar && stickyInnerRef.current && scrollRef.current) {
+            stickyInnerRef.current.style.transform = `translateX(-${scrollRef.current.scrollLeft}px)`;
+        }
+    }, [showStickyBar]);
 
     const categoryName = compareItems[0]?.categoryName;
     const categorySlug = compareItems[0]?.categorySlug;
@@ -292,11 +346,59 @@ export default function ComparePageClient() {
                 </div>
             </div>
 
-            <div className="overflow-x-auto pb-2">
+            {showStickyBar && colCount > 0 && (
+                <div
+                    className="fixed inset-x-0 z-40 border-b border-white/[0.08] bg-[#121212]/95 shadow-[0_8px_24px_rgba(0,0,0,0.45)] backdrop-blur"
+                    style={{ top: navHeight }}
+                >
+                    <div className="mx-auto w-full max-w-[1920px] overflow-hidden px-4 sm:px-6 lg:px-10">
+                        <div ref={stickyInnerRef} className="grid min-w-fit py-2" style={gridStyle}>
+                            <div className="flex items-center pr-3 text-xs text-[#8E8E8E]">
+                                Comparing {colCount} products
+                            </div>
+                            {columns.map(({ item, product }) => (
+                                <Link
+                                    key={item._id}
+                                    href={`/product/${item.slug || item._id}`}
+                                    className="flex min-w-0 items-center gap-2.5 border-l border-white/[0.06] px-3"
+                                >
+                                    <span className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-[#0e0e0e]">
+                                        <Image
+                                            src={product.images?.[0] || "/placeholder.svg"}
+                                            alt=""
+                                            fill
+                                            sizes="40px"
+                                            className="object-cover"
+                                        />
+                                    </span>
+                                    <span className="min-w-0">
+                                        <span className="block truncate text-xs font-semibold text-[#E6E6E6]" title={product.title}>
+                                            {product.title}
+                                        </span>
+                                        <span className="block text-sm font-extrabold tabular-nums text-[#F1F1F1]">
+                                            LKR {getEffectivePrice(product).toLocaleString()}
+                                        </span>
+                                    </span>
+                                </Link>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <div
+                ref={scrollRef}
+                className="overflow-x-auto pb-2"
+                onScroll={(e) => {
+                    if (stickyInnerRef.current) {
+                        stickyInnerRef.current.style.transform = `translateX(-${e.currentTarget.scrollLeft}px)`;
+                    }
+                }}
+            >
                 <div className="min-w-fit space-y-10">
-                    {/* Product cards */}
-                    <div className="grid gap-3 sm:gap-4" style={gridStyle}>
-                        <div className="sticky left-0 z-10 flex flex-col justify-end gap-3 rounded-2xl border border-white/[0.07] bg-[#121212] p-4 text-xs text-[#8E8E8E]">
+                    {/* Product cards — one column each, separated */}
+                    <div ref={productCardsRef} className="grid" style={gridStyle}>
+                        <div className="sticky left-0 z-10 flex flex-col justify-end gap-3 bg-background pb-1 pr-3 text-xs text-[#8E8E8E]">
                             <span className="inline-flex items-center gap-2">
                                 <span className="inline-block h-3 w-3 rounded-sm border border-emerald-500/60 bg-emerald-500/20" />
                                 Better spec
@@ -310,19 +412,20 @@ export default function ComparePageClient() {
                             )}
                         </div>
                         {columns.map(({ item, product }) => (
-                            <CompareProductCard
-                                key={item._id}
-                                product={product}
-                                href={`/product/${item.slug || item._id}`}
-                                onRemove={() => removeFromCompare(item._id)}
-                                onAddToCart={() => {
-                                    addToCart(
-                                        { ...product, price: getEffectivePrice(product), availability: getAvailability(product) },
-                                        1
-                                    );
-                                    toast.success("Added to cart");
-                                }}
-                            />
+                            <div key={item._id} className="min-w-0 px-1.5 sm:px-2">
+                                <CompareProductCard
+                                    product={product}
+                                    href={`/product/${item.slug || item._id}`}
+                                    onRemove={() => removeFromCompare(item._id)}
+                                    onAddToCart={() => {
+                                        addToCart(
+                                            { ...product, price: getEffectivePrice(product), availability: getAvailability(product) },
+                                            1
+                                        );
+                                        toast.success("Added to cart");
+                                    }}
+                                />
+                            </div>
                         ))}
                     </div>
 
@@ -332,18 +435,21 @@ export default function ComparePageClient() {
                         </p>
                     ) : (
                         <>
-                            {/* Key specifications — tile layout, kept apart from the detail table */}
+                            {/* Key specifications — one highlighted panel */}
                             {keyRows.length > 0 && (
-                                <section>
-                                    <BlockHeading eyebrow="At a glance" title="Key Specifications" accent />
-                                    <div className="space-y-2.5">
+                                <section className="overflow-hidden rounded-2xl border border-[#D12B28]/30 bg-[#141110] shadow-[0_0_0_1px_rgba(209,43,40,0.05),inset_0_1px_0_rgba(255,255,255,0.04)]">
+                                    <div className="border-b border-[#D12B28]/25 bg-gradient-to-r from-[#D12B28]/25 via-[#D12B28]/10 to-transparent px-4 py-3 sm:px-5">
+                                        <div className="sticky left-5 w-fit">
+                                            <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.22em] text-[#F1A9A7]">
+                                                At a glance
+                                            </span>
+                                            <h2 className="text-lg font-bold tracking-tight text-[#F1F1F1] sm:text-xl">Key Specifications</h2>
+                                        </div>
+                                    </div>
+                                    <div className="divide-y divide-white/[0.06]">
                                         {keyRows.map((row) => (
-                                            <div
-                                                key={row.key}
-                                                className="grid items-stretch gap-3 rounded-2xl border border-white/[0.07] bg-gradient-to-r from-[#1c1716] to-[#141414] p-2.5 sm:gap-4"
-                                                style={gridStyle}
-                                            >
-                                                <div className="sticky left-0 z-10 flex items-center gap-2 rounded-xl bg-[#1c1716] px-3 py-2">
+                                            <div key={row.key} className="grid transition-colors hover:bg-white/[0.02]" style={gridStyle}>
+                                                <div className="sticky left-0 z-10 flex items-center gap-2 bg-[#141110] px-4 py-3.5 sm:px-5">
                                                     {row.differs && colCount > 1 && (
                                                         <span className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400" title="Values differ" />
                                                     )}
@@ -354,19 +460,15 @@ export default function ComparePageClient() {
                                                     return (
                                                         <div
                                                             key={i}
-                                                            className={`relative flex min-h-[3.25rem] items-center justify-center rounded-xl border px-3 py-2.5 text-center text-sm font-semibold sm:text-[15px] ${
-                                                                isBest
-                                                                    ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-300"
-                                                                    : "border-white/[0.06] bg-[#121212] text-[#E6E6E6]"
+                                                            className={`flex min-w-0 items-center gap-1.5 border-l border-white/[0.06] px-4 py-3.5 text-sm font-semibold sm:text-[15px] ${
+                                                                isBest ? "bg-emerald-500/10 text-emerald-300" : "text-[#E6E6E6]"
                                                             }`}
                                                         >
-                                                            {isBest && (
-                                                                <Check className="absolute right-2 top-2 h-3.5 w-3.5 text-emerald-400" aria-label="Better" />
-                                                            )}
+                                                            {isBest && <Check className="h-4 w-4 shrink-0 text-emerald-400" aria-label="Better" />}
                                                             {value == null || value === "" ? (
                                                                 <span className="font-normal text-[#5E5E5E]">—</span>
                                                             ) : (
-                                                                <span className="whitespace-pre-line break-words">{value}</span>
+                                                                <span className="min-w-0 whitespace-pre-line break-words">{value}</span>
                                                             )}
                                                         </div>
                                                     );
@@ -516,10 +618,10 @@ function DetailSection({
                 {section.rows.map((row) => (
                     <div
                         key={row.key}
-                        className="grid gap-3 px-4 py-3 text-sm transition-colors hover:bg-white/[0.02] sm:gap-4 sm:px-5"
+                        className="grid text-sm transition-colors hover:bg-white/[0.02]"
                         style={gridStyle}
                     >
-                        <div className="sticky left-0 z-10 flex items-start gap-1.5 bg-[#121212] font-medium text-[#8E8E8E]">
+                        <div className="sticky left-0 z-10 flex items-start gap-1.5 bg-[#121212] px-4 py-3 font-medium text-[#8E8E8E] sm:px-5">
                             {row.differs && colCount > 1 && (
                                 <span className="mt-1.5 inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400" title="Values differ" />
                             )}
@@ -530,8 +632,8 @@ function DetailSection({
                             return (
                                 <div
                                     key={i}
-                                    className={`flex min-w-0 items-start gap-1.5 whitespace-pre-line break-words leading-relaxed ${
-                                        isBest ? "font-semibold text-emerald-300" : "text-[#D4D4D4]"
+                                    className={`flex min-w-0 items-start gap-1.5 whitespace-pre-line break-words border-l border-white/[0.06] px-4 py-3 leading-relaxed ${
+                                        isBest ? "bg-emerald-500/[0.07] font-semibold text-emerald-300" : "text-[#D4D4D4]"
                                     }`}
                                 >
                                     {isBest && <Check className="mt-1 h-3.5 w-3.5 shrink-0 text-emerald-400" aria-label="Better" />}

@@ -73,18 +73,86 @@ function notFoundResponse(): NextResponse {
     });
 }
 
-async function productSlugExists(slug: string): Promise<boolean> {
+/**
+ * Every matched request runs this proxy before the CDN cache is consulted, so a
+ * per-request `exists()` query made each cached product/category view cost a DB
+ * round trip (and often a fresh Mongo connection) — the bulk of our Fluid CPU.
+ * Instead, each instance keeps the active slug sets in memory and reloads them at
+ * most every SLUG_CACHE_TTL_MS. A miss still falls back to a direct query, so
+ * products/categories created since the last load are never wrongly 404'd; only
+ * genuinely unknown URLs pay for a query.
+ */
+const SLUG_CACHE_TTL_MS = 10 * 60 * 1000;
+
+type SlugCache = { loadedAt: number; values: Set<string> };
+
+let productSlugCache: SlugCache | null = null;
+let productSlugLoad: Promise<SlugCache> | null = null;
+let categorySlugCache: SlugCache | null = null;
+let categorySlugLoad: Promise<SlugCache> | null = null;
+
+async function loadProductSlugs(): Promise<SlugCache> {
     await ensureDb();
+    const docs = await Product.find({ isActive: true })
+        .select("_id slug")
+        .lean<{ _id: unknown; slug?: string }[]>();
+    const values = new Set<string>();
+    for (const doc of docs) {
+        values.add(String(doc._id));
+        if (doc.slug) values.add(doc.slug);
+    }
+    return { loadedAt: Date.now(), values };
+}
+
+async function loadCategorySlugs(): Promise<SlugCache> {
+    await ensureDb();
+    const docs = await Category.find({ isActive: true }).select("slug").lean<{ slug?: string }[]>();
+    const values = new Set<string>();
+    for (const doc of docs) {
+        if (doc.slug) values.add(doc.slug.toLowerCase());
+    }
+    return { loadedAt: Date.now(), values };
+}
+
+async function getProductSlugs(): Promise<Set<string>> {
+    if (productSlugCache && Date.now() - productSlugCache.loadedAt < SLUG_CACHE_TTL_MS) {
+        return productSlugCache.values;
+    }
+    productSlugLoad ??= loadProductSlugs().finally(() => {
+        productSlugLoad = null;
+    });
+    productSlugCache = await productSlugLoad;
+    return productSlugCache.values;
+}
+
+async function getCategorySlugs(): Promise<Set<string>> {
+    if (categorySlugCache && Date.now() - categorySlugCache.loadedAt < SLUG_CACHE_TTL_MS) {
+        return categorySlugCache.values;
+    }
+    categorySlugLoad ??= loadCategorySlugs().finally(() => {
+        categorySlugLoad = null;
+    });
+    categorySlugCache = await categorySlugLoad;
+    return categorySlugCache.values;
+}
+
+async function productSlugExists(slug: string): Promise<boolean> {
+    if ((await getProductSlugs()).has(slug)) return true;
+    // Miss: may be a product created/reactivated since the last load.
     const query = isObjectIdString(slug)
         ? { _id: slug, isActive: true }
         : { slug, isActive: true };
-    return (await Product.exists(query)) != null;
+    const exists = (await Product.exists(query)) != null;
+    if (exists) productSlugCache?.values.add(slug);
+    return exists;
 }
 
 async function categorySlugExists(categorySlug: string): Promise<boolean> {
-    await ensureDb();
     const slug = decodeURIComponent(categorySlug).trim().toLowerCase();
-    return (await Category.exists({ slug, isActive: true })) != null;
+    if ((await getCategorySlugs()).has(slug)) return true;
+    const exists = (await Category.exists({ slug, isActive: true })) != null;
+    if (exists) categorySlugCache?.values.add(slug);
+    return exists;
 }
 
 async function handleProduct(request: NextRequest) {
