@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Check, Link2, Save, Search, Sparkles, Trash2, X } from "lucide-react";
+import { Check, Link2, Plus, Save, Search, Sparkles, Trash2, X } from "lucide-react";
 import api from "@/lib/api";
 import PopupDialog from "@/components/PopupDialog";
 import PageHeader from "@/components/admin/PageHeader";
-import { attributeMatchKey, type AttributeAliasGroup } from "@/lib/attributeMatchKey";
+import { attributeLooseKey, attributeMatchKey, type AttributeAliasGroup } from "@/lib/attributeMatchKey";
 import { attributeSimilarity, clusterSimilarNames, SUGGESTION_THRESHOLD } from "@/lib/attributeSimilarity";
 
 interface Category {
@@ -53,6 +53,8 @@ export default function AttributeMappingAdmin() {
     const [mergeName, setMergeName] = useState("");
     const [dismissed, setDismissed] = useState<Set<string>>(new Set());
     const [suggestionNames, setSuggestionNames] = useState<Record<string, string>>({});
+    const [mappingSearch, setMappingSearch] = useState("");
+    const [newMappingName, setNewMappingName] = useState("");
     const [popupInfo, setPopupInfo] = useState<{ title: string; message: string; tone: "success" | "danger" } | null>(null);
 
     const mainCategories = useMemo(
@@ -108,14 +110,23 @@ export default function AttributeMappingAdmin() {
     /** match key -> index of the mapping that owns it */
     const ownerByKey = useMemo(() => {
         const map = new Map<string, number>();
+        const loose = new Map<string, number>();
         groups.forEach((group, index) => {
             for (const alias of [group.canonical, ...group.aliases]) {
                 const key = attributeMatchKey(alias);
                 if (key && !map.has(key)) map.set(key, index);
+                const looseKey = attributeLooseKey(alias);
+                if (looseKey && !loose.has(looseKey)) loose.set(looseKey, index);
             }
         });
+        // Names the compare page merges automatically (plural / bracketed note) count as mapped too.
+        for (const attr of attributes) {
+            if (map.has(attr.key)) continue;
+            const index = loose.get(attributeLooseKey(attr.name));
+            if (index != null) map.set(attr.key, index);
+        }
         return map;
-    }, [groups]);
+    }, [groups, attributes]);
 
     const suggestions = useMemo<Suggestion[]>(() => {
         const clusters = clusterSimilarNames(attributes.map((a) => a.name));
@@ -192,6 +203,29 @@ export default function AttributeMappingAdmin() {
         updateGroups([...remaining, merged]);
     };
 
+    /** Move `names` into the mapping at `index`, taking them out of any other mapping. */
+    const addNamesToGroup = (index: number, names: string[]) => {
+        const keys = new Set(names.map(attributeMatchKey).filter(Boolean));
+        if (keys.size === 0) return;
+        const next = groups
+            .map((g, i) => {
+                if (i === index) {
+                    const existing = new Set(g.aliases.map(attributeMatchKey));
+                    return { ...g, aliases: [...g.aliases, ...names.filter((n) => !existing.has(attributeMatchKey(n)))] };
+                }
+                return { ...g, aliases: g.aliases.filter((a) => !keys.has(attributeMatchKey(a))) };
+            })
+            .filter((g, i) => i === index || g.aliases.length > 0);
+        updateGroups(next);
+    };
+
+    const addNewMapping = () => {
+        const name = newMappingName.trim();
+        if (!name) return;
+        updateGroups([{ canonical: name, aliases: [name] }, ...groups]);
+        setNewMappingName("");
+    };
+
     const acceptSuggestion = (s: Suggestion) => {
         const names = s.keys.map((k) => attrByKey.get(k)?.name ?? k);
         mergeNames(names, suggestionNames[s.signature] ?? s.canonical);
@@ -214,18 +248,13 @@ export default function AttributeMappingAdmin() {
             const { data } = await api.put(`/admin/categories/${selectedCategory}/attribute-aliases`, { groups });
             setGroups(data.groups ?? []);
             setDirty(false);
-            setPopupInfo({ title: "Saved", message: "Attribute mappings saved. The compare page will use them within a minute.", tone: "success" });
+            setPopupInfo({ title: "Saved", message: "Attribute mappings saved. The compare page uses them right away.", tone: "success" });
         } catch (err) {
             console.error("Save failed", err);
             setPopupInfo({ title: "Save failed", message: "An error occurred while saving the mappings.", tone: "danger" });
         } finally {
             setSaving(false);
         }
-    };
-
-    const describe = (name: string) => {
-        const attr = attrByKey.get(attributeMatchKey(name));
-        return attr ? `${attr.productCount} product${attr.productCount === 1 ? "" : "s"}` : "not used yet";
     };
 
     return (
@@ -276,6 +305,87 @@ export default function AttributeMappingAdmin() {
             {selectedCategory && !loading && (
                 <div className="grid gap-8 lg:grid-cols-[1fr_1fr]">
                     <div className="space-y-8">
+                        {/* Mapped attributes */}
+                        <section className="admin-card rounded-xl p-6">
+                            <h2 className="mb-1 flex items-center gap-2 text-lg font-bold text-main">
+                                <Link2 className="h-5 w-5 text-accent" /> Mapped attributes ({groups.length})
+                            </h2>
+                            <p className="mb-4 text-xs text-sub">
+                                Each mapping is shown as one row on the compare page. Rename it, add more names to it, or remove names.
+                            </p>
+                            <div className="mb-4 flex gap-2">
+                                <input
+                                    type="text"
+                                    value={newMappingName}
+                                    onChange={(e) => setNewMappingName(e.target.value)}
+                                    onKeyDown={(e) => e.key === "Enter" && addNewMapping()}
+                                    placeholder="New mapping name (e.g. Terabytes Written)"
+                                    className="min-w-0 flex-1 rounded-lg border border-border-soft bg-surface px-3 py-2 text-sm text-main"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={addNewMapping}
+                                    disabled={!newMappingName.trim()}
+                                    className="flex items-center gap-1.5 rounded-lg bg-accent/20 px-3 py-2 text-sm font-medium text-accent hover:bg-accent/30 disabled:opacity-50"
+                                >
+                                    <Plus className="h-4 w-4" /> New mapping
+                                </button>
+                            </div>
+                            {groups.length > 4 && (
+                                <div className="relative mb-3">
+                                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-sub" />
+                                    <input
+                                        type="text"
+                                        value={mappingSearch}
+                                        onChange={(e) => setMappingSearch(e.target.value)}
+                                        placeholder="Search mappings…"
+                                        className="w-full rounded-lg border border-border-soft bg-surface py-2 pl-9 pr-3 text-sm text-main"
+                                    />
+                                </div>
+                            )}
+                            {groups.length === 0 ? (
+                                <p className="py-4 text-center text-sm text-sub">No mappings yet.</p>
+                            ) : (
+                                <div className="space-y-3">
+                                    {groups.map((group, index) => {
+                                        const q = mappingSearch.trim().toLowerCase();
+                                        if (
+                                            q &&
+                                            !group.canonical.toLowerCase().includes(q) &&
+                                            !group.aliases.some((a) => a.toLowerCase().includes(q))
+                                        ) {
+                                            return null;
+                                        }
+                                        return (
+                                            <MappingCard
+                                                key={index}
+                                                group={group}
+                                                index={index}
+                                                groups={groups}
+                                                attributes={attributes}
+                                                attrByKey={attrByKey}
+                                                ownerByKey={ownerByKey}
+                                                onRename={(name) =>
+                                                    updateGroups(groups.map((g, i) => (i === index ? { ...g, canonical: name } : g)))
+                                                }
+                                                onDelete={() => updateGroups(groups.filter((_, i) => i !== index))}
+                                                onRemoveAlias={(alias) =>
+                                                    updateGroups(
+                                                        groups
+                                                            .map((g, i) =>
+                                                                i === index ? { ...g, aliases: g.aliases.filter((a) => a !== alias) } : g
+                                                            )
+                                                            .filter((g) => g.aliases.length > 0)
+                                                    )
+                                                }
+                                                onAddNames={(names) => addNamesToGroup(index, names)}
+                                            />
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </section>
+
                         {/* Suggestions */}
                         <section className="admin-card rounded-xl p-6">
                             <h2 className="mb-1 flex items-center gap-2 text-lg font-bold text-main">
@@ -340,71 +450,6 @@ export default function AttributeMappingAdmin() {
                                 </div>
                             )}
                         </section>
-
-                        {/* Existing mappings */}
-                        <section className="admin-card rounded-xl p-6">
-                            <h2 className="mb-1 flex items-center gap-2 text-lg font-bold text-main">
-                                <Link2 className="h-5 w-5 text-accent" /> Mappings ({groups.length})
-                            </h2>
-                            <p className="mb-4 text-xs text-sub">Each mapping is shown as one row on the compare page.</p>
-                            {groups.length === 0 ? (
-                                <p className="py-4 text-center text-sm text-sub">No mappings yet.</p>
-                            ) : (
-                                <div className="space-y-3">
-                                    {groups.map((group, index) => (
-                                        <div key={index} className="rounded-lg border border-accent/30 bg-accent/5 p-3">
-                                            <div className="mb-2 flex items-center gap-2">
-                                                <input
-                                                    type="text"
-                                                    value={group.canonical}
-                                                    onChange={(e) =>
-                                                        updateGroups(groups.map((g, i) => (i === index ? { ...g, canonical: e.target.value } : g)))
-                                                    }
-                                                    className="min-w-0 flex-1 rounded-lg border border-border-soft bg-surface px-3 py-1.5 text-sm font-semibold text-main"
-                                                    aria-label="Name shown on compare page"
-                                                />
-                                                <button
-                                                    type="button"
-                                                    onClick={() => updateGroups(groups.filter((_, i) => i !== index))}
-                                                    className="rounded p-1.5 text-danger transition-colors hover:bg-danger/10"
-                                                    title="Delete mapping"
-                                                >
-                                                    <Trash2 className="h-4 w-4" />
-                                                </button>
-                                            </div>
-                                            <div className="flex flex-wrap gap-1.5">
-                                                {group.aliases.map((alias) => (
-                                                    <span
-                                                        key={alias}
-                                                        className="inline-flex items-center gap-1 rounded-md border border-border-soft bg-surface px-2 py-1 text-xs text-main"
-                                                        title={describe(alias)}
-                                                    >
-                                                        {alias}
-                                                        <span className="text-sub">({attrByKey.get(attributeMatchKey(alias))?.productCount ?? 0})</span>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() =>
-                                                                updateGroups(
-                                                                    groups
-                                                                        .map((g, i) =>
-                                                                            i === index ? { ...g, aliases: g.aliases.filter((a) => a !== alias) } : g
-                                                                        )
-                                                                        .filter((g) => g.aliases.length > 0)
-                                                                )
-                                                            }
-                                                            className="text-sub hover:text-danger"
-                                                            aria-label={`Remove ${alias}`}
-                                                        >
-                                                            <X className="h-3 w-3" />
-                                                        </button>
-                                                    </span>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </section>
                     </div>
 
                     {/* All attribute names */}
@@ -455,6 +500,26 @@ export default function AttributeMappingAdmin() {
                                         Clear
                                     </button>
                                 </div>
+                                {groups.length > 0 && (
+                                    <select
+                                        value=""
+                                        onChange={(e) => {
+                                            if (e.target.value === "") return;
+                                            addNamesToGroup(Number(e.target.value), selectedAttrs.map((a) => a.name));
+                                            setSelectedKeys([]);
+                                            setMergeName("");
+                                        }}
+                                        className="mt-2 w-full rounded-lg border border-border-soft bg-surface px-3 py-1.5 text-sm text-main [&>option]:text-white"
+                                        aria-label="Add selected to an existing mapping"
+                                    >
+                                        <option value="">…or add selected to an existing mapping</option>
+                                        {groups.map((g, i) => (
+                                            <option key={i} value={i}>
+                                                {g.canonical}
+                                            </option>
+                                        ))}
+                                    </select>
+                                )}
                             </div>
                         )}
 
@@ -522,6 +587,163 @@ export default function AttributeMappingAdmin() {
                 onClose={() => setPopupInfo(null)}
                 onConfirm={() => setPopupInfo(null)}
             />
+        </div>
+    );
+}
+
+function MappingCard({
+    group,
+    index,
+    groups,
+    attributes,
+    attrByKey,
+    ownerByKey,
+    onRename,
+    onDelete,
+    onRemoveAlias,
+    onAddNames,
+}: {
+    group: AttributeAliasGroup;
+    index: number;
+    groups: AttributeAliasGroup[];
+    attributes: AttributeInfo[];
+    attrByKey: Map<string, AttributeInfo>;
+    ownerByKey: Map<string, number>;
+    onRename: (name: string) => void;
+    onDelete: () => void;
+    onRemoveAlias: (alias: string) => void;
+    onAddNames: (names: string[]) => void;
+}) {
+    const [query, setQuery] = useState("");
+    const [open, setOpen] = useState(false);
+
+    const ownKeys = useMemo(() => new Set(group.aliases.map(attributeMatchKey)), [group.aliases]);
+
+    /** Attribute names not in this mapping: typed matches first, otherwise the most similar ones. */
+    const candidates = useMemo(() => {
+        const q = query.trim().toLowerCase();
+        const names = [group.canonical, ...group.aliases];
+        return attributes
+            .filter((a) => !ownKeys.has(a.key))
+            .map((a) => ({
+                attr: a,
+                score: Math.max(...names.map((n) => attributeSimilarity(n, a.name).score)),
+            }))
+            .filter(({ attr, score }) =>
+                q ? attr.name.toLowerCase().includes(q) || attr.variants.some((v) => v.toLowerCase().includes(q)) : score >= 0.5
+            )
+            .sort((x, y) => y.score - x.score || y.attr.productCount - x.attr.productCount)
+            .slice(0, 8);
+    }, [attributes, group.aliases, group.canonical, ownKeys, query]);
+
+    const typed = query.trim();
+    const typedIsNew = Boolean(typed) && !ownKeys.has(attributeMatchKey(typed)) && !attrByKey.has(attributeMatchKey(typed));
+
+    const add = (name: string) => {
+        onAddNames([name]);
+        setQuery("");
+    };
+
+    return (
+        <div className="rounded-lg border border-accent/30 bg-accent/5 p-3">
+            <div className="mb-2 flex items-center gap-2">
+                <input
+                    type="text"
+                    value={group.canonical}
+                    onChange={(e) => onRename(e.target.value)}
+                    className="min-w-0 flex-1 rounded-lg border border-border-soft bg-surface px-3 py-1.5 text-sm font-semibold text-main"
+                    aria-label="Name shown on compare page"
+                />
+                <button
+                    type="button"
+                    onClick={onDelete}
+                    className="rounded p-1.5 text-danger transition-colors hover:bg-danger/10"
+                    title="Delete mapping"
+                >
+                    <Trash2 className="h-4 w-4" />
+                </button>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+                {group.aliases.map((alias) => (
+                    <span
+                        key={alias}
+                        className="inline-flex items-center gap-1 rounded-md border border-border-soft bg-surface px-2 py-1 text-xs text-main"
+                        title={attrByKey.get(attributeMatchKey(alias))?.samples.join(" · ")}
+                    >
+                        {alias}
+                        <span className="text-sub">({attrByKey.get(attributeMatchKey(alias))?.productCount ?? 0})</span>
+                        <button
+                            type="button"
+                            onClick={() => onRemoveAlias(alias)}
+                            className="text-sub hover:text-danger"
+                            aria-label={`Remove ${alias}`}
+                        >
+                            <X className="h-3 w-3" />
+                        </button>
+                    </span>
+                ))}
+            </div>
+
+            <div className="relative mt-2">
+                <input
+                    type="text"
+                    value={query}
+                    onChange={(e) => {
+                        setQuery(e.target.value);
+                        setOpen(true);
+                    }}
+                    onFocus={() => setOpen(true)}
+                    onBlur={() => setOpen(false)}
+                    onKeyDown={(e) => {
+                        if (e.key === "Enter" && typed) {
+                            e.preventDefault();
+                            add(candidates[0]?.attr.name ?? typed);
+                        }
+                    }}
+                    placeholder="+ Add attribute to this mapping…"
+                    className="w-full rounded-lg border border-dashed border-border-soft bg-transparent px-3 py-1.5 text-xs text-main placeholder:text-sub focus:border-accent"
+                />
+                {open && (candidates.length > 0 || typedIsNew) && (
+                    <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-64 overflow-y-auto rounded-lg border border-border-soft bg-surface p-1 shadow-xl">
+                        {!typed && (
+                            <p className="px-2 pb-1 pt-0.5 text-[10px] font-semibold uppercase tracking-wide text-sub">Similar names</p>
+                        )}
+                        {candidates.map(({ attr, score }) => {
+                            const owner = ownerByKey.get(attr.key);
+                            return (
+                                <button
+                                    key={attr.key}
+                                    type="button"
+                                    onMouseDown={(e) => e.preventDefault()}
+                                    onClick={() => add(attr.name)}
+                                    className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-main hover:bg-panel"
+                                >
+                                    <span className="min-w-0 flex-1 truncate">{attr.name}</span>
+                                    <span className="shrink-0 text-sub">{attr.productCount}</span>
+                                    {score >= SUGGESTION_THRESHOLD && (
+                                        <span className="shrink-0 rounded bg-warning/15 px-1 text-[10px] font-semibold uppercase text-warning">
+                                            Similar
+                                        </span>
+                                    )}
+                                    {owner != null && owner !== index && (
+                                        <span className="shrink-0 text-[10px] text-sub">moves from “{groups[owner]?.canonical}”</span>
+                                    )}
+                                </button>
+                            );
+                        })}
+                        {typedIsNew && (
+                            <button
+                                type="button"
+                                onMouseDown={(e) => e.preventDefault()}
+                                onClick={() => add(typed)}
+                                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-accent hover:bg-panel"
+                            >
+                                <Plus className="h-3 w-3" /> Add “{typed}” (not used by any product yet)
+                            </button>
+                        )}
+                    </div>
+                )}
+            </div>
         </div>
     );
 }

@@ -14,8 +14,6 @@ const updateAliasesSchema = z.object({
     })).max(500),
 });
 
-const PUBLIC_ALIAS_CACHE_CONTROL = 'public, s-maxage=60, stale-while-revalidate=300';
-
 function paramOf(req: Request, name: string): string {
     const raw = req.params[name];
     return Array.isArray(raw) ? raw[0] ?? '' : raw ?? '';
@@ -77,17 +75,38 @@ function sanitizeGroups(groups: { canonical: string; aliases: string[] }[]) {
     return out;
 }
 
-/** GET /products/attribute-aliases/:categoryId — public, used by the compare page. */
+/**
+ * GET /products/attribute-aliases?categoryIds=a,b,c   (or /products/attribute-aliases/:categoryId)
+ * Public, used by the compare page. Each id is walked up to its main category, so the
+ * caller can pass any category the compared products belong to.
+ */
 export const getPublicAttributeAliases = async (req: Request, res: Response) => {
     try {
-        const categoryId = paramOf(req, 'categoryId');
-        res.set('Cache-Control', PUBLIC_ALIAS_CACHE_CONTROL);
-        if (!mongoose.isValidObjectId(categoryId)) {
+        res.set('Cache-Control', 'no-store');
+        const fromQuery = typeof req.query.categoryIds === 'string' ? req.query.categoryIds.split(',') : [];
+        const requested = [...fromQuery, paramOf(req, 'categoryId')]
+            .map((id) => id.trim())
+            .filter((id) => mongoose.isValidObjectId(id));
+        if (requested.length === 0) {
             res.json({ groups: [] });
             return;
         }
-        const config = await CategoryAttributeAlias.findOne({ categoryId }).lean();
-        res.json({ groups: config?.groups ?? [] });
+
+        const all = await Category.find({}, '_id parentId').lean<{ _id: mongoose.Types.ObjectId; parentId?: mongoose.Types.ObjectId | null }[]>();
+        const parentOf = new Map(all.map((c) => [String(c._id), c.parentId ? String(c.parentId) : null]));
+        const roots = new Set<string>();
+        for (const id of requested) {
+            let current: string | null = id;
+            const seen = new Set<string>();
+            while (current && parentOf.get(current) && !seen.has(current)) {
+                seen.add(current);
+                current = parentOf.get(current) ?? null;
+            }
+            if (current) roots.add(current);
+        }
+
+        const configs = await CategoryAttributeAlias.find({ categoryId: { $in: [...roots] } }).lean();
+        res.json({ groups: configs.flatMap((c) => c.groups ?? []) });
     } catch (error) {
         res.status(500).json({ message: (error as Error).message });
     }

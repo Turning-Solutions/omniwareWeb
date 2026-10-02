@@ -5,15 +5,15 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useQueries, useQuery } from "@tanstack/react-query";
-import { Check, GitCompareArrows, Plus, ShoppingCart, Trash2, X } from "lucide-react";
+import { GitCompareArrows, Plus, ShoppingCart, Trash2, X } from "lucide-react";
 import toast from "react-hot-toast";
 import api from "@/lib/api";
 import type { Product } from "@/hooks/useProducts";
-import { useCompare } from "@/context/CompareContext";
+import { MAX_COMPARE_ITEMS, useCompare } from "@/context/CompareContext";
 import { useCart } from "@/context/CartContext";
 import { buildAttributeResolver, type AttributeAliasGroup, type ResolvedAttribute } from "@/lib/attributeMatchKey";
 import { getCombinedWarrantyLabel } from "@/lib/warranty";
-import { getBestValueIndexes, valuesDiffer, type SpecDirection } from "@/lib/compareSpecs";
+import { valuesDiffer, type SpecDirection } from "@/lib/compareSpecs";
 
 type Row = {
     key: string;
@@ -30,7 +30,7 @@ type SectionVariant = "key" | "overview" | "detail";
 
 type Section = { title: string; rows: Row[]; variant: SectionVariant };
 
-type DecoratedRow = Row & { differs: boolean; best: Set<number> };
+type DecoratedRow = Row & { differs: boolean };
 
 const AVAILABILITY_LABELS: Record<string, string> = {
     in_stock: "In stock",
@@ -204,15 +204,26 @@ export default function ComparePageClient() {
         failedIds.split(",").forEach(removeFromCompare);
     }, [failedIds, removeFromCompare]);
 
-    const mainCategoryId = compareItems[0]?.categoryId;
+    // Every category the compared products sit in — the API maps each to its main category.
+    const aliasCategoryIds = useMemo(() => {
+        const ids = new Set<string>();
+        if (compareItems[0]?.categoryId) ids.add(compareItems[0].categoryId);
+        for (const p of products) {
+            for (const ref of p.categoryIds ?? []) {
+                const id = typeof ref === "string" ? ref : ref?._id;
+                if (id) ids.add(String(id));
+            }
+        }
+        return [...ids].sort().join(",");
+    }, [compareItems, products]);
     const { data: aliasGroups } = useQuery<AttributeAliasGroup[]>({
-        queryKey: ["attribute-aliases", mainCategoryId],
+        queryKey: ["attribute-aliases", aliasCategoryIds],
         queryFn: async () => {
-            const { data } = await api.get(`/products/attribute-aliases/${mainCategoryId}`);
+            const { data } = await api.get(`/products/attribute-aliases?categoryIds=${encodeURIComponent(aliasCategoryIds)}`);
             return Array.isArray(data?.groups) ? data.groups : [];
         },
-        enabled: Boolean(mainCategoryId),
-        staleTime: 5 * 60 * 1000,
+        enabled: Boolean(aliasCategoryIds),
+        staleTime: 0,
     });
     const resolveAttribute = useMemo(() => buildAttributeResolver(aliasGroups), [aliasGroups]);
 
@@ -228,7 +239,6 @@ export default function ComparePageClient() {
                         .map((row) => ({
                             ...row,
                             differs: valuesDiffer(row.values),
-                            best: getBestValueIndexes(row.label, row.values, row.direction),
                         }))
                         .filter((row) => !differencesOnly || row.differs),
                 }))
@@ -297,7 +307,8 @@ export default function ComparePageClient() {
     const colCount = columns.length;
     // Every block uses the same column template so product cards, spec tiles and detail rows line up.
     const gridStyle: CSSProperties = {
-        gridTemplateColumns: `minmax(8.5rem, 13rem) repeat(${Math.max(colCount, 1)}, minmax(12rem, 1fr))`,
+        // Columns are always sized as if 5 products were shown, so fewer products don't blow up the images.
+        gridTemplateColumns: `minmax(8.5rem, 13rem) repeat(${Math.max(colCount, 1)}, minmax(12rem, calc((100% - 13rem) / ${MAX_COMPARE_ITEMS})))`,
     };
     const keyRows = decoratedSections.filter((s) => s.variant === "key").flatMap((s) => s.rows);
     const detailSections = decoratedSections.filter((s) => s.variant !== "key");
@@ -400,10 +411,6 @@ export default function ComparePageClient() {
                     <div ref={productCardsRef} className="grid" style={gridStyle}>
                         <div className="sticky left-0 z-10 flex flex-col justify-end gap-3 bg-background pb-1 pr-3 text-xs text-[#8E8E8E]">
                             <span className="inline-flex items-center gap-2">
-                                <span className="inline-block h-3 w-3 rounded-sm border border-emerald-500/60 bg-emerald-500/20" />
-                                Better spec
-                            </span>
-                            <span className="inline-flex items-center gap-2">
                                 <span className="inline-block h-2 w-2 rounded-full bg-amber-400" />
                                 Values differ
                             </span>
@@ -456,15 +463,11 @@ export default function ComparePageClient() {
                                                     <span className="text-sm font-semibold text-[#E6E6E6]">{row.label}</span>
                                                 </div>
                                                 {row.values.map((value, i) => {
-                                                    const isBest = row.best.has(i);
                                                     return (
                                                         <div
                                                             key={i}
-                                                            className={`flex min-w-0 items-center gap-1.5 border-l border-white/[0.06] px-4 py-3.5 text-sm font-semibold sm:text-[15px] ${
-                                                                isBest ? "bg-emerald-500/10 text-emerald-300" : "text-[#E6E6E6]"
-                                                            }`}
+                                                            className="flex min-w-0 items-center gap-1.5 border-l border-white/[0.06] px-4 py-3.5 text-sm font-semibold text-[#E6E6E6] sm:text-[15px]"
                                                         >
-                                                            {isBest && <Check className="h-4 w-4 shrink-0 text-emerald-400" aria-label="Better" />}
                                                             {value == null || value === "" ? (
                                                                 <span className="font-normal text-[#5E5E5E]">—</span>
                                                             ) : (
@@ -628,15 +631,11 @@ function DetailSection({
                             {row.label}
                         </div>
                         {row.values.map((value, i) => {
-                            const isBest = row.best.has(i);
                             return (
                                 <div
                                     key={i}
-                                    className={`flex min-w-0 items-start gap-1.5 whitespace-pre-line break-words border-l border-white/[0.06] px-4 py-3 leading-relaxed ${
-                                        isBest ? "bg-emerald-500/[0.07] font-semibold text-emerald-300" : "text-[#D4D4D4]"
-                                    }`}
+                                    className="flex min-w-0 items-start gap-1.5 whitespace-pre-line break-words border-l border-white/[0.06] px-4 py-3 leading-relaxed text-[#D4D4D4]"
                                 >
-                                    {isBest && <Check className="mt-1 h-3.5 w-3.5 shrink-0 text-emerald-400" aria-label="Better" />}
                                     <div className="min-w-0">
                                         {value == null || value === "" ? (
                                             <span className="text-[#5E5E5E]">—</span>

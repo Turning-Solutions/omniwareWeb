@@ -9,6 +9,7 @@ router.get('/facets', getProductFacets);
 router.get('/grouped', getProductsGrouped);
 router.get('/brands', getBrands);
 router.get('/categories', getCategories);
+router.get('/attribute-aliases', getPublicAttributeAliases);
 router.get('/attribute-aliases/:categoryId', getPublicAttributeAliases);
 router.get('/id/:id', getProductById);
 router.get('/:slug', getProductBySlug);
