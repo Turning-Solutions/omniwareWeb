@@ -3,6 +3,11 @@ import { attributeMatchKey } from "@/lib/attributeMatchKey";
 /** Words that don't change what an attribute is about ("Memory Support" ≈ "Memory"). */
 const FILLER_WORDS = new Set(["the", "of", "and", "for", "with", "info", "information", "details", "spec", "specs"]);
 
+/** Words that can be appended to a name without changing what it describes. */
+const GENERIC_EXTRA_WORDS = new Set([
+    "type", "support", "supported", "version", "standard", "model", "feature", "name", "value", "detail",
+]);
+
 const singular = (word: string) =>
     word.length > 3 && word.endsWith("s") && !word.endsWith("ss") ? word.slice(0, -1) : word;
 
@@ -51,6 +56,11 @@ export function attributeSimilarity(nameA: string, nameB: string): SimilarityRes
     const tb = meaningfulTokens(b);
     if (ta.join(" ") === tb.join(" ")) return { score: 0.95, reason: "Same words" };
 
+    // Different numbers mean different things ("USB 2.0 Ports" vs "USB 3.2 Ports").
+    const digitsA = a.match(/\d+/g)?.join(" ") ?? "";
+    const digitsB = b.match(/\d+/g)?.join(" ") ?? "";
+    if (digitsA !== digitsB) return { score: 0, reason: "" };
+
     // "OS" vs "Operating System", "TDP" vs "Thermal Design Power"
     const allA = tokens(a);
     const allB = tokens(b);
@@ -63,57 +73,74 @@ export function attributeSimilarity(nameA: string, nameB: string): SimilarityRes
 
     const setA = new Set(ta);
     const setB = new Set(tb);
-    const shared = ta.filter((w) => setB.has(w)).length;
-    const union = new Set([...ta, ...tb]).size;
+    const shared = [...setA].filter((w) => setB.has(w)).length;
+    const union = new Set([...setA, ...setB]).size;
     const jaccard = union ? shared / union : 0;
 
     const longer = Math.max(compactA.length, compactB.length);
     const spelling = longer ? 1 - levenshtein(compactA, compactB) / longer : 0;
-    if (spelling >= 0.85) return { score: spelling, reason: "Similar spelling" };
+    // Typos only: same number of words, nearly the same letters ("Bluetooh" vs "Bluetooth").
+    if (ta.length === tb.length && spelling >= 0.85) return { score: spelling, reason: "Similar spelling" };
 
+    // "Socket" vs "Socket Type": only when the extra words don't change the meaning —
+    // "Audio" vs "Audio Jacks" or "Connector" vs "Fan Connectors" are different things.
     const smaller = setA.size <= setB.size ? setA : setB;
     const larger = smaller === setA ? setB : setA;
     if (smaller.size > 0 && [...smaller].every((w) => larger.has(w))) {
-        return { score: 0.75, reason: "One name contains the other" };
+        const extra = [...larger].filter((w) => !smaller.has(w));
+        if (extra.every((w) => GENERIC_EXTRA_WORDS.has(w))) {
+            return { score: 0.8, reason: "Same name with a generic extra word" };
+        }
+        // Below the suggestion threshold, but still flagged "Similar" when picking names manually.
+        return { score: 0.6, reason: "One name contains the other" };
     }
 
-    if (jaccard >= 0.5) return { score: jaccard, reason: "Shares most words" };
+    // Needs real overlap: "USB 2.0 Header" vs "USB 2.0 Ports" share words but aren't the same.
+    if (jaccard >= 0.75) return { score: jaccard, reason: "Shares most words" };
     return { score: Math.max(jaccard, spelling * 0.6), reason: "" };
 }
 
 export const SUGGESTION_THRESHOLD = 0.7;
 
 /**
- * Cluster names that look alike (union-find over pairwise similarity).
- * Returns only clusters with two or more names.
+ * Group names that look alike. Complete linkage: a name only joins a group when it is
+ * similar to *every* name already in it, so loose pairs can't chain unrelated names together.
+ * Returns only groups with two or more names.
  */
 export function clusterSimilarNames(names: string[], threshold = SUGGESTION_THRESHOLD) {
-    const parent = names.map((_, i) => i);
-    const find = (i: number): number => (parent[i] === i ? i : (parent[i] = find(parent[i])));
-    const links: { i: number; reason: string }[] = [];
-
-    for (let i = 0; i < names.length; i++) {
-        for (let j = i + 1; j < names.length; j++) {
-            const { score, reason } = attributeSimilarity(names[i], names[j]);
-            if (score < threshold) continue;
-            links.push({ i, reason });
-            const ri = find(i);
-            const rj = find(j);
-            if (ri !== rj) parent[rj] = ri;
+    const n = names.length;
+    const scores = new Map<string, SimilarityResult>();
+    const pairKey = (i: number, j: number) => (i < j ? `${i}:${j}` : `${j}:${i}`);
+    const pairs: { i: number; j: number; score: number }[] = [];
+    for (let i = 0; i < n; i++) {
+        for (let j = i + 1; j < n; j++) {
+            const result = attributeSimilarity(names[i], names[j]);
+            if (result.score < threshold) continue;
+            scores.set(pairKey(i, j), result);
+            pairs.push({ i, j, score: result.score });
         }
     }
+    pairs.sort((x, y) => y.score - x.score);
 
-    const clusters = new Map<number, number[]>();
-    names.forEach((_, i) => {
-        const root = find(i);
-        if (!clusters.has(root)) clusters.set(root, []);
-        clusters.get(root)!.push(i);
-    });
+    const clusterOf = names.map((_, i) => i);
+    const members = new Map<number, number[]>(names.map((_, i) => [i, [i]]));
+    for (const { i, j } of pairs) {
+        const ci = clusterOf[i];
+        const cj = clusterOf[j];
+        if (ci === cj) continue;
+        const a = members.get(ci)!;
+        const b = members.get(cj)!;
+        const allSimilar = a.every((x) => b.every((y) => scores.has(pairKey(x, y))));
+        if (!allSimilar) continue;
+        for (const y of b) clusterOf[y] = ci;
+        members.set(ci, [...a, ...b]);
+        members.delete(cj);
+    }
 
-    return Array.from(clusters.entries())
-        .filter(([, members]) => members.length > 1)
-        .map(([root, members]) => ({
-            names: members.map((i) => names[i]),
-            reason: links.find((link) => find(link.i) === root)?.reason || "Similar names",
+    return Array.from(members.values())
+        .filter((group) => group.length > 1)
+        .map((group) => ({
+            names: group.map((i) => names[i]),
+            reason: scores.get(pairKey(group[0], group[1]))?.reason || "Similar names",
         }));
 }
