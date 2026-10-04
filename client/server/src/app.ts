@@ -9,6 +9,7 @@ import builderRoutes from './routes/builderRoutes';
 import adminProductRoutes from './routes/admin.products';
 import analyticsRoutes from './routes/analyticsRoutes';
 import featuredSpecsRoutes from './routes/featuredSpecsRoutes';
+import attributeNormalizationRoutes from './routes/attributeNormalizationRoutes';
 import uploadRoutes from './routes/uploadRoutes';
 import contactRoutes from './routes/contactRoutes';
 import promotionRoutes from './routes/promotionRoutes';
@@ -63,6 +64,7 @@ function createApp() {
     app.use('/api/v1/orders', orderRoutes);
     app.use('/api/v1/admin/products', adminProductRoutes);
     app.use('/api/v1/admin/categories', featuredSpecsRoutes);
+    app.use('/api/v1/admin/attribute-normalization', attributeNormalizationRoutes);
     app.use('/api/v1/admin/upload', uploadRoutes);
     app.use('/api/v1/admin/quotes', adminQuotesRoutes);
     app.use('/api/v1/admin', adminRoutes);

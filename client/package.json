@@ -10,6 +10,8 @@
     "test:e2e": "playwright test",
     "scrape:maps-reviews": "node scripts/scrape-google-maps-reviews.mjs",
     "backfill:product-slugs": "npx tsx scripts/backfill-product-slugs.ts",
+    "db:backup": "npx tsx scripts/db-backup.ts",
+    "db:restore": "npx tsx scripts/db-restore.ts",
     "generate:brand-icons": "node scripts/generate-brand-icons.mjs"
   },
   "dependencies": {

@@ -49,3 +49,6 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 # Coverage directory used by tools like istanbul
 coverage/
 *.lcov
+
+# Local database backups (npm run db:backup)
+client/backups/
