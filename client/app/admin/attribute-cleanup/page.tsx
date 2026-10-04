@@ -8,38 +8,13 @@ import PageHeader from "@/components/admin/PageHeader";
 import StatusBadge from "@/components/admin/StatusBadge";
 import { attributeMatchKey } from "@/lib/attributeMatchKey";
 import { clusterSimilarNames } from "@/lib/attributeSimilarity";
+import NamingSchemeStep from "@/components/admin/attribute-cleanup/NamingSchemeStep";
+import type { Inventory } from "@/components/admin/attribute-cleanup/types";
 
 interface Category {
     _id: string;
     name: string;
     parentId?: string | null;
-}
-
-interface InventoryName {
-    key: string;
-    name: string;
-    variants: { name: string; count: number }[];
-    sources: { spec: number; attribute: number };
-    productCount: number;
-    occurrenceCount: number;
-    brands: { brand: string; count: number }[];
-    groups: { group: string; count: number }[];
-    signatures: {
-        signature: string;
-        label: string;
-        count: number;
-        brands: string[];
-        samples: { value: string; productId: string; productTitle: string; brand: string }[];
-    }[];
-    flags: { ambiguous: boolean; brandSpecific: boolean; multiGroup: boolean };
-}
-
-interface Inventory {
-    categoryId: string;
-    categoryName: string;
-    productCount: number;
-    occurrenceCount: number;
-    names: InventoryName[];
 }
 
 type Filter = "all" | "ambiguous" | "brandSpecific" | "multiGroup" | "similar";
@@ -55,6 +30,7 @@ export default function AttributeCleanupPage() {
     const [filter, setFilter] = useState<Filter>("all");
     const [search, setSearch] = useState("");
     const [expanded, setExpanded] = useState<Set<string>>(new Set());
+    const [step, setStep] = useState(0);
 
     const mainCategories = useMemo(
         () => categories.filter((c) => !c.parentId).sort((a, b) => a.name.localeCompare(b.name)),
@@ -182,17 +158,28 @@ export default function AttributeCleanupPage() {
 
             {/* Pipeline */}
             <ol className="mb-6 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {STEPS.map((step, i) => (
-                    <li
-                        key={step}
-                        className={`rounded-lg border px-3 py-2 text-xs ${
-                            i === 0 ? "border-accent/50 bg-accent/10 text-main" : "border-border-soft text-sub opacity-60"
-                        }`}
-                    >
-                        <span className="font-semibold">Step {i + 1}</span> · {step}
-                        {i > 0 && <span className="ml-1">(coming next)</span>}
-                    </li>
-                ))}
+                {STEPS.map((label, i) => {
+                    const available = i <= 1;
+                    return (
+                        <li key={label}>
+                            <button
+                                type="button"
+                                disabled={!available}
+                                onClick={() => setStep(i)}
+                                className={`w-full rounded-lg border px-3 py-2 text-left text-xs transition-colors ${
+                                    step === i
+                                        ? "border-accent/50 bg-accent/10 text-main"
+                                        : available
+                                          ? "border-border-soft text-sub hover:text-main"
+                                          : "cursor-not-allowed border-border-soft text-sub opacity-50"
+                                }`}
+                            >
+                                <span className="font-semibold">Step {i + 1}</span> · {label}
+                                {!available && <span className="ml-1">(coming next)</span>}
+                            </button>
+                        </li>
+                    );
+                })}
             </ol>
 
             <div className="admin-card mb-6 rounded-xl p-6">
@@ -210,14 +197,18 @@ export default function AttributeCleanupPage() {
                     ))}
                 </select>
                 <p className="mt-2 text-xs text-sub">
-                    Read-only report. Includes products in all subcategories. Nothing in the database is changed on this step.
+                    Includes products in all subcategories. Products are not changed in steps 1–2 — only the report and the naming scheme.
                 </p>
             </div>
 
             {loading && <div className="py-10 text-center text-sub">Building inventory…</div>}
             {error && <div className="rounded-lg border border-danger/40 bg-danger/10 p-4 text-sm text-danger">{error}</div>}
 
-            {inventory && !loading && (
+            {inventory && !loading && step === 1 && (
+                <NamingSchemeStep key={inventory.categoryId} categoryId={inventory.categoryId} names={inventory.names} />
+            )}
+
+            {inventory && !loading && step === 0 && (
                 <>
                     <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
                         <Stat label="Products" value={inventory.productCount} />

@@ -32,4 +32,6 @@ export const config = {
         bodyParser: false,
         externalResolver: true,
     },
+    // Admin AI steps (Gemini naming scheme) can take tens of seconds per request.
+    maxDuration: 60,
 };
