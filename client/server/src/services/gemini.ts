@@ -4,7 +4,8 @@
  */
 
 const API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
-const DEFAULT_MODEL = 'gemini-2.5-flash';
+// Google retires model names for new API keys over time; override with GEMINI_MODEL without a code change.
+const DEFAULT_MODEL = 'gemini-3.8-flash';
 const REQUEST_TIMEOUT_MS = 50_000;
 
 export class GeminiError extends Error {
