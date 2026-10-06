@@ -11,7 +11,7 @@ import {
 } from '../../../lib/attributeNamingRules';
 import { attributeLooseKey } from '../../../lib/attributeMatchKey';
 
-export const DEFAULT_CHUNK_SIZE = 30;
+export const DEFAULT_CHUNK_SIZE = 12;
 
 const SYSTEM_INSTRUCTION = `You standardise ATTRIBUTE NAMES for a computer hardware store. Different manufacturers
 name the same specification differently, and sometimes use the same name for different things.

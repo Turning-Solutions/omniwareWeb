@@ -114,7 +114,9 @@ export const generateNamingSchemeChunk = async (req: Request, res: Response, nex
         res.json(await generateSchemeChunk({ category, chunkIndex }));
     } catch (error) {
         if (error instanceof GeminiError) {
-            res.status(error.status === 429 ? 429 : 502).json({ message: error.message });
+            // Rate limits, overloads, timeouts and flaky answers are worth retrying; auth / bad-request errors are not.
+            const retryable = error.status === undefined || error.status === 429 || error.status >= 500;
+            res.status(error.status === 429 ? 429 : 502).json({ message: error.message, retryable });
             return;
         }
         next(error);

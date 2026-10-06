@@ -23,9 +23,21 @@ type Filter = "attention" | "renamed" | "kept" | "all";
 const NEW_NAME = "__new__";
 
 const errorMessage = (err: unknown, fallback: string) => {
-    const e = err as { response?: { status?: number; data?: { message?: string } } };
-    if (e?.response?.status === 401) return "Your admin session has expired — log in again.";
-    return e?.response?.data?.message || fallback;
+    const e = err as { response?: { status?: number; data?: { message?: string } }; message?: string };
+    const status = e?.response?.status;
+    if (status === 401) return "Your admin session has expired — log in again.";
+    if (e?.response?.data?.message) return e.response.data.message;
+    if (status === 504) return "The server timed out before the AI answered (HTTP 504).";
+    if (status) return `${fallback} (HTTP ${status})`;
+    return e?.message ? `${fallback} (${e.message})` : fallback;
+};
+
+/** Worth retrying automatically: rate limits, overloads, platform timeouts, network blips. */
+const isRetryable = (err: unknown) => {
+    const e = err as { response?: { status?: number; data?: { retryable?: boolean } } };
+    const status = e?.response?.status;
+    if (e?.response?.data?.retryable === false) return false;
+    return status === undefined || status === 429 || status === 502 || status === 503 || status === 504;
 };
 
 /** Strip Mongo/extra fields so the payload matches the API schema. */
@@ -245,7 +257,7 @@ export default function NamingSchemeStep({ categoryId, names }: { categoryId: st
         setProblems([]);
         let chunk = startChunk;
         let total = progress?.total ?? scheme?.generation?.totalChunks ?? 1;
-        let rateLimitRetries = 0;
+        let retries = 0;
         try {
             while (chunk < total) {
                 setProgress({ done: chunk, total });
@@ -254,14 +266,17 @@ export default function NamingSchemeStep({ categoryId, names }: { categoryId: st
                     setScheme(data.scheme);
                     total = data.totalChunks;
                     chunk += 1;
-                    rateLimitRetries = 0;
+                    retries = 0;
                     setResumeFrom(chunk < total ? chunk : null);
                 } catch (err) {
-                    const status = (err as { response?: { status?: number } })?.response?.status;
-                    if (status === 429 && rateLimitRetries < 3) {
-                        rateLimitRetries += 1;
-                        setError(`Gemini rate limit reached — waiting 30s before retrying (attempt ${rateLimitRetries}/3)…`);
-                        await new Promise((r) => setTimeout(r, 30_000));
+                    if (isRetryable(err) && retries < 3) {
+                        retries += 1;
+                        const status = (err as { response?: { status?: number } })?.response?.status;
+                        const waitSeconds = status === 429 ? 30 : 4;
+                        setError(
+                            `${errorMessage(err, "AI request failed.")} Retrying part ${chunk + 1} in ${waitSeconds}s (attempt ${retries}/3)…`
+                        );
+                        await new Promise((r) => setTimeout(r, waitSeconds * 1000));
                         setError("");
                         continue;
                     }
