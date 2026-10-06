@@ -478,8 +478,14 @@ export default function NamingSchemeStep({ categoryId, names }: { categoryId: st
 
                 {ai && !ai.configured && (
                     <p className="mt-4 rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm text-warning">
-                        {ai.providerLabel} isn&apos;t set up on the server (<code>{ai.keyEnv}</code>). Add it to the environment and
-                        redeploy, or choose another provider under &quot;AI model&quot;.
+                        {ai.keySet ? (
+                            <>No model chosen for {ai.providerLabel} yet — pick one under &quot;AI model&quot; above.</>
+                        ) : (
+                            <>
+                                {ai.providerLabel} isn&apos;t set up on the server (<code>{ai.keyEnv}</code>). Add it to the environment and
+                                redeploy, or choose another provider under &quot;AI model&quot;.
+                            </>
+                        )}
                     </p>
                 )}
                 {busy === "generating" && progress && (

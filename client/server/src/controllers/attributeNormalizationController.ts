@@ -16,6 +16,7 @@ import {
     describeActiveAi,
     getActiveAi,
     isProviderConfigured,
+    listProviderModels,
     providerById,
 } from '../services/aiProviders';
 import type { NamingRule } from '../../../lib/attributeNamingRules';
@@ -313,6 +314,27 @@ export const updateAiSettings = async (req: Request, res: Response, next: NextFu
             { upsert: true, setDefaultsOnInsert: true }
         );
         res.json({ active: describeActiveAi(await getActiveAi()) });
+    } catch (error) {
+        next(error);
+    }
+};
+
+/** GET /admin/attribute-normalization/ai-settings/models?provider=openrouter — the provider's live model list. */
+export const listAiModels = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+        const raw = req.query.provider;
+        const provider = providerById(typeof raw === 'string' ? raw : undefined);
+        if (!provider) {
+            res.status(400).json({ message: 'Unknown provider.' });
+            return;
+        }
+        res.set('Cache-Control', 'no-store');
+        try {
+            res.json({ models: await listProviderModels(provider) });
+        } catch (error) {
+            // A failed lookup is not fatal: the admin can still type a model name by hand.
+            res.json({ models: [], error: `Could not load models from ${provider.label}: ${(error as Error).message}` });
+        }
     } catch (error) {
         next(error);
     }

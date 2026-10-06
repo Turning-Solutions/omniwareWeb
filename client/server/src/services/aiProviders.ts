@@ -64,11 +64,12 @@ export const PROVIDERS: ProviderDef[] = [
         keyEnv: 'OPENROUTER_API_KEY',
         keyUrl: 'https://openrouter.ai/keys',
         baseUrl: 'https://openrouter.ai/api/v1',
-        defaultModel: 'meta-llama/llama-3.3-70b-instruct:free',
-        models: ['meta-llama/llama-3.3-70b-instruct:free', 'openai/gpt-oss-120b:free'],
+        // Free model lists change weekly — the picker loads the live list instead of hard-coding names.
+        defaultModel: '',
+        models: [],
         minGapSeconds: 4,
         chunkSize: 10,
-        note: 'Many models behind one key. Models ending in ":free" cost nothing (roughly 20 requests/minute, ~50/day without credits). Browse openrouter.ai/models?max_price=0.',
+        note: 'Many models behind one key. Free models cost nothing (roughly 20 requests/minute, ~50/day without credits) but come and go — pick one from the live list below.',
     },
     {
         id: 'mistral',
@@ -127,6 +128,8 @@ export interface ActiveAi {
     provider: ProviderDef;
     model: string;
     configured: boolean;
+    /** The provider's API key (or base URL for custom) is set, regardless of model. */
+    keySet: boolean;
 }
 
 /** The provider + model currently selected (DB setting, else environment, else Gemini default). */
@@ -135,7 +138,8 @@ export async function getActiveAi(): Promise<ActiveAi> {
     const provider = providerById(saved?.provider) ?? providerById(process.env.AI_PROVIDER) ?? PROVIDERS[0];
     const envModel = provider.id === 'gemini' ? process.env.GEMINI_MODEL : process.env.AI_MODEL;
     const model = (saved?.provider === provider.id && saved.modelName) || envModel?.trim() || provider.defaultModel;
-    return { provider, model, configured: isProviderConfigured(provider) && Boolean(model) };
+    const keySet = isProviderConfigured(provider);
+    return { provider, model, configured: keySet && Boolean(model), keySet };
 }
 
 /** Attribute names per request for a provider (GEMINI_CHUNK_SIZE / AI_CHUNK_SIZE override). */
@@ -150,6 +154,7 @@ export const describeActiveAi = (active: ActiveAi) => ({
     providerLabel: active.provider.label,
     model: active.model,
     configured: active.configured,
+    keySet: active.keySet,
     keyEnv: active.provider.keyEnv,
     minGapSeconds: active.provider.minGapSeconds,
     chunkSize: chunkSizeFor(active.provider),
@@ -189,4 +194,79 @@ export async function generateJson<T>(
                 ? { 'HTTP-Referer': process.env.NEXT_PUBLIC_SITE_URL || 'https://www.omniware.lk', 'X-Title': 'Omniware attribute cleanup' }
                 : {},
     });
+}
+
+export interface ModelOption {
+    id: string;
+    label?: string;
+    note?: string;
+}
+
+async function getJson(url: string, headers: Record<string, string> = {}): Promise<unknown> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 10_000);
+    try {
+        const res = await fetch(url, { headers, signal: controller.signal });
+        if (!res.ok) throw new Error(`${res.status} ${res.statusText}`.trim());
+        return await res.json();
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
+const NON_CHAT_MODEL = /embed|whisper|tts|speech|transcri|moderation|guard|rerank|image|vision-preview|dall-?e/i;
+
+/**
+ * Models the provider offers right now. For OpenRouter only FREE models are listed (public endpoint,
+ * no key needed); other providers are asked with the server-side key.
+ */
+export async function listProviderModels(p: ProviderDef): Promise<ModelOption[]> {
+    if (p.kind === 'gemini') {
+        const key = process.env[p.keyEnv]?.trim();
+        if (!key) throw new Error(`${p.keyEnv} is not set`);
+        const data = (await getJson('https://generativelanguage.googleapis.com/v1beta/models?pageSize=200', { 'x-goog-api-key': key })) as {
+            models?: { name: string; displayName?: string; supportedGenerationMethods?: string[] }[];
+        };
+        return (data.models ?? [])
+            .filter((m) => m.supportedGenerationMethods?.includes('generateContent') && /gemini/i.test(m.name))
+            .map((m) => ({ id: m.name.replace(/^models\//, ''), label: m.displayName }))
+            .sort((a, b) => b.id.localeCompare(a.id));
+    }
+
+    if (p.id === 'openrouter') {
+        const data = (await getJson('https://openrouter.ai/api/v1/models')) as {
+            data?: {
+                id: string;
+                name?: string;
+                context_length?: number;
+                pricing?: { prompt?: string; completion?: string };
+                supported_parameters?: string[];
+                architecture?: { output_modalities?: string[] };
+            }[];
+        };
+        return (data.data ?? [])
+            .filter((m) => {
+                const free = m.id.endsWith(':free') || (Number(m.pricing?.prompt) === 0 && Number(m.pricing?.completion) === 0);
+                const textOut = !m.architecture?.output_modalities || m.architecture.output_modalities.every((x) => x === 'text');
+                return free && textOut && !NON_CHAT_MODEL.test(m.id) && !m.id.startsWith('openrouter/');
+            })
+            .sort((a, b) => (b.context_length ?? 0) - (a.context_length ?? 0))
+            .map((m) => {
+                const json = m.supported_parameters?.some((x) => x === 'response_format' || x === 'structured_outputs');
+                const ctx = m.context_length ? `${Math.round(m.context_length / 1000)}k context` : '';
+                return { id: m.id, label: m.name, note: [ctx, json ? 'JSON mode' : ''].filter(Boolean).join(' · ') };
+            });
+    }
+
+    const baseUrl = baseUrlOf(p);
+    if (!baseUrl) throw new Error(`${p.baseUrlEnv ?? 'Base URL'} is not set`);
+    const key = process.env[p.keyEnv]?.trim();
+    if (!key && !p.keyOptional) throw new Error(`${p.keyEnv} is not set`);
+    const data = (await getJson(`${baseUrl.replace(/\/+$/, '')}/models`, key ? { Authorization: `Bearer ${key}` } : {})) as {
+        data?: { id: string }[];
+    };
+    return (data.data ?? [])
+        .filter((m) => !NON_CHAT_MODEL.test(m.id))
+        .map((m) => ({ id: m.id }))
+        .sort((a, b) => a.id.localeCompare(b.id));
 }

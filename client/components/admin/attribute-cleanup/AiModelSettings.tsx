@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Bot, CheckCircle2, KeyRound, Save } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { Bot, CheckCircle2, KeyRound, RefreshCw, Save } from "lucide-react";
 import api from "@/lib/api";
 import StatusBadge from "@/components/admin/StatusBadge";
 import type { ActiveAi } from "./types";
@@ -19,6 +19,12 @@ interface ProviderInfo {
 }
 
 /** Pick the AI provider and model. API keys stay in server environment variables — only whether one is set is shown. */
+interface ModelOption {
+    id: string;
+    label?: string;
+    note?: string;
+}
+
 export default function AiModelSettings({ active, onChanged }: { active: ActiveAi | null; onChanged: (ai: ActiveAi) => void }) {
     const [open, setOpen] = useState(false);
     const [providers, setProviders] = useState<ProviderInfo[]>([]);
@@ -27,6 +33,9 @@ export default function AiModelSettings({ active, onChanged }: { active: ActiveA
     const [saving, setSaving] = useState(false);
     const [saved, setSaved] = useState(false);
     const [error, setError] = useState("");
+    const [liveModels, setLiveModels] = useState<ModelOption[]>([]);
+    const [loadingModels, setLoadingModels] = useState(false);
+    const [modelsError, setModelsError] = useState("");
 
     useEffect(() => {
         if (!open || providers.length) return;
@@ -43,6 +52,29 @@ export default function AiModelSettings({ active, onChanged }: { active: ActiveA
     }, [active]);
 
     const current = providers.find((p) => p.id === provider);
+
+    const loadModels = useCallback(async (providerId: string) => {
+        setLoadingModels(true);
+        setModelsError("");
+        try {
+            const { data } = await api.get("/admin/attribute-normalization/ai-settings/models", { params: { provider: providerId } });
+            setLiveModels(data.models ?? []);
+            if (data.error) setModelsError(data.error);
+        } catch {
+            setLiveModels([]);
+            setModelsError("Could not load the model list.");
+        } finally {
+            setLoadingModels(false);
+        }
+    }, []);
+
+    // Always show what the provider offers right now — model names (especially free ones) change often.
+    useEffect(() => {
+        if (open && providers.length) {
+            setLiveModels([]);
+            void loadModels(provider);
+        }
+    }, [open, provider, providers.length, loadModels]);
 
     const changeProvider = (id: string) => {
         setProvider(id);
@@ -82,8 +114,8 @@ export default function AiModelSettings({ active, onChanged }: { active: ActiveA
                     )}
                 </span>
                 {active && (
-                    <StatusBadge tone={active.configured ? "success" : "danger"}>
-                        {active.configured ? "Key set" : "Key missing"}
+                    <StatusBadge tone={active.configured ? "success" : active.keySet ? "warning" : "danger"}>
+                        {active.configured ? "Ready" : active.keySet ? "Choose a model" : "Key missing"}
                     </StatusBadge>
                 )}
             </button>
@@ -118,11 +150,53 @@ export default function AiModelSettings({ active, onChanged }: { active: ActiveA
                                 className="mt-1 w-full rounded-lg border border-border-soft bg-surface px-3 py-2 text-sm text-main"
                             />
                             <datalist id="ai-model-suggestions">
-                                {(current?.models ?? []).map((m) => (
+                                {[...(current?.models ?? []), ...liveModels.map((m) => m.id)].map((m) => (
                                     <option key={m} value={m} />
                                 ))}
                             </datalist>
                         </label>
+                    </div>
+
+                    <div className="space-y-1">
+                        <div className="flex items-center justify-between gap-2 text-xs text-sub">
+                            <span>
+                                {provider === "openrouter" ? "Free models available now (live from OpenRouter)" : "Models available now (live from the provider)"}
+                                {liveModels.length > 0 && ` · ${liveModels.length}`}
+                            </span>
+                            <button
+                                type="button"
+                                onClick={() => loadModels(provider)}
+                                disabled={loadingModels}
+                                className="flex items-center gap-1 text-accent hover:underline disabled:opacity-50"
+                            >
+                                <RefreshCw className={`h-3 w-3 ${loadingModels ? "animate-spin" : ""}`} /> Refresh
+                            </button>
+                        </div>
+                        <select
+                            value={liveModels.some((m) => m.id === model) ? model : ""}
+                            onChange={(e) => {
+                                if (e.target.value) {
+                                    setModel(e.target.value);
+                                    setSaved(false);
+                                }
+                            }}
+                            disabled={liveModels.length === 0}
+                            className="w-full rounded-lg border border-border-soft bg-surface px-3 py-2 text-sm text-main disabled:opacity-60 [&>option]:text-white"
+                        >
+                            <option value="">
+                                {loadingModels ? "Loading…" : liveModels.length ? "— Pick from the list —" : "No list available — type a model name above"}
+                            </option>
+                            {liveModels.map((m) => (
+                                <option key={m.id} value={m.id}>
+                                    {m.id}
+                                    {m.note ? ` — ${m.note}` : ""}
+                                </option>
+                            ))}
+                        </select>
+                        {modelsError && <p className="text-xs text-warning">{modelsError}</p>}
+                        {provider === "openrouter" && liveModels.length > 0 && (
+                            <p className="text-xs text-sub">Larger models with JSON mode work best. Free models can disappear — if one stops working, pick another.</p>
+                        )}
                     </div>
 
                     {current && (

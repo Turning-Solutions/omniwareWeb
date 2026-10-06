@@ -33,6 +33,7 @@ export interface ActiveAi {
     providerLabel: string;
     model: string;
     configured: boolean;
+    keySet: boolean;
     keyEnv: string;
     minGapSeconds: number;
     chunkSize: number;

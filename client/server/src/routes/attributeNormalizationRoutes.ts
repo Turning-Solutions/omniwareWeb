@@ -6,6 +6,7 @@ import {
     generateNamingSchemeChunk,
     getAiSettings,
     getCategoryInventory,
+    listAiModels,
     getNamingScheme,
     updateAiSettings,
     updateAttributeTemplate,
@@ -17,6 +18,7 @@ const router = express.Router({ mergeParams: true });
 router.use(requireAuth, requireAdmin);
 
 router.get('/ai-settings', getAiSettings);
+router.get('/ai-settings/models', listAiModels);
 router.put('/ai-settings', updateAiSettings);
 router.get('/:categoryKey/inventory', getCategoryInventory);
 router.get('/:categoryKey/scheme', getNamingScheme);
