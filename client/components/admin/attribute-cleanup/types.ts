@@ -49,3 +49,42 @@ export interface NamingScheme {
     approvedBy?: string;
     updatedAt?: string;
 }
+
+export interface ReviewItem {
+    id: string;
+    productId: string;
+    title: string;
+    brand: string;
+    image?: string;
+    status: "pending" | "accepted" | "rejected";
+    needsLook: boolean;
+    changeCount: number;
+}
+
+export interface ReviewChange {
+    container: "specs" | "attributeGroups" | "attributes";
+    groupName?: string;
+    oldName: string;
+    newName: string;
+    value: string;
+    confidence: "high" | "medium" | "low";
+    reason?: string;
+}
+
+export interface ReviewDetail {
+    id: string;
+    productId: string;
+    productSlug?: string;
+    title: string;
+    brand: string;
+    image?: string;
+    status: "pending" | "accepted" | "rejected";
+    needsLook: boolean;
+    collisions: string[];
+    changes: ReviewChange[];
+    acceptedAt?: string;
+    acceptedBy?: string;
+    stale: boolean;
+    staleMessage?: string;
+    canonicalNames: string[];
+}

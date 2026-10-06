@@ -18,7 +18,7 @@ const navGroups = [
             { href: "/admin/category-manager", label: "Category Manager", icon: FolderTree },
             { href: "/admin/categories/spec-features", label: "Featured Specs", icon: Filter },
             { href: "/admin/categories/attribute-mapping", label: "Attribute Mapping", icon: Link2 },
-            { href: "/admin/attribute-cleanup", label: "Attribute Cleanup", icon: Wand2 },
+            { href: "/admin/attribute-cleanup", label: "Product Detail Names", icon: Wand2 },
         ],
     },
     {

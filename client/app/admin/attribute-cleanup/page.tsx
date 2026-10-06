@@ -10,6 +10,7 @@ import { attributeMatchKey } from "@/lib/attributeMatchKey";
 import { clusterSimilarNames } from "@/lib/attributeSimilarity";
 import NamingSchemeStep from "@/components/admin/attribute-cleanup/NamingSchemeStep";
 import type { Inventory } from "@/components/admin/attribute-cleanup/types";
+import ReviewStep from "@/components/admin/attribute-cleanup/ReviewStep";
 
 interface Category {
     _id: string;
@@ -19,7 +20,11 @@ interface Category {
 
 type Filter = "all" | "ambiguous" | "brandSpecific" | "multiGroup" | "similar";
 
-const STEPS = ["Inventory", "Naming scheme (AI)", "Product proposals", "Review & apply"];
+const STEPS = [
+    { title: "Look around", text: "See which names your products use. Optional." },
+    { title: "Choose names", text: "AI suggests one standard name for each. You confirm." },
+    { title: "Review products", text: "Check each product's new names and accept them." },
+];
 
 export default function AttributeCleanupPage() {
     const [categories, setCategories] = useState<Category[]>([]);
@@ -30,7 +35,8 @@ export default function AttributeCleanupPage() {
     const [filter, setFilter] = useState<Filter>("all");
     const [search, setSearch] = useState("");
     const [expanded, setExpanded] = useState<Set<string>>(new Set());
-    const [step, setStep] = useState(0);
+    // Step 1 is only a look around — start on "Choose names", where the work happens.
+    const [step, setStep] = useState(1);
 
     const mainCategories = useMemo(
         () => categories.filter((c) => !c.parentId).sort((a, b) => a.name.localeCompare(b.name)),
@@ -132,17 +138,17 @@ export default function AttributeCleanupPage() {
 
     const filterButtons: { id: Filter; label: string; tone: string }[] = [
         { id: "all", label: "All names", tone: "" },
-        { id: "ambiguous", label: "Mixed meanings", tone: "text-danger" },
-        { id: "brandSpecific", label: "Brand-specific", tone: "text-warning" },
-        { id: "similar", label: "Similar wording", tone: "text-info" },
-        { id: "multiGroup", label: "In several groups", tone: "" },
+        { id: "ambiguous", label: "Same name, different meanings", tone: "text-danger" },
+        { id: "brandSpecific", label: "Brands use it differently", tone: "text-warning" },
+        { id: "similar", label: "Possible duplicates", tone: "text-info" },
+        { id: "multiGroup", label: "Appears in several sections", tone: "" },
     ];
 
     return (
         <div className="mx-auto max-w-6xl px-4 py-8 sm:py-10 lg:py-12">
             <PageHeader
-                title="Attribute Cleanup"
-                subtitle="Unify attribute names across brands. Only names change — values are never touched."
+                title="Product Detail Names"
+                subtitle="Different brands name the same detail differently (for example “TBW” and “Terabytes Written”). Here you pick one standard name for each, so products line up when customers compare them. Only the names change — the values never do."
                 action={
                     inventory ? (
                         <button
@@ -156,40 +162,41 @@ export default function AttributeCleanupPage() {
                 }
             />
 
-            {/* Pipeline */}
-            <ol className="mb-6 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {STEPS.map((label, i) => {
-                    const available = i <= 1;
-                    return (
-                        <li key={label}>
-                            <button
-                                type="button"
-                                disabled={!available}
-                                onClick={() => setStep(i)}
-                                className={`w-full rounded-lg border px-3 py-2 text-left text-xs transition-colors ${
-                                    step === i
-                                        ? "border-accent/50 bg-accent/10 text-main"
-                                        : available
-                                          ? "border-border-soft text-sub hover:text-main"
-                                          : "cursor-not-allowed border-border-soft text-sub opacity-50"
-                                }`}
-                            >
-                                <span className="font-semibold">Step {i + 1}</span> · {label}
-                                {!available && <span className="ml-1">(coming next)</span>}
-                            </button>
-                        </li>
-                    );
-                })}
+            {/* The three steps */}
+            <ol className="mb-6 grid gap-2 sm:grid-cols-3">
+                {STEPS.map((item, i) => (
+                    <li key={item.title}>
+                        <button
+                            type="button"
+                            onClick={() => setStep(i)}
+                            className={`h-full w-full rounded-lg border px-3 py-2.5 text-left transition-colors ${
+                                step === i ? "border-accent/60 bg-accent/10" : "border-border-soft hover:bg-panel"
+                            }`}
+                        >
+                            <span className="flex items-center gap-2 text-sm font-semibold text-main">
+                                <span
+                                    className={`flex h-5 w-5 items-center justify-center rounded-full text-[11px] ${
+                                        step === i ? "bg-accent text-white" : "border border-border-soft text-sub"
+                                    }`}
+                                >
+                                    {i + 1}
+                                </span>
+                                {item.title}
+                            </span>
+                            <span className="mt-1 block text-xs text-sub">{item.text}</span>
+                        </button>
+                    </li>
+                ))}
             </ol>
 
             <div className="admin-card mb-6 rounded-xl p-6">
-                <label className="mb-2 block text-sub">Main category</label>
+                <label className="mb-2 block text-sub">Which product category do you want to clean up?</label>
                 <select
                     className="w-full rounded-lg border border-border-soft bg-panel px-4 py-2 text-main [&>option]:text-white"
                     value={selectedCategory}
                     onChange={(e) => setSelectedCategory(e.target.value)}
                 >
-                    <option value="">-- Choose main category --</option>
+                    <option value="">-- Choose a category --</option>
                     {mainCategories.map((c) => (
                         <option key={c._id} value={c._id}>
                             {c.name}
@@ -197,24 +204,37 @@ export default function AttributeCleanupPage() {
                     ))}
                 </select>
                 <p className="mt-2 text-xs text-sub">
-                    Includes products in all subcategories. Products are not changed in steps 1–2 — only the report and the naming scheme.
+                    Works on one category at a time, including its subcategories. Do one category fully (steps 2 → 3) before starting the next.
                 </p>
             </div>
 
-            {loading && <div className="py-10 text-center text-sub">Building inventory…</div>}
+            {loading && <div className="py-10 text-center text-sub">Loading your products…</div>}
             {error && <div className="rounded-lg border border-danger/40 bg-danger/10 p-4 text-sm text-danger">{error}</div>}
 
             {inventory && !loading && step === 1 && (
-                <NamingSchemeStep key={inventory.categoryId} categoryId={inventory.categoryId} names={inventory.names} />
+                <NamingSchemeStep key={inventory.categoryId} categoryId={inventory.categoryId} names={inventory.names} onGoToReview={() => setStep(2)} />
+            )}
+
+            {inventory && !loading && step === 2 && (
+                <ReviewStep
+                    key={inventory.categoryId}
+                    categoryId={inventory.categoryId}
+                    categoryName={inventory.categoryName}
+                    onGoToNames={() => setStep(1)}
+                />
             )}
 
             {inventory && !loading && step === 0 && (
                 <>
+                    <p className="mb-4 rounded-lg border border-border-soft bg-panel p-3 text-sm text-sub">
+                        This is just a look at every detail name used by {inventory.categoryName} products — nothing here changes anything. It helps you see
+                        how messy the names are. You can skip straight to <strong className="text-main">Choose names</strong>.
+                    </p>
                     <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
                         <Stat label="Products" value={inventory.productCount} />
-                        <Stat label="Name uses" value={inventory.occurrenceCount} />
-                        <Stat label="Distinct names" value={names.length} />
-                        <Stat label="Mixed meanings" value={counts.ambiguous} tone="text-danger" />
+                        <Stat label="Times a name is used" value={inventory.occurrenceCount} />
+                        <Stat label="Different names" value={names.length} />
+                        <Stat label="Same name, different meanings" value={counts.ambiguous} tone="text-danger" />
                     </div>
 
                     <div className="admin-card rounded-xl p-6">
@@ -259,35 +279,34 @@ export default function AttributeCleanupPage() {
                                                 <div className="flex flex-wrap items-center gap-2">
                                                     <span className="font-semibold text-main">{n.name}</span>
                                                     <span className="text-xs text-sub">
-                                                        {n.productCount} products · {n.signatures.length} value shape
-                                                        {n.signatures.length === 1 ? "" : "s"}
+                                                        {n.productCount} products · {n.signatures.length} kind{n.signatures.length === 1 ? "" : "s"} of value
                                                     </span>
                                                     {n.flags.ambiguous && (
                                                         <StatusBadge tone="danger">
                                                             <AlertTriangle className="mr-1 inline h-3 w-3" />
-                                                            Mixed meanings
+                                                            Used for different things
                                                         </StatusBadge>
                                                     )}
                                                     {n.flags.brandSpecific && (
                                                         <StatusBadge tone="warning">
                                                             <Tags className="mr-1 inline h-3 w-3" />
-                                                            Brand-specific
+                                                            Brands differ
                                                         </StatusBadge>
                                                     )}
                                                     {n.flags.multiGroup && (
                                                         <StatusBadge tone="neutral">
                                                             <Layers className="mr-1 inline h-3 w-3" />
-                                                            {n.groups.length} groups
+                                                            in {n.groups.length} sections
                                                         </StatusBadge>
                                                     )}
-                                                    {n.sources.spec > 0 && <StatusBadge tone="info">Filter spec</StatusBadge>}
+                                                    {n.sources.spec > 0 && <StatusBadge tone="info">Shop filter</StatusBadge>}
                                                 </div>
                                                 <p className="mt-1 truncate text-xs text-sub">
                                                     {n.brands.map((b) => `${b.brand} (${b.count})`).join(" · ")}
                                                 </p>
                                                 {similar && similar.length > 0 && (
                                                     <p className="mt-1 flex items-center gap-1 text-xs text-info">
-                                                        <Shuffle className="h-3 w-3" /> Similar wording: {similar.join(", ")}
+                                                        <Shuffle className="h-3 w-3" /> Looks like: {similar.join(", ")}
                                                     </p>
                                                 )}
                                             </div>
@@ -303,7 +322,7 @@ export default function AttributeCleanupPage() {
                                                 )}
                                                 {n.groups.length > 0 && (
                                                     <p className="text-xs text-sub">
-                                                        Groups: {n.groups.map((g) => `${g.group} (${g.count})`).join(", ")}
+                                                        Sections: {n.groups.map((g) => `${g.group} (${g.count})`).join(", ")}
                                                     </p>
                                                 )}
                                                 {n.signatures.map((sig) => (

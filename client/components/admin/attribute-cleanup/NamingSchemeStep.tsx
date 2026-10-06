@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, ArrowRight, CheckCircle2, ChevronDown, ChevronRight, ListChecks, Lock, Save, Search, Sparkles, Split, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { AlertTriangle, ArrowRight, Check, CheckCircle2, ChevronDown, ChevronRight, ListChecks, Lock, Save, Search, Sparkles, Split, Trash2 } from "lucide-react";
 import api from "@/lib/api";
 import StatusBadge from "@/components/admin/StatusBadge";
 import {
@@ -54,7 +54,7 @@ const cleanRule = (r: NamingRule): NamingRule => ({
     source: r.source,
 });
 
-export default function NamingSchemeStep({ categoryId, names }: { categoryId: string; names: InventoryName[] }) {
+export default function NamingSchemeStep({ categoryId, names, onGoToReview }: { categoryId: string; names: InventoryName[]; onGoToReview: () => void }) {
     const [scheme, setScheme] = useState<NamingScheme | null>(null);
     const [ai, setAi] = useState<ActiveAi | null>(null);
     const [loading, setLoading] = useState(true);
@@ -140,7 +140,7 @@ export default function NamingSchemeStep({ categoryId, names }: { categoryId: st
     const parsedTemplate = useMemo(() => parseTemplateText(templateText), [templateText]);
 
     const saveTemplate = async () => {
-        if (dirty && !window.confirm("Saving the standard list reloads the scheme and discards unsaved scheme edits. Continue?")) return;
+        if (dirty && !window.confirm("Saving your list updates the suggestions and discards edits you haven't saved. Continue?")) return;
         setSavingTemplate(true);
         setError("");
         try {
@@ -212,7 +212,7 @@ export default function NamingSchemeStep({ categoryId, names }: { categoryId: st
         let target = value;
         let newCanonical: CanonicalAttribute[] | undefined;
         if (value === NEW_NAME) {
-            const name = window.prompt("New attribute name (Title Case, no units):")?.trim();
+            const name = window.prompt("New name (Title Case):")?.trim();
             if (!name) return;
             const existing = canonical.find((c) => c.name.toLowerCase() === name.toLowerCase());
             if (existing) {
@@ -249,7 +249,7 @@ export default function NamingSchemeStep({ categoryId, names }: { categoryId: st
         if (
             startChunk === 0 &&
             scheme &&
-            !window.confirm("Generate a new naming scheme with AI? This replaces the current draft (including your edits).")
+            !window.confirm("Ask the AI for new suggestions? This replaces the current suggestions, including any changes you made.")
         ) {
             return;
         }
@@ -306,8 +306,8 @@ export default function NamingSchemeStep({ categoryId, names }: { categoryId: st
             const quota = (err as { response?: { data?: { quotaExhausted?: boolean } } })?.response?.data?.quotaExhausted;
             setError(
                 quota
-                    ? `${errorMessage(err, "AI generation failed.")} Progress is saved — use Resume (part ${chunk + 1}) after it resets, or pick another model/provider under "AI model" above and generate again.`
-                    : `${errorMessage(err, "AI generation failed.")} You can resume from part ${chunk + 1}.`
+                    ? `${errorMessage(err, "AI generation failed.")} Your progress is saved — press Continue (part ${chunk + 1}) after it resets, or pick another AI in the "AI model" box below and get new suggestions.`
+                    : `${errorMessage(err, "The AI request failed.")} Press Continue to carry on from part ${chunk + 1}.`
             );
         } finally {
             setBusy(null);
@@ -344,7 +344,7 @@ export default function NamingSchemeStep({ categoryId, names }: { categoryId: st
     const approve = async () => {
         if (counts.attention > 0 &&
             !window.confirm(
-                `${counts.attention} name(s) still need attention. Unset shapes keep their original names. Approve anyway?`
+                `${counts.attention} name(s) still need your decision. They will keep their original names. Confirm anyway?`
             )) {
             return;
         }
@@ -374,8 +374,39 @@ export default function NamingSchemeStep({ categoryId, names }: { categoryId: st
 
     if (loading) return <div className="py-10 text-center text-sub">Loading naming scheme…</div>;
 
+    const confirmed = scheme?.status === "approved" && !dirty;
+    const undecidedCount = rows.filter((r) => r.unset && !r.conflict).length;
+
+    const openStandardList = () => {
+        setTemplateText(templateToText(template));
+        setEditingTemplate(true);
+        window.setTimeout(() => document.getElementById("standard-list")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+    };
+
+    const showAttention = () => {
+        setFilter("attention");
+        window.setTimeout(() => document.getElementById("name-results")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+    };
+
+    /** Leave every undecided name exactly as it is (it keeps its original name). */
+    const keepUndecided = () => {
+        const targetKeys = new Set(rows.filter((r) => r.unset && !r.conflict).map((r) => r.name.key));
+        if (targetKeys.size === 0) return;
+        let nextRules = rules.filter((r) => !targetKeys.has(r.key));
+        for (const r of rows) {
+            if (!targetKeys.has(r.name.key)) continue;
+            const fixed = r.shapeRows.map((row) =>
+                row.brandTargets
+                    ? { ...row, brandTargets: Object.fromEntries(Object.entries(row.brandTargets).map(([b, t]) => [b, t === UNSET ? KEEP : t])) }
+                    : { ...row, target: row.target === UNSET ? KEEP : row.target }
+            );
+            nextRules = [...nextRules, ...rowsToRules(r.name.key, fixed, rules)];
+        }
+        updateScheme({ rules: nextRules, unresolved: (scheme?.unresolved ?? []).filter((u) => !targetKeys.has(u.key)) });
+    };
+
     const targetLabel = (t: string) =>
-        t === KEEP ? "Keep original name" : t === UNSET ? "Not decided" : t === CONFLICT ? "Conflicting rules" : canonicalById.get(t)?.name ?? t;
+        t === KEEP ? "Keep original name" : t === UNSET ? "No name chosen yet" : t === CONFLICT ? "Two rules clash" : canonicalById.get(t)?.name ?? t;
 
     const renderTargetSelect = (value: string, onChange: (v: string) => void) => (
         <select
@@ -385,10 +416,10 @@ export default function NamingSchemeStep({ categoryId, names }: { categoryId: st
                 value === UNSET || value === CONFLICT ? "border-danger/60" : value === KEEP ? "border-border-soft" : "border-accent/50"
             }`}
         >
-            <option value="">{value === CONFLICT ? "⚠ Conflicting rules — choose…" : "— Choose —"}</option>
+            <option value="">{value === CONFLICT ? "⚠ Two rules clash — choose a name…" : "— Choose a name —"}</option>
             <option value={KEEP}>Keep original name</option>
             {sortedCanonical.some((c) => c.standard) && (
-                <optgroup label="Standard attributes">
+                <optgroup label="My standard names">
                     {sortedCanonical
                         .filter((c) => c.standard)
                         .map((c) => (
@@ -407,83 +438,129 @@ export default function NamingSchemeStep({ categoryId, names }: { categoryId: st
                         </option>
                     ))}
             </optgroup>
-            <option value={NEW_NAME}>+ New name…</option>
+            <option value={NEW_NAME}>+ Add a new name…</option>
         </select>
     );
 
     return (
         <div className="space-y-6">
-            {/* Status + actions */}
+            {/* What this step is + a checklist of what to do */}
             <div className="admin-card rounded-xl p-6">
-                <div className="flex flex-wrap items-start justify-between gap-4">
-                    <div>
-                        <h2 className="flex items-center gap-2 text-lg font-bold text-main">
-                            <Sparkles className="h-5 w-5 text-accent" /> Naming scheme
-                            {scheme && (
-                                <StatusBadge tone={scheme.status === "approved" ? "success" : "warning"}>
-                                    {scheme.status === "approved" ? "Approved" : "Draft"}
-                                </StatusBadge>
-                            )}
-                            {dirty && <StatusBadge tone="info">Unsaved changes</StatusBadge>}
-                        </h2>
-                        <p className="mt-1 text-xs text-sub">
-                            The AI proposes one canonical name per meaning. A raw name can be split by value shape or brand.
-                            Nothing on products changes in this step. A full run uses about {Math.max(1, Math.ceil(names.length / (ai?.chunkSize ?? 20)))} AI
-                            requests (free tiers have daily limits — switch the model below if one runs out).
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="max-w-3xl">
+                        <h2 className="text-lg font-bold text-main">Choose the standard names</h2>
+                        <p className="mt-1 text-sm text-sub">
+                            Brands often name the same detail differently. Here an AI looks at all the names these products use and suggests{" "}
+                            <strong className="text-main">one standard name</strong> for each group that means the same thing. You check its suggestions and
+                            confirm them. <strong className="text-main">Nothing on your products changes in this step</strong> — you apply the new names to
+                            products one by one in the next step.
                         </p>
-                        {scheme?.status === "approved" && scheme.approvedAt && (
-                            <p className="mt-1 text-xs text-success">
-                                Approved {new Date(scheme.approvedAt).toLocaleString()}
-                                {scheme.approvedBy ? ` by ${scheme.approvedBy}` : ""}
-                            </p>
-                        )}
                     </div>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                        {scheme && <StatusBadge tone={confirmed ? "success" : "warning"}>{confirmed ? "Names confirmed" : "Not confirmed yet"}</StatusBadge>}
+                        {dirty && <StatusBadge tone="info">Unsaved edits</StatusBadge>}
+                    </div>
+                </div>
+
+                <ol className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                    <ChecklistItem
+                        n={1}
+                        done={template.length > 0}
+                        title="Add your standard names"
+                        text="Optional, but gives the best results: the exact names you want, like “Memory Type” or “Capacity”. The AI will use them."
+                    >
                         <button
                             type="button"
-                            onClick={() => runGeneration(0)}
-                            disabled={Boolean(busy) || !ai?.configured}
-                            className="flex items-center gap-2 rounded-lg bg-accent/20 px-4 py-2 text-sm font-medium text-accent hover:bg-accent/30 disabled:opacity-50"
+                            onClick={openStandardList}
+                            className="rounded-lg border border-border-soft px-3 py-1.5 text-sm text-main hover:bg-surface"
                         >
-                            <Sparkles className="h-4 w-4" /> {scheme ? "Regenerate with AI" : "Generate with AI"}
+                            {template.length ? "Edit my list" : "Add my list"}
                         </button>
-                        {resumeFrom != null && busy !== "generating" && scheme && (
+                    </ChecklistItem>
+                    <ChecklistItem
+                        n={2}
+                        done={Boolean(scheme)}
+                        title="Get AI suggestions"
+                        text={`The AI groups names that mean the same thing and picks a standard name for each. Takes a few minutes (about ${Math.max(1, Math.ceil(names.length / (ai?.chunkSize ?? 20)))} AI requests).`}
+                    >
+                        <div className="flex flex-wrap gap-2">
                             <button
                                 type="button"
-                                onClick={() => runGeneration(resumeFrom)}
-                                disabled={!ai?.configured}
-                                className="rounded-lg border border-accent/40 px-4 py-2 text-sm text-accent hover:bg-accent/10"
+                                onClick={() => runGeneration(0)}
+                                disabled={Boolean(busy) || !ai?.configured}
+                                className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-50"
                             >
-                                Resume (part {resumeFrom + 1})
+                                <Sparkles className="h-4 w-4" /> {scheme ? "Get new suggestions" : "Get AI suggestions"}
+                            </button>
+                            {resumeFrom != null && busy !== "generating" && scheme && (
+                                <button
+                                    type="button"
+                                    onClick={() => runGeneration(resumeFrom)}
+                                    disabled={!ai?.configured}
+                                    className="rounded-lg border border-accent/40 px-3 py-1.5 text-sm text-accent hover:bg-accent/10"
+                                >
+                                    Continue (part {resumeFrom + 1})
+                                </button>
+                            )}
+                        </div>
+                    </ChecklistItem>
+                    <ChecklistItem
+                        n={3}
+                        done={Boolean(scheme) && counts.attention === 0}
+                        title="Fix what needs you"
+                        text={
+                            !scheme
+                                ? "After the suggestions arrive, a few names may need your decision."
+                                : counts.attention
+                                  ? `${counts.attention} name${counts.attention === 1 ? "" : "s"} need your decision.`
+                                  : "Nothing left to decide."
+                        }
+                    >
+                        {scheme && counts.attention > 0 && (
+                            <button type="button" onClick={showAttention} className="rounded-lg border border-border-soft px-3 py-1.5 text-sm text-main hover:bg-surface">
+                                Show them
                             </button>
                         )}
-                        <button
-                            type="button"
-                            onClick={save}
-                            disabled={!dirty || Boolean(busy)}
-                            className="flex items-center gap-2 rounded-lg border border-border-soft px-4 py-2 text-sm text-main hover:bg-panel disabled:opacity-50"
-                        >
-                            <Save className="h-4 w-4" /> {busy === "saving" ? "Saving…" : "Save draft"}
-                        </button>
+                    </ChecklistItem>
+                    <ChecklistItem
+                        n={4}
+                        done={confirmed}
+                        title="Confirm the names"
+                        text="Locks in this naming plan so the next step can use it. You can still change it later."
+                    >
                         <button
                             type="button"
                             onClick={approve}
-                            disabled={!scheme || Boolean(busy) || (scheme.status === "approved" && !dirty)}
-                            className="flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-50"
+                            disabled={!scheme || Boolean(busy) || confirmed}
+                            className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-50"
                         >
-                            <CheckCircle2 className="h-4 w-4" /> {busy === "approving" ? "Approving…" : "Approve scheme"}
+                            <CheckCircle2 className="h-4 w-4" /> {busy === "approving" ? "Confirming…" : confirmed ? "Confirmed" : "Confirm names"}
+                        </button>
+                    </ChecklistItem>
+                </ol>
+
+                {dirty && (
+                    <div className="mt-4 flex flex-wrap items-center gap-3 rounded-lg border border-info/40 bg-info/10 p-3 text-sm text-main">
+                        You have edits that aren&apos;t saved yet.
+                        <button
+                            type="button"
+                            onClick={save}
+                            disabled={Boolean(busy)}
+                            className="flex items-center gap-1.5 rounded-lg border border-border-soft px-3 py-1 text-sm hover:bg-surface disabled:opacity-50"
+                        >
+                            <Save className="h-4 w-4" /> {busy === "saving" ? "Saving…" : "Save my edits"}
                         </button>
                     </div>
-                </div>
+                )}
 
                 {ai && !ai.configured && (
                     <p className="mt-4 rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm text-warning">
                         {ai.keySet ? (
-                            <>No model chosen for {ai.providerLabel} yet — pick one under &quot;AI model&quot; above.</>
+                            <>No AI model chosen for {ai.providerLabel} yet — pick one in the “AI model” box below.</>
                         ) : (
                             <>
-                                {ai.providerLabel} isn&apos;t set up on the server (<code>{ai.keyEnv}</code>). Add it to the environment and
-                                redeploy, or choose another provider under &quot;AI model&quot;.
+                                {ai.providerLabel} isn&apos;t set up on the server (<code>{ai.keyEnv}</code>). Add it to the environment and redeploy, or choose
+                                another provider in the “AI model” box below.
                             </>
                         )}
                     </p>
@@ -491,7 +568,9 @@ export default function NamingSchemeStep({ categoryId, names }: { categoryId: st
                 {busy === "generating" && progress && (
                     <div className="mt-4">
                         <div className="mb-1 flex justify-between text-xs text-sub">
-                            <span>Asking {ai?.model || "the AI"}… part {Math.min(progress.done + 1, progress.total)} of {progress.total}</span>
+                            <span>
+                                Asking {ai?.model || "the AI"}… part {Math.min(progress.done + 1, progress.total)} of {progress.total}
+                            </span>
                             <span>{Math.round((progress.done / progress.total) * 100)}%</span>
                         </div>
                         <div className="h-2 overflow-hidden rounded-full bg-panel">
@@ -509,6 +588,21 @@ export default function NamingSchemeStep({ categoryId, names }: { categoryId: st
                 )}
             </div>
 
+            {confirmed && (
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-success/40 bg-success/10 p-4">
+                    <p className="text-sm text-main">
+                        <strong>Names confirmed.</strong> Nothing on your products has changed yet. Next, go through the products and apply the new names.
+                    </p>
+                    <button
+                        type="button"
+                        onClick={onGoToReview}
+                        className="flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white hover:bg-accent/90"
+                    >
+                        Review products <ArrowRight className="h-4 w-4" />
+                    </button>
+                </div>
+            )}
+
             <AiModelSettings
                 active={ai}
                 onChanged={(next) => {
@@ -517,25 +611,22 @@ export default function NamingSchemeStep({ categoryId, names }: { categoryId: st
                 }}
             />
 
-            {/* Standard attribute list */}
-            <div className="admin-card rounded-xl p-6">
+            {/* Standard names list */}
+            <div id="standard-list" className="admin-card rounded-xl p-6">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                         <h3 className="flex items-center gap-2 text-base font-bold text-main">
-                            <ListChecks className="h-5 w-5 text-accent" /> Standard attribute list ({template.length})
+                            <ListChecks className="h-5 w-5 text-accent" /> My standard names ({template.length})
                         </h3>
                         <p className="mt-1 text-xs text-sub">
-                            The official names for this category. The AI must use these exact names when the meaning matches;
-                            attributes that match none of them keep their own name.
+                            The exact names you want for this category. When something means the same, the AI uses your name. Names that match none of them
+                            stay as they are.
                         </p>
                     </div>
                     {!editingTemplate && (
                         <button
                             type="button"
-                            onClick={() => {
-                                setTemplateText(templateToText(template));
-                                setEditingTemplate(true);
-                            }}
+                            onClick={openStandardList}
                             className="rounded-lg border border-border-soft px-3 py-1.5 text-sm text-main hover:bg-panel"
                         >
                             {template.length ? "Edit list" : "Add list"}
@@ -546,26 +637,20 @@ export default function NamingSchemeStep({ categoryId, names }: { categoryId: st
                 {!editingTemplate && template.length > 0 && (
                     <div className="mt-3 flex flex-wrap gap-1.5">
                         {template.map((a) => (
-                            <span
-                                key={a.name}
-                                title={a.description}
-                                className="rounded-md border border-border-soft bg-surface px-2 py-1 text-xs text-main"
-                            >
+                            <span key={a.name} title={a.description} className="rounded-md border border-border-soft bg-surface px-2 py-1 text-xs text-main">
                                 {a.name}
                             </span>
                         ))}
                     </div>
                 )}
                 {!editingTemplate && template.length === 0 && (
-                    <p className="mt-3 text-xs text-warning">
-                        No standard list yet — the AI will invent names. Add one first for best results.
-                    </p>
+                    <p className="mt-3 text-xs text-warning">No list yet — the AI will make up its own names. For the best result, add one first.</p>
                 )}
 
                 {editingTemplate && (
                     <div className="mt-4 space-y-3">
                         <div className="flex flex-wrap items-center gap-2 text-xs text-sub">
-                            Load a preset:
+                            Start from a ready-made list:
                             {TEMPLATE_PRESETS.map((preset) => (
                                 <button
                                     key={preset.id}
@@ -581,12 +666,11 @@ export default function NamingSchemeStep({ categoryId, names }: { categoryId: st
                             value={templateText}
                             onChange={(e) => setTemplateText(e.target.value)}
                             rows={12}
-                            placeholder={"One per line: Name | example values\nor paste a Markdown table"}
+                            placeholder={"One name per line. You can add example values after a | sign:\nMemory Type | DDR4 / DDR5\nCapacity | 16GB / 32GB"}
                             className="w-full rounded-lg border border-border-soft bg-surface px-3 py-2 font-mono text-xs text-main"
                         />
                         <p className="text-xs text-sub">
-                            {parsedTemplate.length} attributes detected. Paste a table, or write one per line as{" "}
-                            <code>Name | example values</code>.
+                            {parsedTemplate.length} names found. You can also paste a table. The text after <code>|</code> is only an example for the AI.
                         </p>
                         <div className="flex gap-2">
                             <button
@@ -597,11 +681,7 @@ export default function NamingSchemeStep({ categoryId, names }: { categoryId: st
                             >
                                 <Save className="h-4 w-4" /> {savingTemplate ? "Saving…" : "Save list"}
                             </button>
-                            <button
-                                type="button"
-                                onClick={() => setEditingTemplate(false)}
-                                className="rounded-lg px-4 py-2 text-sm text-sub hover:text-main"
-                            >
+                            <button type="button" onClick={() => setEditingTemplate(false)} className="rounded-lg px-4 py-2 text-sm text-sub hover:text-main">
                                 Cancel
                             </button>
                         </div>
@@ -610,234 +690,277 @@ export default function NamingSchemeStep({ categoryId, names }: { categoryId: st
 
                 {scheme && !editingTemplate && unusedStandard.length > 0 && (
                     <p className="mt-3 text-xs text-sub">
-                        <span className="font-semibold text-warning">No product attribute mapped yet to:</span>{" "}
-                        {unusedStandard.map((c) => c.name).join(", ")}
+                        <span className="font-semibold text-warning">No product detail matched these yet:</span> {unusedStandard.map((c) => c.name).join(", ")}
                     </p>
                 )}
             </div>
 
             {!scheme ? (
                 <div className="admin-card rounded-xl p-10 text-center text-sm text-sub">
-                    No naming scheme yet. Click <strong>Generate with AI</strong> — it sends this category&apos;s attribute names,
-                    value shapes and sample values to Gemini in small parts.
+                    No suggestions yet. Click <strong className="text-main">Get AI suggestions</strong> above — it sends this category&apos;s detail names and a few
+                    example values to the AI, in small parts.
                 </div>
             ) : (
-                <>
-                    {/* Canonical names */}
-                    <div className="admin-card rounded-xl p-6">
-                        <button
-                            type="button"
-                            onClick={() => setShowCanonical((v) => !v)}
-                            className="flex w-full items-center justify-between text-left"
-                        >
-                            <span className="text-base font-bold text-main">Canonical names ({canonical.length})</span>
-                            {showCanonical ? <ChevronDown className="h-4 w-4 text-sub" /> : <ChevronRight className="h-4 w-4 text-sub" />}
-                        </button>
-                        {showCanonical && (
-                            <div className="mt-4 space-y-2">
-                                {sortedCanonical.map((c) => (
-                                    <div key={c.id} className="grid gap-2 sm:grid-cols-[minmax(0,14rem)_1fr_auto_auto] sm:items-center">
-                                        <input
-                                            value={c.name}
-                                            disabled={c.standard}
-                                            title={c.standard ? "Standard name — change it in the standard attribute list" : undefined}
-                                            onChange={(e) =>
-                                                updateScheme({
-                                                    canonical: canonical.map((x) => (x.id === c.id ? { ...x, name: e.target.value } : x)),
-                                                })
-                                            }
-                                            className="rounded-lg border border-border-soft bg-surface px-3 py-1.5 text-sm font-semibold text-main disabled:opacity-80"
-                                            aria-label="Canonical name"
-                                        />
-                                        <input
-                                            value={c.description ?? ""}
-                                            onChange={(e) =>
-                                                updateScheme({
-                                                    canonical: canonical.map((x) => (x.id === c.id ? { ...x, description: e.target.value } : x)),
-                                                })
-                                            }
-                                            placeholder="What it means"
-                                            className="rounded-lg border border-border-soft bg-surface px-3 py-1.5 text-xs text-sub"
-                                            aria-label="Description"
-                                        />
-                                        <span className="flex items-center gap-1 text-xs text-sub">
-                                            {c.standard && (
-                                                <StatusBadge tone="info">
-                                                    <Lock className="mr-1 inline h-3 w-3" />
-                                                    Standard
-                                                </StatusBadge>
-                                            )}
-                                            {usage.get(c.id) ?? 0} rules
-                                        </span>
-                                        <button
-                                            type="button"
-                                            disabled={(usage.get(c.id) ?? 0) > 0 || c.standard}
-                                            onClick={() => updateScheme({ canonical: canonical.filter((x) => x.id !== c.id) })}
-                                            className="rounded p-1.5 text-danger hover:bg-danger/10 disabled:opacity-30"
-                                            title={(usage.get(c.id) ?? 0) > 0 ? "In use — reassign its rules first" : "Delete"}
-                                        >
-                                            <Trash2 className="h-4 w-4" />
-                                        </button>
-                                    </div>
-                                ))}
-                                <button
-                                    type="button"
-                                    onClick={() => addCanonical(window.prompt("New attribute name (Title Case, no units):") ?? "")}
-                                    className="mt-2 text-sm text-accent hover:underline"
-                                >
-                                    + Add canonical name
-                                </button>
-                            </div>
-                        )}
+                <div id="name-results" className="admin-card rounded-xl p-6">
+                    <h3 className="text-base font-bold text-main">The AI&apos;s suggestions</h3>
+                    <p className="mt-1 text-sm text-sub">
+                        {counts.all} detail names found: <strong className="text-main">{counts.renamed}</strong> will be renamed,{" "}
+                        <strong className="text-main">{counts.kept}</strong> keep their name,{" "}
+                        <strong className={counts.attention ? "text-danger" : "text-main"}>{counts.attention}</strong> need your decision.
+                    </p>
+
+                    <div className="my-4 flex flex-wrap gap-2">
+                        {(
+                            [
+                                ["attention", "Need your decision", "text-danger"],
+                                ["renamed", "Will be renamed", "text-accent"],
+                                ["kept", "Stay the same", ""],
+                                ["all", "All", ""],
+                            ] as [Filter, string, string][]
+                        ).map(([id, label, tone]) => (
+                            <button
+                                key={id}
+                                type="button"
+                                onClick={() => setFilter(id)}
+                                className={`rounded-full border px-3 py-1.5 text-xs font-medium ${
+                                    filter === id ? "border-accent bg-accent/15 text-main" : "border-border-soft text-sub hover:text-main"
+                                }`}
+                            >
+                                <span className={tone}>{label}</span> ({counts[id]})
+                            </button>
+                        ))}
                     </div>
 
-                    {/* Per-name review */}
-                    <div className="admin-card rounded-xl p-6">
-                        <div className="mb-4 flex flex-wrap gap-2">
-                            {(
-                                [
-                                    ["attention", "Needs attention", "text-danger"],
-                                    ["renamed", "Will be renamed", "text-accent"],
-                                    ["kept", "Keeps its name", ""],
-                                    ["all", "All", ""],
-                                ] as [Filter, string, string][]
-                            ).map(([id, label, tone]) => (
+                    {filter === "attention" && counts.attention > 0 && (
+                        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm text-main">
+                            <span>
+                                The AI couldn&apos;t decide these. Open each one and pick the right name from the list — or choose{" "}
+                                <strong>“Keep original name”</strong> if none fits.
+                            </span>
+                            {undecidedCount > 0 && (
                                 <button
-                                    key={id}
                                     type="button"
-                                    onClick={() => setFilter(id)}
-                                    className={`rounded-full border px-3 py-1.5 text-xs font-medium ${
-                                        filter === id ? "border-accent bg-accent/15 text-main" : "border-border-soft text-sub hover:text-main"
-                                    }`}
+                                    onClick={keepUndecided}
+                                    className="rounded-lg border border-border-soft bg-surface px-3 py-1.5 text-sm hover:bg-panel"
+                                    title="Leaves every undecided name exactly as it is"
                                 >
-                                    <span className={tone}>{label}</span> ({counts[id]})
+                                    Keep the original name for all {undecidedCount} undecided
                                 </button>
-                            ))}
-                        </div>
-                        <div className="relative mb-4">
-                            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-sub" />
-                            <input
-                                value={search}
-                                onChange={(e) => setSearch(e.target.value)}
-                                placeholder="Search raw or canonical names…"
-                                className="w-full rounded-lg border border-border-soft bg-surface py-2 pl-9 pr-3 text-sm text-main"
-                            />
-                        </div>
-
-                        <div className="divide-y divide-border-soft">
-                            {visible.map((r) => {
-                                const n = r.name;
-                                // Names needing attention start open; clicking flips the default either way.
-                                const open = r.attention ? !expanded.has(n.key) : expanded.has(n.key);
-                                const summaryTargets = Array.from(
-                                    new Set(r.shapeRows.flatMap((row) => (row.brandTargets ? Object.values(row.brandTargets) : [row.target])))
-                                );
-                                return (
-                                    <div key={n.key} className="py-3">
-                                        <button type="button" onClick={() => toggleExpanded(n.key)} className="flex w-full items-start gap-2 text-left">
-                                            {open ? (
-                                                <ChevronDown className="mt-0.5 h-4 w-4 shrink-0 text-sub" />
-                                            ) : (
-                                                <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-sub" />
-                                            )}
-                                            <div className="min-w-0 flex-1">
-                                                <div className="flex flex-wrap items-center gap-2">
-                                                    <span className="font-semibold text-main">{n.name}</span>
-                                                    <ArrowRight className="h-3.5 w-3.5 text-sub" />
-                                                    {summaryTargets.map((t) => (
-                                                        <span
-                                                            key={t}
-                                                            className={`rounded px-1.5 py-0.5 text-xs ${
-                                                                t === UNSET || t === CONFLICT
-                                                                    ? "bg-danger/15 text-danger"
-                                                                    : t === KEEP
-                                                                      ? "bg-panel text-sub"
-                                                                      : "bg-accent/15 text-accent"
-                                                            }`}
-                                                        >
-                                                            {targetLabel(t)}
-                                                        </span>
-                                                    ))}
-                                                    <span className="text-xs text-sub">· {n.productCount} products</span>
-                                                    {r.conflict && <StatusBadge tone="danger">Conflict</StatusBadge>}
-                                                    {r.note && <StatusBadge tone="warning">Unresolved</StatusBadge>}
-                                                    {r.lowConfidence && <StatusBadge tone="warning">Low confidence</StatusBadge>}
-                                                    {n.flags.ambiguous && <StatusBadge tone="danger">Mixed meanings</StatusBadge>}
-                                                    {n.sources.spec > 0 && <StatusBadge tone="info">Filter spec</StatusBadge>}
-                                                </div>
-                                                {r.note && (
-                                                    <p className="mt-1 flex items-center gap-1 text-xs text-warning">
-                                                        <AlertTriangle className="h-3 w-3" /> {r.note}
-                                                    </p>
-                                                )}
-                                            </div>
-                                        </button>
-
-                                        {open && (
-                                            <div className="ml-6 mt-3 space-y-2">
-                                                {r.shapeRows.map((row, index) => {
-                                                    const shape = n.signatures.find((s) => s.signature === row.signature);
-                                                    if (!shape) return null;
-                                                    return (
-                                                        <div key={row.signature} className="rounded-lg border border-border-soft bg-panel p-3">
-                                                            <div className="grid gap-3 md:grid-cols-[1fr_16rem]">
-                                                                <div className="min-w-0">
-                                                                    <p className="text-sm font-medium text-main">
-                                                                        {shape.label}
-                                                                        <span className="ml-1 text-xs text-sub">
-                                                                            · {shape.count} use{shape.count === 1 ? "" : "s"} · {shape.brands.join(", ")}
-                                                                        </span>
-                                                                    </p>
-                                                                    <p className="mt-1 line-clamp-2 whitespace-pre-line text-xs text-sub">
-                                                                        e.g. {shape.samples.slice(0, 2).map((s) => s.value).join("  |  ")}
-                                                                    </p>
-                                                                    {row.reason && (
-                                                                        <p className="mt-1 text-xs italic text-sub">
-                                                                            AI: {row.reason}
-                                                                            {row.confidence ? ` (${row.confidence} confidence)` : ""}
-                                                                        </p>
-                                                                    )}
-                                                                </div>
-                                                                <div className="space-y-2">
-                                                                    {row.brandTargets ? (
-                                                                        Object.entries(row.brandTargets).map(([brand, target]) => (
-                                                                            <label key={brand} className="block text-xs text-sub">
-                                                                                {brand}
-                                                                                {renderTargetSelect(target, (v) => setTarget(n.key, r.shapeRows, index, v, brand))}
-                                                                            </label>
-                                                                        ))
-                                                                    ) : (
-                                                                        renderTargetSelect(row.target, (v) => setTarget(n.key, r.shapeRows, index, v))
-                                                                    )}
-                                                                    {shape.brands.length > 1 && (
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => toggleSplit(n.key, r.shapeRows, index, shape.brands)}
-                                                                            className="flex items-center gap-1 text-xs text-sub hover:text-main"
-                                                                        >
-                                                                            <Split className="h-3 w-3" />
-                                                                            {row.brandTargets ? "Same for all brands" : "Different per brand"}
-                                                                        </button>
-                                                                    )}
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        )}
-                                    </div>
-                                );
-                            })}
-                            {visible.length === 0 && (
-                                <p className="py-8 text-center text-sm text-sub">
-                                    {filter === "attention" ? "Nothing needs attention." : "No names match."}
-                                </p>
                             )}
                         </div>
+                    )}
+
+                    <div className="relative mb-4">
+                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-sub" />
+                        <input
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            placeholder="Search a name…"
+                            className="w-full rounded-lg border border-border-soft bg-surface py-2 pl-9 pr-3 text-sm text-main"
+                        />
                     </div>
-                </>
+
+                    <div className="divide-y divide-border-soft">
+                        {visible.map((r) => {
+                            const n = r.name;
+                            // Names that need you start open; clicking flips the default either way.
+                            const open = r.attention ? !expanded.has(n.key) : expanded.has(n.key);
+                            const summaryTargets = Array.from(
+                                new Set(r.shapeRows.flatMap((row) => (row.brandTargets ? Object.values(row.brandTargets) : [row.target])))
+                            );
+                            return (
+                                <div key={n.key} className="py-3">
+                                    <button type="button" onClick={() => toggleExpanded(n.key)} className="flex w-full items-start gap-2 text-left">
+                                        {open ? (
+                                            <ChevronDown className="mt-0.5 h-4 w-4 shrink-0 text-sub" />
+                                        ) : (
+                                            <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-sub" />
+                                        )}
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <span className="font-semibold text-main">{n.name}</span>
+                                                <span className="text-xs text-sub">on {n.productCount} products</span>
+                                                <ArrowRight className="h-3.5 w-3.5 text-sub" aria-label="becomes" />
+                                                {summaryTargets.map((t) => (
+                                                    <span
+                                                        key={t}
+                                                        className={`rounded px-1.5 py-0.5 text-xs ${
+                                                            t === UNSET || t === CONFLICT
+                                                                ? "bg-danger/15 text-danger"
+                                                                : t === KEEP
+                                                                  ? "bg-panel text-sub"
+                                                                  : "bg-accent/15 text-accent"
+                                                        }`}
+                                                    >
+                                                        {targetLabel(t)}
+                                                    </span>
+                                                ))}
+                                                {r.conflict && <StatusBadge tone="danger">Two rules clash</StatusBadge>}
+                                                {r.note && <StatusBadge tone="warning">AI couldn&apos;t decide</StatusBadge>}
+                                                {r.lowConfidence && <StatusBadge tone="warning">AI unsure</StatusBadge>}
+                                                {n.flags.ambiguous && <StatusBadge tone="danger">Used for different things</StatusBadge>}
+                                                {n.sources.spec > 0 && (
+                                                    <span title="Customers filter products by this detail in the shop">
+                                                        <StatusBadge tone="info">Shop filter</StatusBadge>
+                                                    </span>
+                                                )}
+                                            </div>
+                                            {r.note && (
+                                                <p className="mt-1 flex items-center gap-1 text-xs text-warning">
+                                                    <AlertTriangle className="h-3 w-3" /> AI note: {r.note}
+                                                </p>
+                                            )}
+                                        </div>
+                                    </button>
+
+                                    {open && (
+                                        <div className="ml-6 mt-3 space-y-2">
+                                            {r.shapeRows.map((row, index) => {
+                                                const shape = n.signatures.find((s) => s.signature === row.signature);
+                                                if (!shape) return null;
+                                                return (
+                                                    <div key={row.signature} className="rounded-lg border border-border-soft bg-panel p-3">
+                                                        <div className="grid gap-3 md:grid-cols-[1fr_16rem]">
+                                                            <div className="min-w-0">
+                                                                <p className="text-sm font-medium text-main">
+                                                                    {shape.count} product{shape.count === 1 ? "" : "s"}
+                                                                    <span className="ml-1 text-xs font-normal text-sub">· {shape.brands.join(", ")}</span>
+                                                                </p>
+                                                                <p className="mt-1 line-clamp-3 whitespace-pre-line text-xs text-sub">
+                                                                    Example values: {shape.samples.slice(0, 2).map((s) => s.value).join("  |  ")}
+                                                                </p>
+                                                                {n.signatures.length > 1 && (
+                                                                    <p className="mt-0.5 text-[11px] text-sub/70">Looks like: {shape.label.toLowerCase()}</p>
+                                                                )}
+                                                                {row.reason && (
+                                                                    <p className="mt-1 text-xs italic text-sub">
+                                                                        AI says: {row.reason}
+                                                                        {row.confidence ? ` (${confidenceWords[row.confidence]})` : ""}
+                                                                    </p>
+                                                                )}
+                                                            </div>
+                                                            <div className="space-y-2">
+                                                                <p className="text-[11px] font-semibold uppercase tracking-wide text-sub">Call it</p>
+                                                                {row.brandTargets ? (
+                                                                    Object.entries(row.brandTargets).map(([brand, target]) => (
+                                                                        <label key={brand} className="block text-xs text-sub">
+                                                                            For {brand}
+                                                                            {renderTargetSelect(target, (v) => setTarget(n.key, r.shapeRows, index, v, brand))}
+                                                                        </label>
+                                                                    ))
+                                                                ) : (
+                                                                    renderTargetSelect(row.target, (v) => setTarget(n.key, r.shapeRows, index, v))
+                                                                )}
+                                                                {shape.brands.length > 1 && (
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => toggleSplit(n.key, r.shapeRows, index, shape.brands)}
+                                                                        className="flex items-center gap-1 text-xs text-sub hover:text-main"
+                                                                    >
+                                                                        <Split className="h-3 w-3" />
+                                                                        {row.brandTargets ? "Same name for all brands" : "Different name per brand"}
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
+                        {visible.length === 0 && (
+                            <p className="py-8 text-center text-sm text-sub">
+                                {filter === "attention" ? "🎉 Nothing needs your decision." : "No names match."}
+                            </p>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* Advanced: the full list of standard names the dropdowns offer */}
+            {scheme && (
+                <div className="admin-card rounded-xl p-6">
+                    <button type="button" onClick={() => setShowCanonical((v) => !v)} className="flex w-full items-center justify-between text-left">
+                        <span className="text-base font-bold text-main">
+                            All names the dropdowns offer ({canonical.length}) <span className="text-xs font-normal text-sub">— advanced</span>
+                        </span>
+                        {showCanonical ? <ChevronDown className="h-4 w-4 text-sub" /> : <ChevronRight className="h-4 w-4 text-sub" />}
+                    </button>
+                    {showCanonical && (
+                        <div className="mt-4 space-y-2">
+                            <p className="text-xs text-sub">Rename a name, describe what it means, or add one. Names from “My standard names” are locked here.</p>
+                            {sortedCanonical.map((c) => (
+                                <div key={c.id} className="grid gap-2 sm:grid-cols-[minmax(0,14rem)_1fr_auto_auto] sm:items-center">
+                                    <input
+                                        value={c.name}
+                                        disabled={c.standard}
+                                        title={c.standard ? "From “My standard names” — change it there" : undefined}
+                                        onChange={(e) => updateScheme({ canonical: canonical.map((x) => (x.id === c.id ? { ...x, name: e.target.value } : x)) })}
+                                        className="rounded-lg border border-border-soft bg-surface px-3 py-1.5 text-sm font-semibold text-main disabled:opacity-80"
+                                        aria-label="Name"
+                                    />
+                                    <input
+                                        value={c.description ?? ""}
+                                        onChange={(e) => updateScheme({ canonical: canonical.map((x) => (x.id === c.id ? { ...x, description: e.target.value } : x)) })}
+                                        placeholder="What it means"
+                                        className="rounded-lg border border-border-soft bg-surface px-3 py-1.5 text-xs text-sub"
+                                        aria-label="Description"
+                                    />
+                                    <span className="flex items-center gap-1 text-xs text-sub">
+                                        {c.standard && (
+                                            <StatusBadge tone="info">
+                                                <Lock className="mr-1 inline h-3 w-3" />
+                                                Mine
+                                            </StatusBadge>
+                                        )}
+                                        used {usage.get(c.id) ?? 0}×
+                                    </span>
+                                    <button
+                                        type="button"
+                                        disabled={(usage.get(c.id) ?? 0) > 0 || c.standard}
+                                        onClick={() => updateScheme({ canonical: canonical.filter((x) => x.id !== c.id) })}
+                                        className="rounded p-1.5 text-danger hover:bg-danger/10 disabled:opacity-30"
+                                        title={(usage.get(c.id) ?? 0) > 0 ? "In use — pick another name for those first" : "Delete"}
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                    </button>
+                                </div>
+                            ))}
+                            <button
+                                type="button"
+                                onClick={() => addCanonical(window.prompt("New name (Title Case):") ?? "")}
+                                className="mt-2 text-sm text-accent hover:underline"
+                            >
+                                + Add a name
+                            </button>
+                        </div>
+                    )}
+                </div>
             )}
         </div>
+    );
+}
+
+const confidenceWords = { high: "confident", medium: "fairly sure", low: "unsure" } as const;
+
+function ChecklistItem({ n, done, title, text, children }: { n: number; done: boolean; title: string; text: ReactNode; children?: ReactNode }) {
+    return (
+        <li className={`flex flex-col gap-2 rounded-lg border p-3 ${done ? "border-success/40 bg-success/5" : "border-border-soft bg-panel"}`}>
+            <div className="flex items-center gap-2">
+                <span
+                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                        done ? "bg-success text-white" : "border border-border-soft bg-surface text-sub"
+                    }`}
+                >
+                    {done ? <Check className="h-3.5 w-3.5" /> : n}
+                </span>
+                <span className="text-sm font-semibold text-main">{title}</span>
+            </div>
+            <p className="text-xs text-sub">{text}</p>
+            {children ? <div className="mt-auto pt-1">{children}</div> : null}
+        </li>
     );
 }
