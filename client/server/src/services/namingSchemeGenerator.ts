@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 import AttributeNamingScheme from '../models/AttributeNamingScheme';
 import CategoryAttributeTemplate from '../models/CategoryAttributeTemplate';
 import { buildCategoryInventory, type InventoryName } from './attributeInventory';
-import { generateJson, geminiModel } from './gemini';
+import { chunkSizeFor, generateJson, getActiveAi } from './aiProviders';
 import {
     canonicalIdFromName,
     type CanonicalAttribute,
@@ -11,7 +11,6 @@ import {
 } from '../../../lib/attributeNamingRules';
 import { attributeLooseKey } from '../../../lib/attributeMatchKey';
 
-export const DEFAULT_CHUNK_SIZE = 12;
 
 const SYSTEM_INSTRUCTION = `You standardise ATTRIBUTE NAMES for a computer hardware store. Different manufacturers
 name the same specification differently, and sometimes use the same name for different things.
@@ -43,6 +42,12 @@ Rules you must follow:
   canonicalId null (keep its original name), or — only if several raw names clearly mean the same non-standard thing —
   create one new non-standard canonical attribute for them.
 - "reason": one short sentence a store admin can understand.`;
+
+/** For providers without a response schema (OpenAI-compatible APIs): describe the JSON in words. */
+const JSON_SHAPE_HINT = `Respond with ONLY one JSON object — no prose, no markdown, no code fences — shaped exactly like:
+{"canonical":[{"id":"kebab-case-id","name":"Title Case Name","description":"what it means"}],
+ "rules":[{"key":"<raw name key from the input>","canonicalId":"<canonical id, or null to keep the original name>","signatures":["<signature from that name's shapes; omit when the rule covers every shape>"],"brands":["<brand; omit unless needed>"],"confidence":"high|medium|low","reason":"one short sentence"}],
+ "unresolved":[{"key":"<raw name key>","note":"why the meaning is unclear"}]}`;
 
 const RESPONSE_SCHEMA = {
     type: 'OBJECT',
@@ -146,7 +151,7 @@ export function mergeAiResponse(
     const idByLoose = new Map(canonical.map((c) => [attributeLooseKey(c.name), c.id]));
     const knownIds = new Set(canonical.map((c) => c.id));
     const aiIdToId = new Map<string, string>();
-    for (const c of ai.canonical ?? []) {
+    for (const c of Array.isArray(ai.canonical) ? ai.canonical : []) {
         const name = c.name?.trim();
         if (!name) continue;
         const loose = attributeLooseKey(name);
@@ -172,7 +177,7 @@ export function mergeAiResponse(
     const nextUnresolved = new Map(unresolved.filter((u) => !chunkByKey.has(u.key)).map((u) => [u.key, u]));
     const keptRules = rules.filter((r) => !chunkByKey.has(r.key));
 
-    for (const r of ai.rules ?? []) {
+    for (const r of Array.isArray(ai.rules) ? ai.rules : []) {
         const name = chunkByKey.get(r.key);
         if (!name) continue;
         const canonicalId = resolveCanonical(r.canonicalId);
@@ -200,7 +205,7 @@ export function mergeAiResponse(
         covered.add(r.key);
     }
 
-    for (const u of ai.unresolved ?? []) {
+    for (const u of Array.isArray(ai.unresolved) ? ai.unresolved : []) {
         if (chunkByKey.has(u.key)) nextUnresolved.set(u.key, { key: u.key, note: u.note?.trim() || 'Unclear meaning.' });
     }
     for (const key of chunkByKey.keys()) {
@@ -231,12 +236,13 @@ export function standardCanonical(attributes: { name: string; description?: stri
 export async function generateSchemeChunk({
     category,
     chunkIndex,
-    chunkSize = DEFAULT_CHUNK_SIZE,
 }: {
     category: { _id: mongoose.Types.ObjectId; name: string };
     chunkIndex: number;
-    chunkSize?: number;
 }) {
+    const active = await getActiveAi();
+    const chunkSize = chunkSizeFor(active.provider);
+    const modelLabel = `${active.provider.id}:${active.model}`;
     const inventory = await buildCategoryInventory(category);
     const names = [...inventory.names].sort((a, b) => a.key.localeCompare(b.key));
     const totalChunks = Math.max(1, Math.ceil(names.length / chunkSize));
@@ -257,7 +263,7 @@ export async function generateSchemeChunk({
             unresolved: [],
             approvedAt: undefined,
             approvedBy: undefined,
-            generation: { model: geminiModel(), startedAt: new Date(), completedChunks: 0, totalChunks },
+            generation: { model: modelLabel, startedAt: new Date(), completedChunks: 0, totalChunks },
         });
     }
 
@@ -267,10 +273,11 @@ export async function generateSchemeChunk({
         unresolved: UnresolvedName[];
     };
     const existingCanonical = current.canonical.map(({ id, name, description, standard }) => ({ id, name, description, standard }));
-    const ai = await generateJson<AiResponse>({
+    const ai = await generateJson<AiResponse>(active, {
         systemInstruction: SYSTEM_INSTRUCTION,
         prompt: buildPrompt(category.name, chunk, existingCanonical),
         responseSchema: RESPONSE_SCHEMA,
+        jsonShapeHint: JSON_SHAPE_HINT,
     });
 
     const merged = mergeAiResponse(
@@ -287,7 +294,7 @@ export async function generateSchemeChunk({
         rules: merged.rules,
         unresolved: merged.unresolved,
         generation: {
-            model: geminiModel(),
+            model: modelLabel,
             startedAt: scheme.generation?.startedAt ?? new Date(),
             completedChunks: chunkIndex + 1,
             totalChunks,

@@ -27,6 +27,17 @@ export interface Inventory {
     names: InventoryName[];
 }
 
+/** What the browser may know about the active AI provider (never any key). */
+export interface ActiveAi {
+    providerId: string;
+    providerLabel: string;
+    model: string;
+    configured: boolean;
+    keyEnv: string;
+    minGapSeconds: number;
+    chunkSize: number;
+}
+
 export interface NamingScheme {
     status: "draft" | "approved";
     canonical: CanonicalAttribute[];

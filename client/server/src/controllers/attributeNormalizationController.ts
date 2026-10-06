@@ -6,8 +6,18 @@ import { buildCategoryInventory } from '../services/attributeInventory';
 import AttributeNamingScheme from '../models/AttributeNamingScheme';
 import CategoryAttributeTemplate from '../models/CategoryAttributeTemplate';
 import { attributeLooseKey } from '../../../lib/attributeMatchKey';
-import { DEFAULT_CHUNK_SIZE, generateSchemeChunk, standardCanonical } from '../services/namingSchemeGenerator';
-import { GeminiError, geminiModel, isGeminiConfigured } from '../services/gemini';
+import { generateSchemeChunk, standardCanonical } from '../services/namingSchemeGenerator';
+import { AiError } from '../services/aiError';
+import AiSetting from '../models/AiSetting';
+import {
+    PROVIDERS,
+    PROVIDER_IDS,
+    chunkSizeFor,
+    describeActiveAi,
+    getActiveAi,
+    isProviderConfigured,
+    providerById,
+} from '../services/aiProviders';
 import type { NamingRule } from '../../../lib/attributeNamingRules';
 
 function paramOf(req: Request, name: string): string {
@@ -88,9 +98,7 @@ export const getNamingScheme = async (req: Request, res: Response, next: NextFun
         res.json({
             scheme,
             template: template?.attributes ?? [],
-            geminiConfigured: isGeminiConfigured(),
-            model: geminiModel(),
-            chunkSize: DEFAULT_CHUNK_SIZE,
+            ai: describeActiveAi(await getActiveAi()),
         });
     } catch (error) {
         next(error);
@@ -102,8 +110,13 @@ export const generateNamingSchemeChunk = async (req: Request, res: Response, nex
     try {
         const category = await resolveCategory(paramOf(req, 'categoryKey'));
         if (!category) return categoryNotFound(next);
-        if (!isGeminiConfigured()) {
-            res.status(400).json({ message: 'GEMINI_API_KEY is not set on the server.' });
+        const active = await getActiveAi();
+        if (!active.configured) {
+            res.status(400).json({
+                message: active.model
+                    ? `${active.provider.label} is not configured: set ${active.provider.id === 'custom' ? 'AI_CUSTOM_BASE_URL' : active.provider.keyEnv} on the server, or pick another provider.`
+                    : `No model chosen for ${active.provider.label}. Enter a model name.`,
+            });
             return;
         }
         const chunkIndex = Number(req.body?.chunkIndex ?? 0);
@@ -113,10 +126,16 @@ export const generateNamingSchemeChunk = async (req: Request, res: Response, nex
         }
         res.json(await generateSchemeChunk({ category, chunkIndex }));
     } catch (error) {
-        if (error instanceof GeminiError) {
+        if (error instanceof AiError) {
             // Rate limits, overloads, timeouts and flaky answers are worth retrying; auth / bad-request errors are not.
-            const retryable = error.status === undefined || error.status === 429 || error.status >= 500;
-            res.status(error.status === 429 ? 429 : 502).json({ message: error.message, retryable, retryAfterSeconds: error.retryAfterSeconds });
+            const quotaExhausted = Boolean(error.quotaExhausted);
+            const retryable = !quotaExhausted && (error.status === undefined || error.status === 429 || error.status >= 500);
+            res.status(error.status === 429 ? 429 : 502).json({
+                message: error.message,
+                retryable,
+                quotaExhausted,
+                retryAfterSeconds: error.retryAfterSeconds,
+            });
             return;
         }
         next(error);
@@ -246,6 +265,54 @@ export const updateAttributeTemplate = async (req: Request, res: Response, next:
         }
 
         res.json({ template: template?.attributes ?? [], scheme: scheme?.toObject() ?? null });
+    } catch (error) {
+        next(error);
+    }
+};
+
+/** GET /admin/attribute-normalization/ai-settings — providers (without keys), which have a key set, and the active choice. */
+export const getAiSettings = async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+        const active = await getActiveAi();
+        res.set('Cache-Control', 'no-store');
+        res.json({
+            active: describeActiveAi(active),
+            providers: PROVIDERS.map((p) => ({
+                id: p.id,
+                label: p.label,
+                configured: isProviderConfigured(p),
+                keyEnv: p.id === 'custom' ? 'AI_CUSTOM_BASE_URL' : p.keyEnv,
+                keyUrl: p.keyUrl,
+                defaultModel: p.defaultModel,
+                models: p.models,
+                note: p.note,
+                chunkSize: chunkSizeFor(p),
+            })),
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+const aiSettingsSchema = z.object({
+    provider: z.enum(PROVIDER_IDS),
+    model: z.string().trim().min(1).max(120),
+});
+
+/** PUT /admin/attribute-normalization/ai-settings  { provider, model } */
+export const updateAiSettings = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+        const parsed = aiSettingsSchema.safeParse(req.body);
+        if (!parsed.success || !providerById(parsed.data.provider)) {
+            res.status(400).json({ message: 'Choose a provider and enter a model name.' });
+            return;
+        }
+        await AiSetting.findOneAndUpdate(
+            { key: 'default' },
+            { $set: { key: 'default', provider: parsed.data.provider, modelName: parsed.data.model, updatedBy: req.authUser?.email } },
+            { upsert: true, setDefaultsOnInsert: true }
+        );
+        res.json({ active: describeActiveAi(await getActiveAi()) });
     } catch (error) {
         next(error);
     }

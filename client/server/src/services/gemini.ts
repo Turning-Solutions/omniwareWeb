@@ -1,38 +1,13 @@
 /**
- * Minimal Gemini REST client for structured (JSON) output. Server-side only — the API key
- * never reaches the browser. Model is configurable via GEMINI_MODEL.
+ * Gemini REST adapter for structured (JSON) output. Server-side only — the API key
+ * never reaches the browser.
  *
- * Calls run inside a serverless function with a hard time limit, so every call works to a
- * deadline (GEMINI_TIME_BUDGET_MS, default 50s) and fails with a clear message instead of
- * letting the platform kill the request with a bare 504.
+ * Every call works to a deadline (AI_TIME_BUDGET_MS, default 50s) and fails with a clear message
+ * instead of letting the platform kill the request with a bare 504.
  */
+import { AiError, MIN_ATTEMPT_MS, formatDuration, isDailyQuota, parseRetryAfterSeconds, sleep, timeBudgetMs } from './aiError';
 
 const API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
-// Google retires model names for new API keys over time; override with GEMINI_MODEL without a code change.
-const DEFAULT_MODEL = 'gemini-3.8-flash';
-const DEFAULT_TIME_BUDGET_MS = 50_000;
-const MIN_ATTEMPT_MS = 8_000;
-
-export class GeminiError extends Error {
-    constructor(message: string, public status?: number, public retryAfterSeconds?: number) {
-        super(message);
-        this.name = 'GeminiError';
-    }
-}
-
-/** Google says "Please retry in 45.49s" in the message (and sometimes a RetryInfo detail). */
-function parseRetryAfterSeconds(message: string, json: GeminiResponse): number | undefined {
-    const fromMessage = /retry in ([\d.]+)\s*s/i.exec(message)?.[1];
-    if (fromMessage) return Math.ceil(Number(fromMessage));
-    const detail = json.error?.details?.find((d) => typeof d.retryDelay === 'string')?.retryDelay;
-    const fromDetail = detail ? /([\d.]+)s/.exec(detail)?.[1] : undefined;
-    return fromDetail ? Math.ceil(Number(fromDetail)) : undefined;
-}
-
-export const isGeminiConfigured = () => Boolean(process.env.GEMINI_API_KEY);
-export const geminiModel = () => process.env.GEMINI_MODEL?.trim() || DEFAULT_MODEL;
-
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
  * Newer Gemini models "think" before answering, which is slow for a mechanical mapping task.
@@ -50,24 +25,25 @@ type GeminiResponse = {
 };
 
 /** Call Gemini with a JSON response schema and return the parsed object. */
-export async function generateJson<T>({
+export async function generateGeminiJson<T>({
+    model,
     systemInstruction,
     prompt,
     responseSchema,
     temperature = 0.1,
 }: {
+    model: string;
     systemInstruction: string;
     prompt: string;
     responseSchema: Record<string, unknown>;
     temperature?: number;
 }): Promise<T> {
     const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) throw new GeminiError('GEMINI_API_KEY is not set on the server.');
+    if (!apiKey) throw new AiError('GEMINI_API_KEY is not set on the server.');
 
-    const deadline = Date.now() + (Number(process.env.GEMINI_TIME_BUDGET_MS) || DEFAULT_TIME_BUDGET_MS);
-    const model = geminiModel();
+    const deadline = Date.now() + timeBudgetMs();
     let useThinking = thinkingConfig() !== undefined;
-    let lastError: GeminiError | null = null;
+    let lastError: AiError | null = null;
 
     for (let attempt = 0; attempt < 3; attempt++) {
         const remaining = deadline - Date.now();
@@ -97,7 +73,14 @@ export async function generateJson<T>({
 
             if (!res.ok) {
                 const googleMessage = json.error?.message || `Gemini request failed (${res.status})`;
-                console.error(`[gemini] ${model} -> ${res.status}: ${googleMessage}`);
+                const retryAfter =
+                    res.status === 429
+                        ? parseRetryAfterSeconds(googleMessage, {
+                              detailDelay: json.error?.details?.find((d) => typeof d.retryDelay === 'string')?.retryDelay,
+                          })
+                        : undefined;
+                const quotaExhausted = isDailyQuota(res.status, googleMessage, retryAfter);
+                console.error(`[ai:gemini] ${model} -> ${res.status}: ${googleMessage}`);
 
                 // The model doesn't accept the thinking setting: retry once without it.
                 if (res.status === 400 && useThinking && /think/i.test(googleMessage)) {
@@ -106,19 +89,22 @@ export async function generateJson<T>({
                     continue;
                 }
 
-                lastError = new GeminiError(
+                lastError = new AiError(
                     res.status === 401 || res.status === 403
                         ? `Google rejected the API key / project: "${googleMessage}" Create a new key in Google AI Studio (aistudio.google.com/apikey) under a different project, update GEMINI_API_KEY and redeploy.`
-                        : res.status === 429
-                          ? `Gemini free-tier rate limit reached: ${googleMessage}`
-                          : googleMessage,
+                        : res.status === 404
+                          ? `Gemini model "${model}" was not found or isn't available to your key: ${googleMessage}`
+                          : res.status === 429
+                            ? quotaExhausted
+                                ? `Gemini DAILY free-tier quota used up for ${model} (resets in about ${formatDuration(retryAfter)}).`
+                                : `Gemini free-tier rate limit reached (per-minute): retry in ${retryAfter ?? '?'}s.`
+                            : googleMessage,
                     res.status,
-                    res.status === 429 ? parseRetryAfterSeconds(googleMessage, json) : undefined
+                    retryAfter,
+                    quotaExhausted
                 );
                 // A rate limit is never retried here: every extra request counts against the quota.
-                // The caller waits for the time Google asked for and tries again.
                 if (res.status >= 500) {
-                    // Short backoff, and only if there is still time for another attempt.
                     const wait = 2000 * (attempt + 1);
                     if (deadline - Date.now() > wait + MIN_ATTEMPT_MS) {
                         await sleep(wait);
@@ -131,32 +117,32 @@ export async function generateJson<T>({
             const candidate = json.candidates?.[0];
             const text = candidate?.content?.parts?.map((p) => p.text ?? '').join('') ?? '';
             if (!text) {
-                throw new GeminiError(`Gemini returned no content (finish reason: ${candidate?.finishReason ?? 'unknown'}).`);
+                throw new AiError(`Gemini returned no content (finish reason: ${candidate?.finishReason ?? 'unknown'}).`);
             }
             try {
                 return JSON.parse(text) as T;
             } catch {
-                throw new GeminiError(
+                throw new AiError(
                     candidate?.finishReason === 'MAX_TOKENS'
                         ? 'Gemini response was cut off (too long). Reduce the chunk size.'
                         : 'Gemini returned invalid JSON.'
                 );
             }
         } catch (error) {
-            if (error instanceof GeminiError) throw error;
+            if (error instanceof AiError) throw error;
             const aborted = (error as Error).name === 'AbortError';
-            lastError = new GeminiError(
+            lastError = new AiError(
                 aborted
-                    ? 'Gemini took too long to answer (over the time limit). It will be retried with a smaller part.'
+                    ? 'Gemini took too long to answer (over the time limit). It will be retried.'
                     : `Could not reach Gemini: ${(error as Error).message}`,
                 aborted ? 504 : undefined
             );
-            console.error(`[gemini] ${model} request error:`, (error as Error).message);
-            if (aborted) break; // no time left for another attempt
+            console.error(`[ai:gemini] ${model} request error:`, (error as Error).message);
+            if (aborted) break;
             await sleep(1500);
         } finally {
             clearTimeout(timer);
         }
     }
-    throw lastError ?? new GeminiError('Gemini did not answer in time.', 504);
+    throw lastError ?? new AiError('Gemini did not answer in time.', 504);
 }

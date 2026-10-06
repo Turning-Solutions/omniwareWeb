@@ -16,7 +16,8 @@ import {
     type ShapeRow,
 } from "@/lib/attributeNamingRules";
 import { TEMPLATE_PRESETS, parseTemplateText, templateToText, type TemplateAttribute } from "@/lib/attributeTemplates";
-import type { InventoryName, NamingScheme } from "./types";
+import type { ActiveAi, InventoryName, NamingScheme } from "./types";
+import AiModelSettings from "./AiModelSettings";
 
 type Filter = "attention" | "renamed" | "kept" | "all";
 
@@ -32,16 +33,13 @@ const errorMessage = (err: unknown, fallback: string) => {
     return e?.message ? `${fallback} (${e.message})` : fallback;
 };
 
-/** Free Gemini tier allows ~5 requests/minute; keep a safe gap between parts. */
-const MIN_SECONDS_BETWEEN_REQUESTS = 13;
-
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** Worth retrying automatically: rate limits, overloads, platform timeouts, network blips. */
 const isRetryable = (err: unknown) => {
-    const e = err as { response?: { status?: number; data?: { retryable?: boolean } } };
+    const e = err as { response?: { status?: number; data?: { retryable?: boolean; quotaExhausted?: boolean } } };
     const status = e?.response?.status;
-    if (e?.response?.data?.retryable === false) return false;
+    if (e?.response?.data?.quotaExhausted || e?.response?.data?.retryable === false) return false;
     return status === undefined || status === 429 || status === 502 || status === 503 || status === 504;
 };
 
@@ -58,8 +56,7 @@ const cleanRule = (r: NamingRule): NamingRule => ({
 
 export default function NamingSchemeStep({ categoryId, names }: { categoryId: string; names: InventoryName[] }) {
     const [scheme, setScheme] = useState<NamingScheme | null>(null);
-    const [geminiConfigured, setGeminiConfigured] = useState(true);
-    const [model, setModel] = useState("");
+    const [ai, setAi] = useState<ActiveAi | null>(null);
     const [loading, setLoading] = useState(true);
     const [dirty, setDirty] = useState(false);
     const [busy, setBusy] = useState<null | "generating" | "saving" | "approving">(null);
@@ -82,8 +79,7 @@ export default function NamingSchemeStep({ categoryId, names }: { categoryId: st
             .then(({ data }) => {
                 if (cancelled) return;
                 setScheme(data.scheme ?? null);
-                setGeminiConfigured(Boolean(data.geminiConfigured));
-                setModel(data.model ?? "");
+                setAi(data.ai ?? null);
                 setTemplate(Array.isArray(data.template) ? data.template : []);
                 const g = data.scheme?.generation;
                 if (g && g.totalChunks && g.completedChunks < g.totalChunks) setResumeFrom(g.completedChunks);
@@ -267,11 +263,12 @@ export default function NamingSchemeStep({ categoryId, names }: { categoryId: st
         try {
             while (chunk < total) {
                 setProgress({ done: chunk, total });
-                // Stay under the free-tier requests-per-minute limit.
+                // Stay under the provider's requests-per-minute limit.
+                const gap = ai?.minGapSeconds ?? 13;
                 const sinceLast = (Date.now() - lastRequestAt) / 1000;
-                if (lastRequestAt && sinceLast < MIN_SECONDS_BETWEEN_REQUESTS) {
-                    setError(`Pacing for the free Gemini limit — next part in ${Math.ceil(MIN_SECONDS_BETWEEN_REQUESTS - sinceLast)}s…`);
-                    await sleep((MIN_SECONDS_BETWEEN_REQUESTS - sinceLast) * 1000);
+                if (lastRequestAt && sinceLast < gap) {
+                    setError(`Pacing for the free-tier limit — next part in ${Math.ceil(gap - sinceLast)}s…`);
+                    await sleep((gap - sinceLast) * 1000);
                     setError("");
                 }
                 try {
@@ -306,7 +303,12 @@ export default function NamingSchemeStep({ categoryId, names }: { categoryId: st
             setFilter("attention");
         } catch (err) {
             setResumeFrom(chunk);
-            setError(`${errorMessage(err, "AI generation failed.")} You can resume from part ${chunk + 1}.`);
+            const quota = (err as { response?: { data?: { quotaExhausted?: boolean } } })?.response?.data?.quotaExhausted;
+            setError(
+                quota
+                    ? `${errorMessage(err, "AI generation failed.")} Progress is saved — use Resume (part ${chunk + 1}) after it resets, or pick another model/provider under "AI model" above and generate again.`
+                    : `${errorMessage(err, "AI generation failed.")} You can resume from part ${chunk + 1}.`
+            );
         } finally {
             setBusy(null);
         }
@@ -426,7 +428,8 @@ export default function NamingSchemeStep({ categoryId, names }: { categoryId: st
                         </h2>
                         <p className="mt-1 text-xs text-sub">
                             The AI proposes one canonical name per meaning. A raw name can be split by value shape or brand.
-                            Nothing on products changes in this step.
+                            Nothing on products changes in this step. A full run uses about {Math.max(1, Math.ceil(names.length / (ai?.chunkSize ?? 20)))} AI
+                            requests (free tiers have daily limits — switch the model below if one runs out).
                         </p>
                         {scheme?.status === "approved" && scheme.approvedAt && (
                             <p className="mt-1 text-xs text-success">
@@ -439,7 +442,7 @@ export default function NamingSchemeStep({ categoryId, names }: { categoryId: st
                         <button
                             type="button"
                             onClick={() => runGeneration(0)}
-                            disabled={Boolean(busy) || !geminiConfigured}
+                            disabled={Boolean(busy) || !ai?.configured}
                             className="flex items-center gap-2 rounded-lg bg-accent/20 px-4 py-2 text-sm font-medium text-accent hover:bg-accent/30 disabled:opacity-50"
                         >
                             <Sparkles className="h-4 w-4" /> {scheme ? "Regenerate with AI" : "Generate with AI"}
@@ -448,7 +451,7 @@ export default function NamingSchemeStep({ categoryId, names }: { categoryId: st
                             <button
                                 type="button"
                                 onClick={() => runGeneration(resumeFrom)}
-                                disabled={!geminiConfigured}
+                                disabled={!ai?.configured}
                                 className="rounded-lg border border-accent/40 px-4 py-2 text-sm text-accent hover:bg-accent/10"
                             >
                                 Resume (part {resumeFrom + 1})
@@ -473,15 +476,16 @@ export default function NamingSchemeStep({ categoryId, names }: { categoryId: st
                     </div>
                 </div>
 
-                {!geminiConfigured && (
+                {ai && !ai.configured && (
                     <p className="mt-4 rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm text-warning">
-                        GEMINI_API_KEY is not set on the server. Add it to the environment and restart / redeploy.
+                        {ai.providerLabel} isn&apos;t set up on the server (<code>{ai.keyEnv}</code>). Add it to the environment and
+                        redeploy, or choose another provider under &quot;AI model&quot;.
                     </p>
                 )}
                 {busy === "generating" && progress && (
                     <div className="mt-4">
                         <div className="mb-1 flex justify-between text-xs text-sub">
-                            <span>Asking {model || "Gemini"}… part {Math.min(progress.done + 1, progress.total)} of {progress.total}</span>
+                            <span>Asking {ai?.model || "the AI"}… part {Math.min(progress.done + 1, progress.total)} of {progress.total}</span>
                             <span>{Math.round((progress.done / progress.total) * 100)}%</span>
                         </div>
                         <div className="h-2 overflow-hidden rounded-full bg-panel">
@@ -498,6 +502,14 @@ export default function NamingSchemeStep({ categoryId, names }: { categoryId: st
                     </ul>
                 )}
             </div>
+
+            <AiModelSettings
+                active={ai}
+                onChanged={(next) => {
+                    setAi(next);
+                    setResumeFrom(null);
+                }}
+            />
 
             {/* Standard attribute list */}
             <div className="admin-card rounded-xl p-6">

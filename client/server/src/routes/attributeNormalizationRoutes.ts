@@ -4,8 +4,10 @@ import { requireAdmin } from '../middleware/requireAdmin';
 import {
     approveNamingScheme,
     generateNamingSchemeChunk,
+    getAiSettings,
     getCategoryInventory,
     getNamingScheme,
+    updateAiSettings,
     updateAttributeTemplate,
     updateNamingScheme,
 } from '../controllers/attributeNormalizationController';
@@ -14,6 +16,8 @@ const router = express.Router({ mergeParams: true });
 
 router.use(requireAuth, requireAdmin);
 
+router.get('/ai-settings', getAiSettings);
+router.put('/ai-settings', updateAiSettings);
 router.get('/:categoryKey/inventory', getCategoryInventory);
 router.get('/:categoryKey/scheme', getNamingScheme);
 router.put('/:categoryKey/scheme', updateNamingScheme);
