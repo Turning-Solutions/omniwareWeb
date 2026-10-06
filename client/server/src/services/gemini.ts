@@ -61,7 +61,13 @@ export async function generateJson<T>({
                 candidates?: { content?: { parts?: { text?: string }[] }; finishReason?: string }[];
             };
             if (!res.ok) {
-                lastError = new GeminiError(json.error?.message || `Gemini request failed (${res.status})`, res.status);
+                const googleMessage = json.error?.message || `Gemini request failed (${res.status})`;
+                lastError = new GeminiError(
+                    res.status === 401 || res.status === 403
+                        ? `Google rejected the API key / project: "${googleMessage}" Create a new key in Google AI Studio (aistudio.google.com/apikey) under a different project, update GEMINI_API_KEY and redeploy.`
+                        : googleMessage,
+                    res.status
+                );
                 if (res.status === 429 || res.status >= 500) {
                     await sleep(4000 * (attempt + 1));
                     continue;
