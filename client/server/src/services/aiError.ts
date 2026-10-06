@@ -37,7 +37,7 @@ export function parseRetryAfterSeconds(message: string, hints: { detailDelay?: s
 
 /** A rate limit that resets in hours (or says "per day") is a daily quota, not a per-minute one. */
 export const isDailyQuota = (status: number, message: string, retryAfter?: number) =>
-    status === 429 && ((retryAfter ?? 0) > 120 || /per\s?day|daily|\bTPD\b|\bRPD\b/i.test(message));
+    status === 429 && ((retryAfter ?? 0) > 120 || /per[\s-]?day|daily|\bTPD\b|\bRPD\b/i.test(message));
 
 export function formatDuration(seconds?: number): string {
     if (!seconds) return 'a few hours';

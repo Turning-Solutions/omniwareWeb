@@ -6,7 +6,7 @@
 import { AiError, MIN_ATTEMPT_MS, extractJson, formatDuration, isDailyQuota, parseRetryAfterSeconds, sleep, timeBudgetMs } from './aiError';
 
 type ChatResponse = {
-    error?: { message?: string } | string;
+    error?: { message?: string; metadata?: { raw?: unknown; provider_name?: string } } | string;
     choices?: { message?: { content?: string | null }; finish_reason?: string }[];
 };
 
@@ -69,9 +69,18 @@ export async function generateOpenAiCompatibleJson<T>({
             const json = (await res.json().catch(() => ({}))) as ChatResponse;
 
             if (!res.ok) {
+                // OpenRouter wraps the upstream provider's real reason in error.metadata.raw.
+                const meta = typeof json.error === 'object' ? json.error?.metadata : undefined;
+                const raw = typeof meta?.raw === 'string' ? meta.raw : meta?.raw ? JSON.stringify(meta.raw) : '';
                 const apiMessage =
-                    (typeof json.error === 'string' ? json.error : json.error?.message) || `${label} request failed (${res.status})`;
-                const headerSeconds = Number(res.headers.get('retry-after'));
+                    [(typeof json.error === 'string' ? json.error : json.error?.message) || `${label} request failed (${res.status})`, raw]
+                        .filter(Boolean)
+                        .join(' — ')
+                        .slice(0, 400) + (meta?.provider_name ? ` [via ${meta.provider_name}]` : '');
+                // Retry-After (seconds) or OpenRouter's X-RateLimit-Reset (epoch milliseconds).
+                const resetMs = Number(res.headers.get('x-ratelimit-reset'));
+                const headerSeconds =
+                    Number(res.headers.get('retry-after')) || (resetMs > Date.now() ? Math.ceil((resetMs - Date.now()) / 1000) : NaN);
                 const retryAfter = res.status === 429 ? parseRetryAfterSeconds(apiMessage, { headerSeconds }) : undefined;
                 const quotaExhausted = isDailyQuota(res.status, apiMessage, retryAfter);
                 console.error(`[ai:${label}] ${model} -> ${res.status}: ${apiMessage}`);
@@ -91,7 +100,7 @@ export async function generateOpenAiCompatibleJson<T>({
                           : res.status === 429
                             ? quotaExhausted
                                 ? `${label} DAILY quota used up for ${model} (resets in about ${formatDuration(retryAfter)}): ${apiMessage}`
-                                : `${label} rate limit reached: retry in ${retryAfter ?? '?'}s.`
+                                : `${label} rate limit reached${retryAfter ? ` (retry in ${retryAfter}s)` : ''}: ${apiMessage}`
                             : apiMessage,
                     res.status,
                     retryAfter,

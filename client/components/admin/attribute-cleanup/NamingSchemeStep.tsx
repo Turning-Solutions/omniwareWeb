@@ -286,7 +286,7 @@ export default function NamingSchemeStep({ categoryId, names }: { categoryId: st
                         const waitSeconds = e.response?.data?.retryAfterSeconds
                             ? e.response.data.retryAfterSeconds + 2
                             : e.response?.status === 429
-                              ? 60
+                              ? 30
                               : 4;
                         setError(
                             `${errorMessage(err, "AI request failed.")} Retrying part ${chunk + 1} in ${waitSeconds}s (attempt ${retries}/3)…`
