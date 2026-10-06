@@ -6,8 +6,13 @@
 import { AiError, MIN_ATTEMPT_MS, extractJson, formatDuration, isDailyQuota, parseRetryAfterSeconds, sleep, timeBudgetMs } from './aiError';
 
 type ChatResponse = {
-    error?: { message?: string; metadata?: { raw?: unknown; provider_name?: string } } | string;
-    choices?: { message?: { content?: string | null }; finish_reason?: string }[];
+    error?: { message?: string; code?: number | string; metadata?: { raw?: unknown; provider_name?: string } } | string;
+    model?: string;
+    provider?: string;
+    choices?: {
+        message?: { content?: string | null; reasoning?: string | null; reasoning_content?: string | null };
+        finish_reason?: string;
+    }[];
 };
 
 export async function generateOpenAiCompatibleJson<T>({
@@ -37,6 +42,7 @@ export async function generateOpenAiCompatibleJson<T>({
     const url = `${baseUrl.replace(/\/+$/, '')}/chat/completions`;
     const deadline = Date.now() + timeBudgetMs();
     let useJsonMode = true;
+    let emptyRetries = 0;
     let lastError: AiError | null = null;
 
     for (let attempt = 0; attempt < 3; attempt++) {
@@ -68,12 +74,15 @@ export async function generateOpenAiCompatibleJson<T>({
             });
             const json = (await res.json().catch(() => ({}))) as ChatResponse;
 
-            if (!res.ok) {
+            // OpenRouter can report an upstream failure inside a 200 response (no choices, an "error" object).
+            const embeddedError = res.ok && !json.choices?.length && Boolean(json.error);
+            if (!res.ok || embeddedError) {
+                const status = res.ok ? Number(typeof json.error === 'object' ? json.error?.code : NaN) || 502 : res.status;
                 // OpenRouter wraps the upstream provider's real reason in error.metadata.raw.
                 const meta = typeof json.error === 'object' ? json.error?.metadata : undefined;
                 const raw = typeof meta?.raw === 'string' ? meta.raw : meta?.raw ? JSON.stringify(meta.raw) : '';
                 const apiMessage =
-                    [(typeof json.error === 'string' ? json.error : json.error?.message) || `${label} request failed (${res.status})`, raw]
+                    [(typeof json.error === 'string' ? json.error : json.error?.message) || `${label} request failed (${status})`, raw]
                         .filter(Boolean)
                         .join(' — ')
                         .slice(0, 400) + (meta?.provider_name ? ` [via ${meta.provider_name}]` : '');
@@ -81,32 +90,32 @@ export async function generateOpenAiCompatibleJson<T>({
                 const resetMs = Number(res.headers.get('x-ratelimit-reset'));
                 const headerSeconds =
                     Number(res.headers.get('retry-after')) || (resetMs > Date.now() ? Math.ceil((resetMs - Date.now()) / 1000) : NaN);
-                const retryAfter = res.status === 429 ? parseRetryAfterSeconds(apiMessage, { headerSeconds }) : undefined;
-                const quotaExhausted = isDailyQuota(res.status, apiMessage, retryAfter);
-                console.error(`[ai:${label}] ${model} -> ${res.status}: ${apiMessage}`);
+                const retryAfter = status === 429 ? parseRetryAfterSeconds(apiMessage, { headerSeconds }) : undefined;
+                const quotaExhausted = isDailyQuota(status, apiMessage, retryAfter);
+                console.error(`[ai:${label}] ${model} -> ${status}: ${apiMessage}`);
 
                 // Provider/model without JSON mode: retry once as plain text and extract the JSON.
-                if (res.status === 400 && useJsonMode && /response_format|json_object|json mode|json/i.test(apiMessage)) {
+                if (status === 400 && useJsonMode && /response_format|json_object|json mode|json/i.test(apiMessage)) {
                     useJsonMode = false;
                     attempt -= 1;
                     continue;
                 }
 
                 lastError = new AiError(
-                    res.status === 401 || res.status === 403
+                    status === 401 || status === 403
                         ? `${label} rejected the API key: "${apiMessage}" Check ${keyEnv} in your environment variables and redeploy.`
-                        : res.status === 404
+                        : status === 404
                           ? `${label} model "${model}" was not found: ${apiMessage}`
-                          : res.status === 429
+                          : status === 429
                             ? quotaExhausted
                                 ? `${label} DAILY quota used up for ${model} (resets in about ${formatDuration(retryAfter)}): ${apiMessage}`
                                 : `${label} rate limit reached${retryAfter ? ` (retry in ${retryAfter}s)` : ''}: ${apiMessage}`
                             : apiMessage,
-                    res.status,
+                    status,
                     retryAfter,
                     quotaExhausted
                 );
-                if (res.status >= 500) {
+                if (status >= 500) {
                     const wait = 2000 * (attempt + 1);
                     if (deadline - Date.now() > wait + MIN_ATTEMPT_MS) {
                         await sleep(wait);
@@ -118,7 +127,33 @@ export async function generateOpenAiCompatibleJson<T>({
 
             const choice = json.choices?.[0];
             const text = choice?.message?.content ?? '';
-            if (!text) throw new AiError(`${label} returned no content (finish reason: ${choice?.finish_reason ?? 'unknown'}).`);
+            const reasoning = choice?.message?.reasoning ?? choice?.message?.reasoning_content ?? '';
+            if (!text.trim()) {
+                // Some "thinking" models leave `content` empty and put the answer in the reasoning text.
+                if (reasoning.trim()) {
+                    try {
+                        return extractJson<T>(reasoning);
+                    } catch {
+                        // fall through to the empty-answer handling
+                    }
+                }
+                console.error(
+                    `[ai:${label}] ${model} empty answer (finish=${choice?.finish_reason ?? 'unknown'}, served by ${json.provider ?? json.model ?? '?'}, reasoning=${reasoning.length} chars)`
+                );
+                // Free models often return an empty reply when overloaded — one quick retry is cheap.
+                if (emptyRetries < 1 && deadline - Date.now() > MIN_ATTEMPT_MS * 2) {
+                    emptyRetries += 1;
+                    await sleep(1500);
+                    continue;
+                }
+                const finish = choice?.finish_reason ?? 'unknown';
+                throw new AiError(
+                    `${label} returned an empty answer (model ${model}${json.provider ? `, served by ${json.provider}` : ''}, finish reason: ${finish}). ` +
+                        (reasoning.trim() || finish === 'length'
+                            ? 'It spent its output on internal reasoning and ran out of room — pick a model without "thinking" or reduce the chunk size (GEMINI_CHUNK_SIZE / AI_CHUNK_SIZE).'
+                            : 'Free models sometimes do this when overloaded — retry, or pick another model.')
+                );
+            }
             try {
                 return extractJson<T>(text);
             } catch {
