@@ -8,7 +8,7 @@ import mongoose, { Schema, Document } from 'mongoose';
 export interface IAttributeNamingScheme extends Document {
     categoryId: mongoose.Types.ObjectId;
     status: 'draft' | 'approved';
-    canonical: { id: string; name: string; description?: string }[];
+    canonical: { id: string; name: string; description?: string; standard?: boolean }[];
     rules: {
         key: string;
         canonicalId: string | null;
@@ -39,6 +39,7 @@ const AttributeNamingSchemeSchema: Schema = new Schema({
         id: { type: String, required: true },
         name: { type: String, required: true, trim: true },
         description: { type: String, trim: true },
+        standard: { type: Boolean, default: false },
     }],
     rules: [{
         _id: false,

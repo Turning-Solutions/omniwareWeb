@@ -6,6 +6,7 @@ import {
     generateNamingSchemeChunk,
     getCategoryInventory,
     getNamingScheme,
+    updateAttributeTemplate,
     updateNamingScheme,
 } from '../controllers/attributeNormalizationController';
 
@@ -18,5 +19,6 @@ router.get('/:categoryKey/scheme', getNamingScheme);
 router.put('/:categoryKey/scheme', updateNamingScheme);
 router.post('/:categoryKey/scheme/generate', generateNamingSchemeChunk);
 router.post('/:categoryKey/scheme/approve', approveNamingScheme);
+router.put('/:categoryKey/template', updateAttributeTemplate);
 
 export default router;

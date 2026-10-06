@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import AttributeNamingScheme from '../models/AttributeNamingScheme';
+import CategoryAttributeTemplate from '../models/CategoryAttributeTemplate';
 import { buildCategoryInventory, type InventoryName } from './attributeInventory';
 import { generateJson, geminiModel } from './gemini';
 import {
@@ -36,6 +37,11 @@ Rules you must follow:
 - If you are not sure what a name means, put it in "unresolved" with a short note instead of guessing.
 - Every raw name in the input must appear in at least one rule or in "unresolved".
 - Reuse canonical attributes from the "existing canonical attributes" list whenever they fit; only add new ones when needed.
+- Canonical attributes marked "standard": true come from the store's official attribute list for this category.
+  Map raw names to a standard attribute whenever the meaning matches (look at the values, not just the name), and never
+  invent a variant of a standard name. A raw name that matches NO standard attribute must still be kept: use
+  canonicalId null (keep its original name), or — only if several raw names clearly mean the same non-standard thing —
+  create one new non-standard canonical attribute for them.
 - "reason": one short sentence a store admin can understand.`;
 
 const RESPONSE_SCHEMA = {
@@ -108,11 +114,18 @@ function describeName(n: InventoryName) {
 }
 
 function buildPrompt(categoryName: string, names: InventoryName[], existing: CanonicalAttribute[]) {
+    const hasStandard = existing.some((c) => c.standard);
     return [
         `Product category: ${categoryName}`,
         '',
-        'Existing canonical attributes (reuse their ids when they fit):',
-        existing.length ? JSON.stringify(existing.map(({ id, name, description }) => ({ id, name, description }))) : '(none yet)',
+        hasStandard
+            ? 'This category has an official standard attribute list (entries with "standard": true). Use those exact names.'
+            : 'This category has no official attribute list yet.',
+        '',
+        'Existing canonical attributes (reuse their ids when they fit; "description" holds example values):',
+        existing.length
+            ? JSON.stringify(existing.map(({ id, name, description, standard }) => ({ id, name, description, standard: Boolean(standard) })))
+            : '(none yet)',
         '',
         `Raw attribute names to map (${names.length}):`,
         JSON.stringify(names.map(describeName)),
@@ -142,7 +155,7 @@ export function mergeAiResponse(
             id = canonicalIdFromName(name);
             let n = 2;
             while (knownIds.has(id)) id = `${canonicalIdFromName(name)}-${n++}`;
-            canonical.push({ id, name, description: c.description?.trim() || undefined });
+            canonical.push({ id, name, description: c.description?.trim() || undefined, standard: false });
             knownIds.add(id);
             idByLoose.set(loose, id);
         }
@@ -199,6 +212,18 @@ export function mergeAiResponse(
     return { canonical, rules: keptRules, unresolved: Array.from(nextUnresolved.values()) };
 }
 
+/** Canonical entries for a standard attribute list (stable ids derived from the names). */
+export function standardCanonical(attributes: { name: string; description?: string }[]): CanonicalAttribute[] {
+    const used = new Set<string>();
+    return attributes.map((a) => {
+        let id = canonicalIdFromName(a.name);
+        let n = 2;
+        while (used.has(id)) id = `${canonicalIdFromName(a.name)}-${n++}`;
+        used.add(id);
+        return { id, name: a.name, description: a.description, standard: true };
+    });
+}
+
 /**
  * Generate one chunk of the naming scheme. The admin UI calls this for chunk 0..N-1 in turn,
  * keeping each request short; later chunks reuse canonical names created by earlier ones.
@@ -223,10 +248,11 @@ export async function generateSchemeChunk({
         scheme = new AttributeNamingScheme({ categoryId: category._id });
     }
     if (chunkIndex === 0) {
-        // Fresh run: start a new draft.
+        // Fresh run: start a new draft, seeded with the category's standard attribute list.
+        const template = await CategoryAttributeTemplate.findOne({ categoryId: category._id }).lean();
         scheme.set({
             status: 'draft',
-            canonical: [],
+            canonical: standardCanonical(template?.attributes ?? []),
             rules: [],
             unresolved: [],
             approvedAt: undefined,
@@ -240,7 +266,7 @@ export async function generateSchemeChunk({
         rules: NamingRule[];
         unresolved: UnresolvedName[];
     };
-    const existingCanonical = current.canonical.map(({ id, name, description }) => ({ id, name, description }));
+    const existingCanonical = current.canonical.map(({ id, name, description, standard }) => ({ id, name, description, standard }));
     const ai = await generateJson<AiResponse>({
         systemInstruction: SYSTEM_INSTRUCTION,
         prompt: buildPrompt(category.name, chunk, existingCanonical),

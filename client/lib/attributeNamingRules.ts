@@ -13,6 +13,8 @@ export interface CanonicalAttribute {
     id: string;
     name: string;
     description?: string;
+    /** Comes from the category's standard attribute list — name is fixed by the admin. */
+    standard?: boolean;
 }
 
 export interface NamingRule {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, ArrowRight, CheckCircle2, ChevronDown, ChevronRight, Save, Search, Sparkles, Split, Trash2 } from "lucide-react";
+import { AlertTriangle, ArrowRight, CheckCircle2, ChevronDown, ChevronRight, ListChecks, Lock, Save, Search, Sparkles, Split, Trash2 } from "lucide-react";
 import api from "@/lib/api";
 import StatusBadge from "@/components/admin/StatusBadge";
 import {
@@ -15,6 +15,7 @@ import {
     type NamingRule,
     type ShapeRow,
 } from "@/lib/attributeNamingRules";
+import { TEMPLATE_PRESETS, parseTemplateText, templateToText, type TemplateAttribute } from "@/lib/attributeTemplates";
 import type { InventoryName, NamingScheme } from "./types";
 
 type Filter = "attention" | "renamed" | "kept" | "all";
@@ -53,6 +54,10 @@ export default function NamingSchemeStep({ categoryId, names }: { categoryId: st
     const [search, setSearch] = useState("");
     const [expanded, setExpanded] = useState<Set<string>>(new Set());
     const [showCanonical, setShowCanonical] = useState(false);
+    const [template, setTemplate] = useState<TemplateAttribute[]>([]);
+    const [templateText, setTemplateText] = useState("");
+    const [editingTemplate, setEditingTemplate] = useState(false);
+    const [savingTemplate, setSavingTemplate] = useState(false);
 
     useEffect(() => {
         let cancelled = false;
@@ -62,6 +67,7 @@ export default function NamingSchemeStep({ categoryId, names }: { categoryId: st
                 setScheme(data.scheme ?? null);
                 setGeminiConfigured(Boolean(data.geminiConfigured));
                 setModel(data.model ?? "");
+                setTemplate(Array.isArray(data.template) ? data.template : []);
                 const g = data.scheme?.generation;
                 if (g && g.totalChunks && g.completedChunks < g.totalChunks) setResumeFrom(g.completedChunks);
             })
@@ -75,7 +81,10 @@ export default function NamingSchemeStep({ categoryId, names }: { categoryId: st
     const canonical = useMemo(() => scheme?.canonical ?? [], [scheme]);
     const rules = useMemo(() => scheme?.rules ?? [], [scheme]);
     const canonicalById = useMemo(() => new Map(canonical.map((c) => [c.id, c])), [canonical]);
-    const sortedCanonical = useMemo(() => [...canonical].sort((a, b) => a.name.localeCompare(b.name)), [canonical]);
+    const sortedCanonical = useMemo(
+        () => [...canonical].sort((a, b) => Number(Boolean(b.standard)) - Number(Boolean(a.standard)) || a.name.localeCompare(b.name)),
+        [canonical]
+    );
 
     const rows = useMemo(() => {
         const out = names.map((n) => {
@@ -111,6 +120,30 @@ export default function NamingSchemeStep({ categoryId, names }: { categoryId: st
         for (const r of rules) if (r.canonicalId) map.set(r.canonicalId, (map.get(r.canonicalId) ?? 0) + 1);
         return map;
     }, [rules]);
+
+    /** Standard fields no rule maps anything to yet. */
+    const unusedStandard = useMemo(() => canonical.filter((c) => c.standard && !usage.get(c.id)), [canonical, usage]);
+
+    const parsedTemplate = useMemo(() => parseTemplateText(templateText), [templateText]);
+
+    const saveTemplate = async () => {
+        if (dirty && !window.confirm("Saving the standard list reloads the scheme and discards unsaved scheme edits. Continue?")) return;
+        setSavingTemplate(true);
+        setError("");
+        try {
+            const { data } = await api.put(`/admin/attribute-normalization/${categoryId}/template`, { attributes: parsedTemplate });
+            setTemplate(data.template ?? []);
+            if (data.scheme) {
+                setScheme(data.scheme);
+                setDirty(false);
+            }
+            setEditingTemplate(false);
+        } catch (err) {
+            setError(errorMessage(err, "Saving the standard attribute list failed."));
+        } finally {
+            setSavingTemplate(false);
+        }
+    };
 
     const visible = useMemo(() => {
         const q = search.trim().toLowerCase();
@@ -252,7 +285,12 @@ export default function NamingSchemeStep({ categoryId, names }: { categoryId: st
         setError("");
         try {
             const { data } = await api.put(`/admin/attribute-normalization/${categoryId}/scheme`, {
-                canonical: scheme.canonical.map(({ id, name, description }) => ({ id, name, ...(description ? { description } : {}) })),
+                canonical: scheme.canonical.map(({ id, name, description, standard }) => ({
+                    id,
+                    name,
+                    ...(description ? { description } : {}),
+                    ...(standard ? { standard: true } : {}),
+                })),
                 rules: scheme.rules.map(cleanRule),
                 unresolved: scheme.unresolved.map(({ key, note }) => ({ key, note })),
             });
@@ -314,11 +352,26 @@ export default function NamingSchemeStep({ categoryId, names }: { categoryId: st
         >
             <option value="">{value === CONFLICT ? "⚠ Conflicting rules — choose…" : "— Choose —"}</option>
             <option value={KEEP}>Keep original name</option>
-            {sortedCanonical.map((c) => (
-                <option key={c.id} value={c.id}>
-                    {c.name}
-                </option>
-            ))}
+            {sortedCanonical.some((c) => c.standard) && (
+                <optgroup label="Standard attributes">
+                    {sortedCanonical
+                        .filter((c) => c.standard)
+                        .map((c) => (
+                            <option key={c.id} value={c.id}>
+                                {c.name}
+                            </option>
+                        ))}
+                </optgroup>
+            )}
+            <optgroup label={sortedCanonical.some((c) => c.standard) ? "Other names" : "Names"}>
+                {sortedCanonical
+                    .filter((c) => !c.standard)
+                    .map((c) => (
+                        <option key={c.id} value={c.id}>
+                            {c.name}
+                        </option>
+                    ))}
+            </optgroup>
             <option value={NEW_NAME}>+ New name…</option>
         </select>
     );
@@ -413,6 +466,105 @@ export default function NamingSchemeStep({ categoryId, names }: { categoryId: st
                 )}
             </div>
 
+            {/* Standard attribute list */}
+            <div className="admin-card rounded-xl p-6">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                        <h3 className="flex items-center gap-2 text-base font-bold text-main">
+                            <ListChecks className="h-5 w-5 text-accent" /> Standard attribute list ({template.length})
+                        </h3>
+                        <p className="mt-1 text-xs text-sub">
+                            The official names for this category. The AI must use these exact names when the meaning matches;
+                            attributes that match none of them keep their own name.
+                        </p>
+                    </div>
+                    {!editingTemplate && (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setTemplateText(templateToText(template));
+                                setEditingTemplate(true);
+                            }}
+                            className="rounded-lg border border-border-soft px-3 py-1.5 text-sm text-main hover:bg-panel"
+                        >
+                            {template.length ? "Edit list" : "Add list"}
+                        </button>
+                    )}
+                </div>
+
+                {!editingTemplate && template.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-1.5">
+                        {template.map((a) => (
+                            <span
+                                key={a.name}
+                                title={a.description}
+                                className="rounded-md border border-border-soft bg-surface px-2 py-1 text-xs text-main"
+                            >
+                                {a.name}
+                            </span>
+                        ))}
+                    </div>
+                )}
+                {!editingTemplate && template.length === 0 && (
+                    <p className="mt-3 text-xs text-warning">
+                        No standard list yet — the AI will invent names. Add one first for best results.
+                    </p>
+                )}
+
+                {editingTemplate && (
+                    <div className="mt-4 space-y-3">
+                        <div className="flex flex-wrap items-center gap-2 text-xs text-sub">
+                            Load a preset:
+                            {TEMPLATE_PRESETS.map((preset) => (
+                                <button
+                                    key={preset.id}
+                                    type="button"
+                                    onClick={() => setTemplateText(templateToText(preset.attributes))}
+                                    className="rounded-full border border-accent/40 px-3 py-1 text-accent hover:bg-accent/10"
+                                >
+                                    {preset.label}
+                                </button>
+                            ))}
+                        </div>
+                        <textarea
+                            value={templateText}
+                            onChange={(e) => setTemplateText(e.target.value)}
+                            rows={12}
+                            placeholder={"One per line: Name | example values\nor paste a Markdown table"}
+                            className="w-full rounded-lg border border-border-soft bg-surface px-3 py-2 font-mono text-xs text-main"
+                        />
+                        <p className="text-xs text-sub">
+                            {parsedTemplate.length} attributes detected. Paste a table, or write one per line as{" "}
+                            <code>Name | example values</code>.
+                        </p>
+                        <div className="flex gap-2">
+                            <button
+                                type="button"
+                                onClick={saveTemplate}
+                                disabled={savingTemplate}
+                                className="flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-50"
+                            >
+                                <Save className="h-4 w-4" /> {savingTemplate ? "Saving…" : "Save list"}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setEditingTemplate(false)}
+                                className="rounded-lg px-4 py-2 text-sm text-sub hover:text-main"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {scheme && !editingTemplate && unusedStandard.length > 0 && (
+                    <p className="mt-3 text-xs text-sub">
+                        <span className="font-semibold text-warning">No product attribute mapped yet to:</span>{" "}
+                        {unusedStandard.map((c) => c.name).join(", ")}
+                    </p>
+                )}
+            </div>
+
             {!scheme ? (
                 <div className="admin-card rounded-xl p-10 text-center text-sm text-sub">
                     No naming scheme yet. Click <strong>Generate with AI</strong> — it sends this category&apos;s attribute names,
@@ -436,12 +588,14 @@ export default function NamingSchemeStep({ categoryId, names }: { categoryId: st
                                     <div key={c.id} className="grid gap-2 sm:grid-cols-[minmax(0,14rem)_1fr_auto_auto] sm:items-center">
                                         <input
                                             value={c.name}
+                                            disabled={c.standard}
+                                            title={c.standard ? "Standard name — change it in the standard attribute list" : undefined}
                                             onChange={(e) =>
                                                 updateScheme({
                                                     canonical: canonical.map((x) => (x.id === c.id ? { ...x, name: e.target.value } : x)),
                                                 })
                                             }
-                                            className="rounded-lg border border-border-soft bg-surface px-3 py-1.5 text-sm font-semibold text-main"
+                                            className="rounded-lg border border-border-soft bg-surface px-3 py-1.5 text-sm font-semibold text-main disabled:opacity-80"
                                             aria-label="Canonical name"
                                         />
                                         <input
@@ -455,10 +609,18 @@ export default function NamingSchemeStep({ categoryId, names }: { categoryId: st
                                             className="rounded-lg border border-border-soft bg-surface px-3 py-1.5 text-xs text-sub"
                                             aria-label="Description"
                                         />
-                                        <span className="text-xs text-sub">{usage.get(c.id) ?? 0} rules</span>
+                                        <span className="flex items-center gap-1 text-xs text-sub">
+                                            {c.standard && (
+                                                <StatusBadge tone="info">
+                                                    <Lock className="mr-1 inline h-3 w-3" />
+                                                    Standard
+                                                </StatusBadge>
+                                            )}
+                                            {usage.get(c.id) ?? 0} rules
+                                        </span>
                                         <button
                                             type="button"
-                                            disabled={(usage.get(c.id) ?? 0) > 0}
+                                            disabled={(usage.get(c.id) ?? 0) > 0 || c.standard}
                                             onClick={() => updateScheme({ canonical: canonical.filter((x) => x.id !== c.id) })}
                                             className="rounded p-1.5 text-danger hover:bg-danger/10 disabled:opacity-30"
                                             title={(usage.get(c.id) ?? 0) > 0 ? "In use — reassign its rules first" : "Delete"}
