@@ -32,6 +32,11 @@ const errorMessage = (err: unknown, fallback: string) => {
     return e?.message ? `${fallback} (${e.message})` : fallback;
 };
 
+/** Free Gemini tier allows ~5 requests/minute; keep a safe gap between parts. */
+const MIN_SECONDS_BETWEEN_REQUESTS = 13;
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 /** Worth retrying automatically: rate limits, overloads, platform timeouts, network blips. */
 const isRetryable = (err: unknown) => {
     const e = err as { response?: { status?: number; data?: { retryable?: boolean } } };
@@ -258,10 +263,19 @@ export default function NamingSchemeStep({ categoryId, names }: { categoryId: st
         let chunk = startChunk;
         let total = progress?.total ?? scheme?.generation?.totalChunks ?? 1;
         let retries = 0;
+        let lastRequestAt = 0;
         try {
             while (chunk < total) {
                 setProgress({ done: chunk, total });
+                // Stay under the free-tier requests-per-minute limit.
+                const sinceLast = (Date.now() - lastRequestAt) / 1000;
+                if (lastRequestAt && sinceLast < MIN_SECONDS_BETWEEN_REQUESTS) {
+                    setError(`Pacing for the free Gemini limit — next part in ${Math.ceil(MIN_SECONDS_BETWEEN_REQUESTS - sinceLast)}s…`);
+                    await sleep((MIN_SECONDS_BETWEEN_REQUESTS - sinceLast) * 1000);
+                    setError("");
+                }
                 try {
+                    lastRequestAt = Date.now();
                     const { data } = await api.post(`/admin/attribute-normalization/${categoryId}/scheme/generate`, { chunkIndex: chunk });
                     setScheme(data.scheme);
                     total = data.totalChunks;
@@ -271,12 +285,16 @@ export default function NamingSchemeStep({ categoryId, names }: { categoryId: st
                 } catch (err) {
                     if (isRetryable(err) && retries < 3) {
                         retries += 1;
-                        const status = (err as { response?: { status?: number } })?.response?.status;
-                        const waitSeconds = status === 429 ? 30 : 4;
+                        const e = err as { response?: { status?: number; data?: { retryAfterSeconds?: number } } };
+                        const waitSeconds = e.response?.data?.retryAfterSeconds
+                            ? e.response.data.retryAfterSeconds + 2
+                            : e.response?.status === 429
+                              ? 60
+                              : 4;
                         setError(
                             `${errorMessage(err, "AI request failed.")} Retrying part ${chunk + 1} in ${waitSeconds}s (attempt ${retries}/3)…`
                         );
-                        await new Promise((r) => setTimeout(r, waitSeconds * 1000));
+                        await sleep(waitSeconds * 1000);
                         setError("");
                         continue;
                     }

@@ -116,7 +116,7 @@ export const generateNamingSchemeChunk = async (req: Request, res: Response, nex
         if (error instanceof GeminiError) {
             // Rate limits, overloads, timeouts and flaky answers are worth retrying; auth / bad-request errors are not.
             const retryable = error.status === undefined || error.status === 429 || error.status >= 500;
-            res.status(error.status === 429 ? 429 : 502).json({ message: error.message, retryable });
+            res.status(error.status === 429 ? 429 : 502).json({ message: error.message, retryable, retryAfterSeconds: error.retryAfterSeconds });
             return;
         }
         next(error);

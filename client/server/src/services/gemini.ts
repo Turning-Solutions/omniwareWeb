@@ -14,10 +14,19 @@ const DEFAULT_TIME_BUDGET_MS = 50_000;
 const MIN_ATTEMPT_MS = 8_000;
 
 export class GeminiError extends Error {
-    constructor(message: string, public status?: number) {
+    constructor(message: string, public status?: number, public retryAfterSeconds?: number) {
         super(message);
         this.name = 'GeminiError';
     }
+}
+
+/** Google says "Please retry in 45.49s" in the message (and sometimes a RetryInfo detail). */
+function parseRetryAfterSeconds(message: string, json: GeminiResponse): number | undefined {
+    const fromMessage = /retry in ([\d.]+)\s*s/i.exec(message)?.[1];
+    if (fromMessage) return Math.ceil(Number(fromMessage));
+    const detail = json.error?.details?.find((d) => typeof d.retryDelay === 'string')?.retryDelay;
+    const fromDetail = detail ? /([\d.]+)s/.exec(detail)?.[1] : undefined;
+    return fromDetail ? Math.ceil(Number(fromDetail)) : undefined;
 }
 
 export const isGeminiConfigured = () => Boolean(process.env.GEMINI_API_KEY);
@@ -36,7 +45,7 @@ function thinkingConfig(): Record<string, unknown> | undefined {
 }
 
 type GeminiResponse = {
-    error?: { message?: string };
+    error?: { message?: string; details?: { retryDelay?: string }[] };
     candidates?: { content?: { parts?: { text?: string }[] }; finishReason?: string }[];
 };
 
@@ -101,11 +110,14 @@ export async function generateJson<T>({
                     res.status === 401 || res.status === 403
                         ? `Google rejected the API key / project: "${googleMessage}" Create a new key in Google AI Studio (aistudio.google.com/apikey) under a different project, update GEMINI_API_KEY and redeploy.`
                         : res.status === 429
-                          ? `Gemini rate limit reached: ${googleMessage}`
+                          ? `Gemini free-tier rate limit reached: ${googleMessage}`
                           : googleMessage,
-                    res.status
+                    res.status,
+                    res.status === 429 ? parseRetryAfterSeconds(googleMessage, json) : undefined
                 );
-                if (res.status === 429 || res.status >= 500) {
+                // A rate limit is never retried here: every extra request counts against the quota.
+                // The caller waits for the time Google asked for and tries again.
+                if (res.status >= 500) {
                     // Short backoff, and only if there is still time for another attempt.
                     const wait = 2000 * (attempt + 1);
                     if (deadline - Date.now() > wait + MIN_ATTEMPT_MS) {
