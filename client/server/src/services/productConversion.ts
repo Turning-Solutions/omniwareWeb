@@ -374,9 +374,10 @@ export function planApproval(product: ConvProduct, fields: IConversionField[], e
     const attributeGroups = (product.attributeGroups ?? [])
         .map((g, gi) => ({ ...g, attributes: (g.attributes ?? []).filter((_, ai) => keepIds.has(`g|${gi}|${ai}`)) }))
         .filter((g) => g.attributes.length > 0);
-    // The legacy list is only shown when a product has no sections; when it does, leave it untouched.
+    // The legacy list is an old hidden copy that the site shows (as "General") whenever a product has no
+    // sections — so when the product has sections it must be cleared too, or removed details come back.
     const attributes = product.attributeGroups?.length
-        ? (product.attributes ?? [])
+        ? []
         : (product.attributes ?? []).filter((_, ai) => keepIds.has(`l|${ai}`));
 
     return { specs: Object.fromEntries(specEntries), specLabels, attributeGroups, attributes, usedKeys };
@@ -470,6 +471,27 @@ export async function approveConversion(
     return { productId: String(product._id), title: conv.productTitle, before, after: { specs, attributeGroups, attributes } };
 }
 
+/**
+ * Products approved before the fix above may still carry the old hidden copy, which shows up as "General".
+ * Clear it on those products — only where the product hasn't been edited since approval (undo still restores it).
+ */
+export async function repairLegacyCopies(categoryId: mongoose.Types.ObjectId): Promise<number> {
+    const approved = await ProductConversion.find({ categoryId, status: 'approved' }, 'productId before afterFingerprint');
+    let fixed = 0;
+    for (const conv of approved) {
+        const before = conv.before as { attributeGroups?: unknown[] } | undefined;
+        if (!before?.attributeGroups?.length) continue; // legacy-only products were handled by "Keep" at approval
+        const product = await Product.findById(conv.productId, 'specs attributeGroups attributes').lean<ConvProduct>();
+        if (!product?.attributes?.length) continue;
+        if (conv.afterFingerprint && fingerprint(product) !== conv.afterFingerprint) continue; // edited since — leave it
+        await Product.updateOne({ _id: product._id }, { $set: { attributes: [] } });
+        conv.set('afterFingerprint', fingerprint({ ...product, attributes: [] }));
+        await conv.save();
+        fixed += 1;
+    }
+    return fixed;
+}
+
 export async function skipConversion(id: string) {
     const conv = await ProductConversion.findById(id);
     if (!conv) throw new ConversionError('This product is no longer in the list.', 404);
@@ -521,9 +543,26 @@ export async function undoConversion(id: string) {
 export async function listConversions(categoryId: mongoose.Types.ObjectId) {
     const items = await ProductConversion.aggregate([
         { $match: { categoryId } },
+        // Current SKUs straight from the product (main + variant + colour SKUs), so the list can be searched by SKU.
+        {
+            $lookup: {
+                from: Product.collection.name,
+                localField: 'productId',
+                foreignField: '_id',
+                pipeline: [{ $project: { sku: 1, 'variants.sku': 1, 'colorVariants.sku': 1 } }],
+                as: 'product',
+            },
+        },
         {
             $project: {
                 productId: 1,
+                sku: { $arrayElemAt: ['$product.sku', 0] },
+                variantSkus: {
+                    $concatArrays: [
+                        { $ifNull: [{ $arrayElemAt: ['$product.variants.sku', 0] }, []] },
+                        { $ifNull: [{ $arrayElemAt: ['$product.colorVariants.sku', 0] }, []] },
+                    ],
+                },
                 title: '$productTitle',
                 brand: 1,
                 image: 1,
@@ -542,6 +581,8 @@ export async function listConversions(categoryId: mongoose.Types.ObjectId) {
         id: String(i._id),
         productId: String(i.productId),
         title: i.title as string,
+        sku: (i.sku as string | undefined) || undefined,
+        skus: [i.sku, ...((i.variantSkus as (string | null)[] | undefined) ?? [])].filter((x): x is string => typeof x === 'string' && x.trim() !== ''),
         brand: i.brand as string,
         image: i.image as string | undefined,
         status: i.status as 'queued' | 'pending' | 'approved' | 'skipped' | 'failed',
@@ -586,4 +627,26 @@ export async function getConversionDetail(id: string) {
         stale: Boolean(staleMessage),
         staleMessage,
     };
+}
+
+/**
+ * Values already used for each standard field across the category (approved products first, then the
+ * AI's prepared ones) — offered as suggestions when the admin types a value, so products stay consistent.
+ */
+export async function usedFieldValues(categoryId: mongoose.Types.ObjectId) {
+    const rows = await ProductConversion.aggregate<{ _id: string; values: { value: string; count: number }[] }>([
+        { $match: { categoryId, status: { $in: ['approved', 'pending'] } } },
+        { $unwind: '$fields' },
+        { $match: { 'fields.value': { $nin: ['', null] } } },
+        {
+            $group: {
+                _id: { name: '$fields.name', value: '$fields.value' },
+                count: { $sum: 1 },
+                approved: { $sum: { $cond: [{ $eq: ['$status', 'approved'] }, 1, 0] } },
+            },
+        },
+        { $sort: { approved: -1, count: -1 } },
+        { $group: { _id: '$_id.name', values: { $push: { value: '$_id.value', count: '$count' } } } },
+    ]);
+    return Object.fromEntries(rows.map((r) => [r._id, r.values.slice(0, 30)]));
 }

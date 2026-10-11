@@ -64,6 +64,8 @@ export default function ConvertStep({
     const [choice, setChoice] = useState<Record<string, string>>({});
     /** Values the admin typed, per standard field (used when the choice is TYPED). */
     const [typed, setTyped] = useState<Record<string, string>>({});
+    /** Values already used for each standard field on other products — suggestions while typing. */
+    const [usedValues, setUsedValues] = useState<Record<string, { value: string; count: number }[]>>({});
     const [keep, setKeep] = useState<Set<string>>(new Set());
     const [acting, setActing] = useState<null | "approve" | "skip" | "undo" | "redo">(null);
     const [actionError, setActionError] = useState("");
@@ -82,9 +84,28 @@ export default function ConvertStep({
         }
     }, [categoryId]);
 
+    const loadUsedValues = useCallback(async () => {
+        try {
+            const { data } = await api.get(`/admin/attribute-normalization/${categoryId}/conversions/values`);
+            setUsedValues(data.values ?? {});
+        } catch {
+            // suggestions are a convenience — typing still works without them
+        }
+    }, [categoryId]);
+
     useEffect(() => {
         void loadQueue();
-    }, [loadQueue]);
+        void loadUsedValues();
+    }, [loadQueue, loadUsedValues]);
+
+    // Products approved before a fix could still show removed details under "General" — clean those up once.
+    useEffect(() => {
+        api.post(`/admin/attribute-normalization/${categoryId}/conversions/repair`)
+            .then(({ data }) => {
+                if (data.fixed) toast.success(`Removed leftover old details from ${data.fixed} converted product${data.fixed === 1 ? "" : "s"}.`);
+            })
+            .catch(() => undefined);
+    }, [categoryId]);
 
     const counts = useMemo(
         () => Object.fromEntries(FILTERS.map((f) => [f.id, items.filter((i) => matches(i, f.id)).length])) as Record<Filter, number>,
@@ -93,7 +114,15 @@ export default function ConvertStep({
     const brands = useMemo(() => Array.from(new Set(items.map((i) => i.brand))).sort(), [items]);
     const visible = useMemo(() => {
         const q = search.trim().toLowerCase();
-        return items.filter((i) => matches(i, filter) && (!brand || i.brand === brand) && (!q || i.title.toLowerCase().includes(q)));
+        // Search by product name or SKU (SKUs match ignoring spaces, dashes and case).
+        const compact = (v: string) => v.toLowerCase().replace(/[\s_-]+/g, "");
+        const qCompact = compact(q);
+        return items.filter(
+            (i) =>
+                matches(i, filter) &&
+                (!brand || i.brand === brand) &&
+                (!q || i.title.toLowerCase().includes(q) || (qCompact && (i.skus ?? []).some((sku) => compact(sku).includes(qCompact))))
+        );
     }, [items, filter, brand, search]);
 
     // Keep a product open, and move on to the next one when it leaves the current list.
@@ -207,6 +236,7 @@ export default function ConvertStep({
             updateItem(detail.id, { status: "approved" });
             setSelectedId(next);
             toast.success("Product updated.");
+            void loadUsedValues();
         } catch (err) {
             setActionError(errorMessage(err, "Could not save the product."));
         } finally {
@@ -383,7 +413,7 @@ export default function ConvertStep({
                             <input
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
-                                placeholder="Search products…"
+                                placeholder="Search name or SKU…"
                                 className="rounded-lg border border-border-soft bg-surface px-3 py-1.5 text-sm text-main"
                             />
                             <select
@@ -416,6 +446,7 @@ export default function ConvertStep({
                                         <span className="block truncate text-sm font-medium text-main">{i.title}</span>
                                         <span className="block truncate text-xs text-sub">
                                             {i.brand}
+                                            {i.sku ? ` · ${i.sku}` : ""}
                                             {i.status === "pending" || i.status === "approved" ? ` · ${i.filled}/${i.fieldCount} filled` : ""}
                                             {i.status === "failed" ? " · AI failed" : ""}
                                         </span>
@@ -535,15 +566,43 @@ export default function ConvertStep({
                                                                         ))}
                                                                     </select>
                                                                     {isTyped ? (
-                                                                        <input
-                                                                            value={typed[f.name] ?? ""}
-                                                                            disabled={locked}
-                                                                            onChange={(e) => setTyped((prev) => ({ ...prev, [f.name]: e.target.value }))}
-                                                                            placeholder={f.example ? `e.g. ${f.example}` : "Type the value"}
-                                                                            aria-label={`Value for ${f.name}`}
-                                                                            autoFocus={!locked}
-                                                                            className="mt-1 w-full rounded-lg border border-info/60 bg-surface px-2.5 py-1.5 text-sm text-main disabled:opacity-80"
-                                                                        />
+                                                                        <>
+                                                                            <input
+                                                                                value={typed[f.name] ?? ""}
+                                                                                disabled={locked}
+                                                                                onChange={(e) => setTyped((prev) => ({ ...prev, [f.name]: e.target.value }))}
+                                                                                placeholder={f.example ? `e.g. ${f.example}` : "Type the value"}
+                                                                                aria-label={`Value for ${f.name}`}
+                                                                                autoFocus={!locked}
+                                                                                list={`used-values-${f.name.replace(/[^a-z0-9]+/gi, "-")}`}
+                                                                                className="mt-1 w-full rounded-lg border border-info/60 bg-surface px-2.5 py-1.5 text-sm text-main disabled:opacity-80"
+                                                                            />
+                                                                            <datalist id={`used-values-${f.name.replace(/[^a-z0-9]+/gi, "-")}`}>
+                                                                                {(usedValues[f.name] ?? []).map((u) => (
+                                                                                    <option key={u.value} value={u.value} />
+                                                                                ))}
+                                                                            </datalist>
+                                                                            {!locked && (usedValues[f.name]?.length ?? 0) > 0 && (
+                                                                                <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                                                                                    <span className="text-[11px] text-sub">Used on other products:</span>
+                                                                                    {(usedValues[f.name] ?? []).slice(0, 8).map((u) => (
+                                                                                        <button
+                                                                                            key={u.value}
+                                                                                            type="button"
+                                                                                            onClick={() => setTyped((prev) => ({ ...prev, [f.name]: u.value }))}
+                                                                                            title={u.value}
+                                                                                            className={`max-w-[14rem] truncate rounded-full border px-2 py-0.5 text-[11px] transition-colors ${
+                                                                                                (typed[f.name] ?? "") === u.value
+                                                                                                    ? "border-accent bg-accent/15 text-main"
+                                                                                                    : "border-border-soft text-sub hover:border-accent/50 hover:text-main"
+                                                                                            }`}
+                                                                                        >
+                                                                                            {u.value} <span className="opacity-60">({u.count})</span>
+                                                                                        </button>
+                                                                                    ))}
+                                                                                </div>
+                                                                            )}
+                                                                        </>
                                                                     ) : chosen ? (
                                                                         <p className="mt-1 whitespace-pre-line break-words rounded bg-panel px-2 py-1 text-sm text-main">{chosen.value}</p>
                                                                     ) : locked && f.value ? (

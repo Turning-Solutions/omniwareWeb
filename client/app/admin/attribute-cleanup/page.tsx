@@ -147,7 +147,7 @@ export default function AttributeCleanupPage() {
     return (
         <div className="mx-auto max-w-6xl px-4 py-8 sm:py-10 lg:py-12">
             <PageHeader
-                title="Product Detail Names"
+                title="Attribute Cleanup"
                 subtitle="Every brand lists product details differently. Here you set one standard list of details per category (for example the 16 RAM details), and the AI converts each product to it — so every product page looks the same and products line up when customers compare them. You approve every product, and any change can be undone."
                 action={
                     inventory ? (

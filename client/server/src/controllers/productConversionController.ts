@@ -13,8 +13,10 @@ import {
     processNextBatch,
     queueConversions,
     redoConversion,
+    repairLegacyCopies,
     skipConversion,
     undoConversion,
+    usedFieldValues,
 } from '../services/productConversion';
 import ProductConversion from '../models/ProductConversion';
 import Category from '../models/Category';
@@ -182,5 +184,30 @@ export const undoConversionEndpoint = async (req: Request, res: Response, next: 
         res.json({ ok: true });
     } catch (error) {
         sendError(error, res, next);
+    }
+};
+
+/** POST /:categoryKey/conversions/repair — clear old hidden detail copies left on already-approved products. */
+export const repairConversions = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+        const category = await resolveCategory(paramOf(req, 'categoryKey'));
+        if (!category) return categoryNotFound(next);
+        const fixed = await repairLegacyCopies(category._id);
+        if (fixed) await refreshSite();
+        res.json({ fixed });
+    } catch (error) {
+        sendError(error, res, next);
+    }
+};
+
+/** GET /:categoryKey/conversions/values — values already used per standard field (typing suggestions). */
+export const getUsedFieldValues = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+        const category = await resolveCategory(paramOf(req, 'categoryKey'));
+        if (!category) return categoryNotFound(next);
+        res.set('Cache-Control', 'no-store');
+        res.json({ values: await usedFieldValues(category._id) });
+    } catch (error) {
+        next(error);
     }
 };

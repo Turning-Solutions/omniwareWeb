@@ -26,8 +26,10 @@ import {
     getAttributeTemplate,
     getConversion,
     getConversionQueue,
+    getUsedFieldValues,
     nextConversions,
     redoConversionEndpoint,
+    repairConversions,
     skipConversionEndpoint,
     startConversions,
     undoConversionEndpoint,
@@ -47,8 +49,10 @@ router.post('/conversion/:id/skip', skipConversionEndpoint);
 router.post('/conversion/:id/undo', undoConversionEndpoint);
 router.post('/conversion/:id/redo', redoConversionEndpoint);
 router.get('/:categoryKey/conversions', getConversionQueue);
+router.get('/:categoryKey/conversions/values', getUsedFieldValues);
 router.post('/:categoryKey/conversions/start', startConversions);
 router.post('/:categoryKey/conversions/next', nextConversions);
+router.post('/:categoryKey/conversions/repair', repairConversions);
 router.get('/:categoryKey/template', getAttributeTemplate);
 
 router.get('/proposal/:id', getProposal);

@@ -314,7 +314,8 @@ export default function ComparePageClient() {
         gridTemplateColumns: `minmax(8.5rem, 13rem) repeat(${Math.max(colCount, 1)}, minmax(12rem, calc((100% - 13rem) / ${MAX_COMPARE_ITEMS})))`,
     };
     const keyRows = decoratedSections.filter((s) => s.variant === "key").flatMap((s) => s.rows);
-    const detailSections = decoratedSections.filter((s) => s.variant !== "key");
+    const overviewSections = decoratedSections.filter((s) => s.variant === "overview");
+    const detailSections = decoratedSections.filter((s) => s.variant === "detail");
 
     return (
         <div className="mx-auto w-full max-w-[1920px] px-4 py-8 sm:px-6 sm:py-10 lg:px-10">
@@ -414,8 +415,8 @@ export default function ComparePageClient() {
                     <div ref={productCardsRef} className="grid" style={gridStyle}>
                         <div className="sticky left-0 z-10 flex flex-col justify-end gap-3 bg-background pb-1 pr-3 text-xs text-[#8E8E8E]">
                             <span className="inline-flex items-center gap-2">
-                                <span className="inline-block h-2 w-2 rounded-full bg-amber-400" />
-                                Values differ
+                                <span className="inline-block h-3 w-5 rounded-sm border-l-2 border-amber-400/70 bg-amber-400/15" />
+                                Highlighted rows: values differ
                             </span>
                             {compareItems.length < 2 && (
                                 <span className="text-amber-300">Add at least one more product to compare.</span>
@@ -445,6 +446,20 @@ export default function ComparePageClient() {
                         </p>
                     ) : (
                         <>
+                            {/* Overview — price, brand, availability, warranty first */}
+                            {overviewSections.length > 0 && (
+                                <section className="overflow-hidden rounded-2xl border border-white/[0.07] bg-[#121212]/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                                    {overviewSections.map((section) => (
+                                        <DetailSection
+                                            key={`${section.variant}:${section.title}`}
+                                            section={section}
+                                            colCount={colCount}
+                                            gridStyle={gridStyle}
+                                        />
+                                    ))}
+                                </section>
+                            )}
+
                             {/* Key specifications — one highlighted panel */}
                             {keyRows.length > 0 && (
                                 <section className="overflow-hidden rounded-2xl border border-[#D12B28]/30 bg-[#141110] shadow-[0_0_0_1px_rgba(209,43,40,0.05),inset_0_1px_0_rgba(255,255,255,0.04)]">
@@ -457,19 +472,30 @@ export default function ComparePageClient() {
                                         </div>
                                     </div>
                                     <div className="divide-y divide-white/[0.06]">
-                                        {keyRows.map((row) => (
-                                            <div key={row.key} className="grid transition-colors hover:bg-white/[0.02]" style={gridStyle}>
-                                                <div className="sticky left-0 z-10 flex items-center gap-2 bg-[#141110] px-4 py-3.5 sm:px-5">
-                                                    {row.differs && colCount > 1 && (
-                                                        <span className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400" title="Values differ" />
-                                                    )}
+                                        {keyRows.map((row) => {
+                                            // Rows where the products differ are highlighted; identical rows stay plain and slightly dimmer.
+                                            const differs = row.differs && colCount > 1;
+                                            return (
+                                            <div
+                                                key={row.key}
+                                                className={`grid transition-colors ${differs ? "bg-amber-400/[0.07]" : ""} hover:bg-white/[0.03]`}
+                                                style={gridStyle}
+                                                title={differs ? "The products differ here" : undefined}
+                                            >
+                                                <div
+                                                    className={`sticky left-0 z-10 flex items-center border-l-2 px-4 py-3.5 sm:px-5 ${
+                                                        differs ? "border-l-amber-400/70 bg-[#1f1a10]" : "border-l-transparent bg-[#141110]"
+                                                    }`}
+                                                >
                                                     <span className="text-sm font-semibold text-[#E6E6E6]">{row.label}</span>
                                                 </div>
                                                 {row.values.map((value, i) => {
                                                     return (
                                                         <div
                                                             key={i}
-                                                            className="flex min-w-0 items-center gap-1.5 border-l border-white/[0.06] px-4 py-3.5 text-sm font-semibold text-[#E6E6E6] sm:text-[15px]"
+                                                            className={`flex min-w-0 items-center gap-1.5 border-l border-white/[0.06] px-4 py-3.5 text-sm font-semibold sm:text-[15px] ${
+                                                                differs ? "text-[#F5F5F5]" : "text-[#A8A8A8]"
+                                                            }`}
                                                         >
                                                             {value == null || value === "" ? (
                                                                 <span className="font-normal text-[#5E5E5E]">—</span>
@@ -480,12 +506,13 @@ export default function ComparePageClient() {
                                                     );
                                                 })}
                                             </div>
-                                        ))}
+                                            );
+                                        })}
                                     </div>
                                 </section>
                             )}
 
-                            {/* Overview + other attributes — same look as the product page "Product details" band */}
+                            {/* Other attributes — same look as the product page "Product details" band */}
                             {detailSections.length > 0 && (
                                 <section>
                                     <BlockHeading eyebrow="Full breakdown" title="Product Details" />
@@ -621,23 +648,29 @@ function DetailSection({
                 </span>
             </div>
             <div className="divide-y divide-white/[0.06] border-b border-white/[0.06]">
-                {section.rows.map((row) => (
+                {section.rows.map((row) => {
+                    const differs = row.differs && colCount > 1;
+                    return (
                     <div
                         key={row.key}
-                        className="grid text-sm transition-colors hover:bg-white/[0.02]"
+                        className={`grid text-sm transition-colors ${differs ? "bg-amber-400/[0.06]" : ""} hover:bg-white/[0.03]`}
                         style={gridStyle}
+                        title={differs ? "The products differ here" : undefined}
                     >
-                        <div className="sticky left-0 z-10 flex items-start gap-1.5 bg-[#121212] px-4 py-3 font-medium text-[#8E8E8E] sm:px-5">
-                            {row.differs && colCount > 1 && (
-                                <span className="mt-1.5 inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400" title="Values differ" />
-                            )}
+                        <div
+                            className={`sticky left-0 z-10 flex items-start border-l-2 px-4 py-3 font-medium text-[#8E8E8E] sm:px-5 ${
+                                differs ? "border-l-amber-400/70 bg-[#1b1810]" : "border-l-transparent bg-[#121212]"
+                            }`}
+                        >
                             {row.label}
                         </div>
                         {row.values.map((value, i) => {
                             return (
                                 <div
                                     key={i}
-                                    className="flex min-w-0 items-start gap-1.5 whitespace-pre-line break-words border-l border-white/[0.06] px-4 py-3 leading-relaxed text-[#D4D4D4]"
+                                    className={`flex min-w-0 items-start gap-1.5 whitespace-pre-line break-words border-l border-white/[0.06] px-4 py-3 leading-relaxed ${
+                                        differs ? "text-[#EDEDED]" : "text-[#9A9A9A]"
+                                    }`}
                                 >
                                     <div className="min-w-0">
                                         {value == null || value === "" ? (
@@ -652,7 +685,8 @@ function DetailSection({
                             );
                         })}
                     </div>
-                ))}
+                    );
+                })}
             </div>
         </div>
     );

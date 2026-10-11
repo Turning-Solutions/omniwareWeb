@@ -92,6 +92,14 @@ export function normalizeProductAttributeGroups(doc: any): any {
             pojo.specs = {};
         }
     }
+    // Display names for spec keys are also a Map — a raw Map serialises to {} and the labels would be lost.
+    if (pojo.specLabels && typeof pojo.specLabels === 'object') {
+        if (pojo.specLabels instanceof Map) {
+            pojo.specLabels = Object.fromEntries(pojo.specLabels.entries());
+        } else if (typeof (pojo.specLabels as any).toObject === 'function') {
+            pojo.specLabels = (pojo.specLabels as any).toObject();
+        }
+    }
     if (pojo.attributeGroups && Array.isArray(pojo.attributeGroups) && pojo.attributeGroups.length > 0) {
         return pojo;
     }

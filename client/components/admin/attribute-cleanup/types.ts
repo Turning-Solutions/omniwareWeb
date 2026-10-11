@@ -95,6 +95,10 @@ export interface ConversionItem {
     id: string;
     productId: string;
     title: string;
+    /** Main SKU, shown in the list. */
+    sku?: string;
+    /** Main + variant + colour SKUs, for searching. */
+    skus: string[];
     brand: string;
     image?: string;
     status: ConversionStatus;
