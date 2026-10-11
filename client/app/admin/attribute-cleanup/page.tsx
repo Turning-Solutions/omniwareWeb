@@ -8,9 +8,9 @@ import PageHeader from "@/components/admin/PageHeader";
 import StatusBadge from "@/components/admin/StatusBadge";
 import { attributeMatchKey } from "@/lib/attributeMatchKey";
 import { clusterSimilarNames } from "@/lib/attributeSimilarity";
-import NamingSchemeStep from "@/components/admin/attribute-cleanup/NamingSchemeStep";
+import StandardListStep from "@/components/admin/attribute-cleanup/StandardListStep";
 import type { Inventory } from "@/components/admin/attribute-cleanup/types";
-import ReviewStep from "@/components/admin/attribute-cleanup/ReviewStep";
+import ConvertStep from "@/components/admin/attribute-cleanup/ConvertStep";
 
 interface Category {
     _id: string;
@@ -21,9 +21,9 @@ interface Category {
 type Filter = "all" | "ambiguous" | "brandSpecific" | "multiGroup" | "similar";
 
 const STEPS = [
-    { title: "Look around", text: "See which names your products use. Optional." },
-    { title: "Choose names", text: "AI suggests one standard name for each. You confirm." },
-    { title: "Review products", text: "Check each product's new names and accept them." },
+    { title: "Look around", text: "See which details your products have today. Optional." },
+    { title: "Standard list", text: "The details every product should show, in order." },
+    { title: "Convert products", text: "AI fills the list for each product. You approve each one." },
 ];
 
 export default function AttributeCleanupPage() {
@@ -35,7 +35,7 @@ export default function AttributeCleanupPage() {
     const [filter, setFilter] = useState<Filter>("all");
     const [search, setSearch] = useState("");
     const [expanded, setExpanded] = useState<Set<string>>(new Set());
-    // Step 1 is only a look around — start on "Choose names", where the work happens.
+    // Step 1 is only a look around — start on the standard list, where the work begins.
     const [step, setStep] = useState(1);
 
     const mainCategories = useMemo(
@@ -148,7 +148,7 @@ export default function AttributeCleanupPage() {
         <div className="mx-auto max-w-6xl px-4 py-8 sm:py-10 lg:py-12">
             <PageHeader
                 title="Product Detail Names"
-                subtitle="Different brands name the same detail differently (for example “TBW” and “Terabytes Written”). Here you pick one standard name for each, so products line up when customers compare them. Only the names change — the values never do."
+                subtitle="Every brand lists product details differently. Here you set one standard list of details per category (for example the 16 RAM details), and the AI converts each product to it — so every product page looks the same and products line up when customers compare them. You approve every product, and any change can be undone."
                 action={
                     inventory ? (
                         <button
@@ -204,7 +204,7 @@ export default function AttributeCleanupPage() {
                     ))}
                 </select>
                 <p className="mt-2 text-xs text-sub">
-                    Works on one category at a time, including its subcategories. Do one category fully (steps 2 → 3) before starting the next.
+                    Works on one category at a time, including its subcategories. Finish one category (steps 2 → 3) before starting the next.
                 </p>
             </div>
 
@@ -212,15 +212,21 @@ export default function AttributeCleanupPage() {
             {error && <div className="rounded-lg border border-danger/40 bg-danger/10 p-4 text-sm text-danger">{error}</div>}
 
             {inventory && !loading && step === 1 && (
-                <NamingSchemeStep key={inventory.categoryId} categoryId={inventory.categoryId} names={inventory.names} onGoToReview={() => setStep(2)} />
-            )}
-
-            {inventory && !loading && step === 2 && (
-                <ReviewStep
+                <StandardListStep
                     key={inventory.categoryId}
                     categoryId={inventory.categoryId}
                     categoryName={inventory.categoryName}
-                    onGoToNames={() => setStep(1)}
+                    names={inventory.names}
+                    onNext={() => setStep(2)}
+                />
+            )}
+
+            {inventory && !loading && step === 2 && (
+                <ConvertStep
+                    key={inventory.categoryId}
+                    categoryId={inventory.categoryId}
+                    categoryName={inventory.categoryName}
+                    onGoToList={() => setStep(1)}
                 />
             )}
 
@@ -228,7 +234,7 @@ export default function AttributeCleanupPage() {
                 <>
                     <p className="mb-4 rounded-lg border border-border-soft bg-panel p-3 text-sm text-sub">
                         This is just a look at every detail name used by {inventory.categoryName} products — nothing here changes anything. It helps you see
-                        how messy the names are. You can skip straight to <strong className="text-main">Choose names</strong>.
+                        how messy the names are. You can skip straight to <strong className="text-main">Standard list</strong>.
                     </p>
                     <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
                         <Stat label="Products" value={inventory.productCount} />

@@ -22,6 +22,8 @@ const productSchema = new mongoose.Schema({
         default: 'pre_order'
     },
     specs: { type: Map, of: String },
+    /** Display name per spec key (e.g. Cas_Latency -> "CAS Latency"), written by the attribute conversion tool. */
+    specLabels: { type: Map, of: String },
     badges: [{ type: String }],
     images: [{ type: String }],
     attributeGroups: [{

@@ -27,7 +27,7 @@ export class ProposalError extends Error {
 /** Spec keys are stored Title_Case_With_Underscores; Mongo map keys can't contain "." or "$". */
 export const specKeyFor = (name: string): string => normalizeSpecKey(name).replace(/[.$]/g, '');
 
-type LeanProduct = {
+export type LeanProduct = {
     _id: mongoose.Types.ObjectId;
     title?: string;
     slug?: string;
@@ -38,7 +38,7 @@ type LeanProduct = {
     attributes?: { name?: string; value?: string }[];
 };
 
-interface Occurrence {
+export interface Occurrence {
     container: IProposalChange['container'];
     groupIndex?: number;
     groupName?: string;
@@ -51,7 +51,7 @@ interface Occurrence {
 }
 
 /** Every named detail on a product, in the same way the inventory reads them (empty ones skipped). */
-function listOccurrences(p: LeanProduct): Occurrence[] {
+export function listOccurrences(p: LeanProduct): Occurrence[] {
     const out: Occurrence[] = [];
     for (const [rawKey, rawValue] of Object.entries(p.specs ?? {})) {
         const value = String(rawValue ?? '').trim();
@@ -78,7 +78,7 @@ function listOccurrences(p: LeanProduct): Occurrence[] {
     return out;
 }
 
-const occurrenceKey = (o: Pick<Occurrence, 'container' | 'key' | 'groupIndex' | 'attrIndex'>) =>
+export const occurrenceKey = (o: Pick<Occurrence, 'container' | 'key' | 'groupIndex' | 'attrIndex'>) =>
     o.container === 'specs' ? `s|${o.key}` : o.container === 'attributeGroups' ? `g|${o.groupIndex}|${o.attrIndex}` : `l|${o.attrIndex}`;
 
 /** Two details of one product ending up with the same name (spec keys and attributes are separate namespaces). */
@@ -266,7 +266,7 @@ export function planChanges(product: LeanProduct, changes: PlannedChange[], dire
  * Keep the shop's filter configuration in step with renamed spec keys: the new key is added next to the
  * old one right away, and the old one is dropped once no product uses it any more.
  */
-async function syncFeaturedKeys(renames: { from: string; to: string }[]) {
+export async function syncFeaturedKeys(renames: { from: string; to: string }[]) {
     for (const { from, to } of renames) {
         if (from === to) continue;
         const configs = await CategoryFeaturedSpecs.find({ featuredSpecKeys: from });

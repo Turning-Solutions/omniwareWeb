@@ -565,7 +565,7 @@ function ProductPageInner({ slug }: { slug: string }) {
                                     {Object.entries(product.specs).map(([key, value]) => (
                                         <div key={key}>
                                             <span className="block text-[11px] font-medium uppercase tracking-wide text-[#8E8E8E]">
-                                                {formatSpecificationLabel(key)}
+                                                {product.specLabels?.[key] || formatSpecificationLabel(key)}
                                             </span>
                                             <span className="text-[#D4D4D4]">{value as string}</span>
                                         </div>

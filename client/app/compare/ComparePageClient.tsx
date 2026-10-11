@@ -104,7 +104,10 @@ function buildSections(products: Product[], resolve: (name: string) => ResolvedA
         for (const [name, raw] of Object.entries(p.specs ?? {})) {
             const value = raw == null ? "" : String(raw).trim();
             if (!value) continue;
-            const { key, label } = resolve(name);
+            const resolved = resolve(name);
+            const key = resolved.key;
+            // Converted products carry the proper display name ("CAS Latency" rather than "Cas Latency").
+            const label = p.specLabels?.[name] || resolved.label;
             if (!specRowsByKey.has(key)) {
                 specRowsByKey.set(key, { key: `spec:${key}`, label, values: products.map(() => null) });
             }

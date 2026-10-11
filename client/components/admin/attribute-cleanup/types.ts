@@ -88,3 +88,61 @@ export interface ReviewDetail {
     staleMessage?: string;
     canonicalNames: string[];
 }
+
+export type ConversionStatus = "queued" | "pending" | "approved" | "skipped" | "failed";
+
+export interface ConversionItem {
+    id: string;
+    productId: string;
+    title: string;
+    brand: string;
+    image?: string;
+    status: ConversionStatus;
+    needsLook: boolean;
+    error?: string;
+    /** Standard fields with a value. */
+    filled: number;
+    fieldCount: number;
+    /** Old details that will be removed. */
+    removing: number;
+}
+
+export interface ConversionField {
+    name: string;
+    value: string;
+    basis: "copied" | "typed" | "reformatted" | "inferred" | "missing";
+    sources: { id: string; name: string; value: string }[];
+    note?: string;
+    check: boolean;
+    example?: string;
+}
+
+export interface ConversionExisting {
+    id: string;
+    container: "specs" | "attributeGroups" | "attributes";
+    groupName?: string;
+    name: string;
+    value: string;
+    usedFor: string[];
+    replaced: boolean;
+    keep: boolean;
+}
+
+export interface ConversionDetail {
+    id: string;
+    productId: string;
+    productSlug?: string;
+    title: string;
+    brand: string;
+    image?: string;
+    status: ConversionStatus;
+    needsLook: boolean;
+    error?: string;
+    aiModel?: string;
+    fields: ConversionField[];
+    existing: ConversionExisting[];
+    approvedAt?: string;
+    approvedBy?: string;
+    stale: boolean;
+    staleMessage?: string;
+}

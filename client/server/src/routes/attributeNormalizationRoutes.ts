@@ -21,6 +21,17 @@ import {
     rejectProposalEndpoint,
     revertProposalEndpoint,
 } from '../controllers/attributeReviewController';
+import {
+    approveConversionEndpoint,
+    getAttributeTemplate,
+    getConversion,
+    getConversionQueue,
+    nextConversions,
+    redoConversionEndpoint,
+    skipConversionEndpoint,
+    startConversions,
+    undoConversionEndpoint,
+} from '../controllers/productConversionController';
 
 const router = express.Router({ mergeParams: true });
 
@@ -29,6 +40,16 @@ router.use(requireAuth, requireAdmin);
 router.get('/ai-settings', getAiSettings);
 router.get('/ai-settings/models', listAiModels);
 router.put('/ai-settings', updateAiSettings);
+
+router.get('/conversion/:id', getConversion);
+router.post('/conversion/:id/approve', approveConversionEndpoint);
+router.post('/conversion/:id/skip', skipConversionEndpoint);
+router.post('/conversion/:id/undo', undoConversionEndpoint);
+router.post('/conversion/:id/redo', redoConversionEndpoint);
+router.get('/:categoryKey/conversions', getConversionQueue);
+router.post('/:categoryKey/conversions/start', startConversions);
+router.post('/:categoryKey/conversions/next', nextConversions);
+router.get('/:categoryKey/template', getAttributeTemplate);
 
 router.get('/proposal/:id', getProposal);
 router.post('/proposal/:id/accept', acceptProposalEndpoint);

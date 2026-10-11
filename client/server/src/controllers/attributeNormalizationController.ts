@@ -8,6 +8,7 @@ import CategoryAttributeTemplate from '../models/CategoryAttributeTemplate';
 import { attributeLooseKey } from '../../../lib/attributeMatchKey';
 import { generateSchemeChunk, standardCanonical } from '../services/namingSchemeGenerator';
 import { AiError } from '../services/aiError';
+import { specKeyFor } from '../services/attributeProposals';
 import AiSetting from '../models/AiSetting';
 import {
     PROVIDERS,
@@ -231,6 +232,18 @@ export const updateAttributeTemplate = async (req: Request, res: Response, next:
             seen.add(key);
             return true;
         });
+
+        // Converted products store these as spec keys; two names with the same key would overwrite each other.
+        const byKey = new Map<string, string>();
+        for (const a of attributes) {
+            const key = specKeyFor(a.name);
+            const clash = byKey.get(key);
+            if (clash) {
+                res.status(400).json({ message: `"${clash}" and "${a.name}" are too similar to tell apart — rename one of them.` });
+                return;
+            }
+            byKey.set(key, a.name);
+        }
 
         const template = await CategoryAttributeTemplate.findOneAndUpdate(
             { categoryId: category._id },
