@@ -60,12 +60,30 @@ export default function StandardListStep({
         setEditing(true);
     };
 
-    const save = async () => {
+    /**
+     * A ready-made list that the saved list looks like an older version of (shares names but differs) —
+     * e.g. the RAM list saved before the ready-made RAM list was changed.
+     */
+    const outdatedPreset = useMemo(() => {
+        if (!list.length) return null;
+        const saved = list.map((a) => attributeLooseKey(a.name));
+        const savedSet = new Set(saved);
+        return (
+            TEMPLATE_PRESETS.find((preset) => {
+                const names = preset.attributes.map((a) => attributeLooseKey(a.name));
+                const shared = names.filter((n) => savedSet.has(n)).length;
+                const identical = names.length === saved.length && names.every((n, i) => n === saved[i]);
+                return !identical && shared >= Math.min(4, names.length);
+            }) ?? null
+        );
+    }, [list]);
+
+    const save = async (attributes: TemplateAttribute[] = parsed) => {
         setSaving(true);
         setError("");
         try {
-            const { data } = await api.put(`/admin/attribute-normalization/${categoryId}/template`, { attributes: parsed });
-            setList(data.template ?? parsed);
+            const { data } = await api.put(`/admin/attribute-normalization/${categoryId}/template`, { attributes });
+            setList(data.template ?? attributes);
             setEditing(false);
         } catch (err) {
             setError(errorMessage(err, "Saving the list failed."));
@@ -95,6 +113,28 @@ export default function StandardListStep({
                         </button>
                     )}
                 </div>
+
+                {!editing && outdatedPreset && (
+                    <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm text-main">
+                        <span>
+                            This saved list is different from the current ready-made <strong>{outdatedPreset.label}</strong> list (
+                            {outdatedPreset.attributes.length} details). It may be an older version.
+                        </span>
+                        <button
+                            type="button"
+                            disabled={saving}
+                            onClick={() => {
+                                if (window.confirm(`Replace the saved list with the ready-made ${outdatedPreset.label} list (${outdatedPreset.attributes.length} details)?`)) {
+                                    void save(outdatedPreset.attributes);
+                                }
+                            }}
+                            className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-50"
+                        >
+                            {saving ? "Saving…" : `Use the ${outdatedPreset.label} list`}
+                        </button>
+                    </div>
+                )}
+                {!editing && error && <p className="mt-3 rounded-lg border border-danger/40 bg-danger/10 p-3 text-sm text-danger">{error}</p>}
 
                 {!editing && (
                     <ol className="mt-4 divide-y divide-border-soft overflow-hidden rounded-lg border border-border-soft">
@@ -142,7 +182,7 @@ export default function StandardListStep({
                         <div className="flex gap-2">
                             <button
                                 type="button"
-                                onClick={save}
+                                onClick={() => save()}
                                 disabled={saving || parsed.length === 0}
                                 className="flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-50"
                             >
