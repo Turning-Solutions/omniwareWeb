@@ -1985,11 +1985,33 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                     )}
                 </section>
 
-                {/* Every other specification on the product (e.g. the converted standard list) */}
+                {/* Product details — attribute groups (e.g. General, Cable Specs) */}
+                <section id="attributes" className="scroll-mt-32 border-t border-border-soft pt-6">
+                    <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                            <h2 className="text-xl font-bold text-main">Product details (Attributes)</h2>
+                            <p className="mt-0.5 text-sm text-sub">Group details by category (General, Cable Specs, etc.) and update values quickly.</p>
+                            <p className="mt-0.5 flex items-center gap-1 text-xs text-sub">
+                                <Link2 className="h-3 w-3 shrink-0" /> To hyperlink just a word or phrase, select it in a value field and click the link icon — the URL stays hidden from customers.
+                            </p>
+                            <p className="mt-1 text-xs text-sub">
+                                {formData.attributeGroups.length} categories,{" "}
+                                {formData.attributeGroups.reduce((sum, g) => sum + g.attributes.length, 0)} total attributes
+                            </p>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={addAttributeGroup}
+                            className="inline-flex items-center gap-2 rounded-lg bg-accent/15 px-3 py-2 text-sm text-accent transition-colors hover:bg-accent/25"
+                        >
+                            <Plus className="h-4 w-4" /> Add category
+                        </button>
+                    </div>
+
                 {formData.filterSpecs.some((s) => !featuredSpecKeys.includes(s.key)) && (
-                    <section id="other-specs" className="scroll-mt-32 border-t border-border-soft pt-6">
-                        <h2 className="text-xl font-bold text-main">Specifications</h2>
-                        <p className="text-sub text-sm mt-0.5 mb-4">Shown on the product page. Clear a value to remove it.</p>
+                    <div className="mb-6 rounded-xl border border-border-soft p-4">
+                        <h3 className="text-sm font-semibold uppercase tracking-wide text-accent">Specifications</h3>
+                        <p className="text-sub text-xs mt-0.5 mb-3">Shown first in Product details on the product page. Clear a value to remove it.</p>
                         <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
                             {formData.filterSpecs
                                 .filter((s) => !featuredSpecKeys.includes(s.key))
@@ -2020,31 +2042,8 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                                     </div>
                                 ))}
                         </div>
-                    </section>
-                )}
-
-                {/* Product details — attribute groups (e.g. General, Cable Specs) */}
-                <section id="attributes" className="scroll-mt-32 border-t border-border-soft pt-6">
-                    <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-                        <div>
-                            <h2 className="text-xl font-bold text-main">Product details (Attributes)</h2>
-                            <p className="mt-0.5 text-sm text-sub">Group details by category (General, Cable Specs, etc.) and update values quickly.</p>
-                            <p className="mt-0.5 flex items-center gap-1 text-xs text-sub">
-                                <Link2 className="h-3 w-3 shrink-0" /> To hyperlink just a word or phrase, select it in a value field and click the link icon — the URL stays hidden from customers.
-                            </p>
-                            <p className="mt-1 text-xs text-sub">
-                                {formData.attributeGroups.length} categories,{" "}
-                                {formData.attributeGroups.reduce((sum, g) => sum + g.attributes.length, 0)} total attributes
-                            </p>
-                        </div>
-                        <button
-                            type="button"
-                            onClick={addAttributeGroup}
-                            className="inline-flex items-center gap-2 rounded-lg bg-accent/15 px-3 py-2 text-sm text-accent transition-colors hover:bg-accent/25"
-                        >
-                            <Plus className="h-4 w-4" /> Add category
-                        </button>
                     </div>
+                )}
 
                     {formData.attributeGroups.length === 0 && (
                         <p className="text-sub text-sm italic">No attribute categories. Click &quot;Add category&quot; to add one (e.g. General, Cable Specs).</p>
