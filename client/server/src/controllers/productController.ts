@@ -7,6 +7,7 @@ import FacetSnapshot from '../models/FacetSnapshot';
 import { buildProductMatchStage, SPECS_OBJECT_TO_ARRAY_PROJECT, DISCOUNT_ONLY_STAGES, type MatchStageCache } from '../utils/productAggregation';
 import { normalizeSpecKey } from '../utils/normalizeSpecKey';
 import { buildFacetRequestCacheKey, clearFacetResponseCache, getFacetResponseCache, setFacetResponseCache } from '../utils/facetRuntimeCache';
+import { bumpCatalogVersion, withResponseCache } from '../utils/cache';
 import { withDiscountInfo, stripAdminOnlyProductFields, normalizeProductAttributeGroups } from '../utils/discountHelpers';
 
 /** Maps shop URL values like price-asc to Mongo sort (also accepts price_asc). */
@@ -113,6 +114,7 @@ export function clearFeaturedSpecsCache(categoryKey?: string | null): void {
 
 export function invalidateFacetCaches(): void {
     clearFacetResponseCache();
+    void bumpCatalogVersion();
     void FacetSnapshot.deleteMany({}).catch(() => undefined);
 }
 
@@ -230,7 +232,7 @@ const hasFilters = (req: Request): boolean => {
  */
 const PUBLIC_LISTING_CACHE_CONTROL = 'public, s-maxage=60, stale-while-revalidate=300';
 
-export const getProducts = async (req: Request, res: Response) => {
+const getProductsHandler = async (req: Request, res: Response) => {
     try {
         res.set('Cache-Control', PUBLIC_LISTING_CACHE_CONTROL);
 
@@ -458,7 +460,7 @@ export const getProducts = async (req: Request, res: Response) => {
     }
 };
 
-export const getProductFacets = async (req: Request, res: Response) => {
+const getProductFacetsHandler = async (req: Request, res: Response) => {
     try {
         res.set('Cache-Control', PUBLIC_LISTING_CACHE_CONTROL);
 
@@ -620,6 +622,11 @@ export const getProductFacets = async (req: Request, res: Response) => {
         res.status(500).json({ message: (error as Error).message });
     }
 };
+
+/** Catalog reads are cached (Redis when REDIS_URL is set, else in-process) and invalidated on any catalog write. */
+const CATALOG_RESPONSE_TTL_MS = 5 * 60 * 1000;
+export const getProducts = withResponseCache('products', CATALOG_RESPONSE_TTL_MS, getProductsHandler, PUBLIC_LISTING_CACHE_CONTROL);
+export const getProductFacets = withResponseCache('facets', CATALOG_RESPONSE_TTL_MS, getProductFacetsHandler, PUBLIC_LISTING_CACHE_CONTROL);
 
 function isValidObjectIdString(s: string): boolean {
     return /^[a-fA-F0-9]{24}$/.test(s);

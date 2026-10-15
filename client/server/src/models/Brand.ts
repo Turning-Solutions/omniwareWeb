@@ -1,3 +1,4 @@
+import { catalogCacheInvalidation } from '../utils/catalogCacheInvalidation';
 import mongoose from 'mongoose';
 
 const brandSchema = new mongoose.Schema({
@@ -8,6 +9,8 @@ const brandSchema = new mongoose.Schema({
 }, {
     timestamps: true
 });
+
+brandSchema.plugin(catalogCacheInvalidation);
 
 const Brand = mongoose.models.Brand ?? mongoose.model('Brand', brandSchema);
 export default Brand;

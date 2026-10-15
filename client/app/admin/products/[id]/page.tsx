@@ -236,6 +236,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
     const [mainCategoryId, setMainCategoryId] = useState("");
     const [subCategoryId, setSubCategoryId] = useState("");
     const [featuredSpecKeys, setFeaturedSpecKeys] = useState<string[]>([]);
+    const [specLabels, setSpecLabels] = useState<Record<string, string>>({});
     const [featuredSpecsLoading, setFeaturedSpecsLoading] = useState(false);
     const [specSuggestions, setSpecSuggestions] = useState<Record<string, string[]>>({});
     const [activeSpecKey, setActiveSpecKey] = useState<string | null>(null);
@@ -380,6 +381,7 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
 
                 const filterSpecs: FilterSpec[] = specsEntries
                     .map(([k, v]) => ({ key: normalizeSpecKey(k), value: String(v) }));
+                setSpecLabels(data.specLabels && typeof data.specLabels === "object" ? data.specLabels : {});
                 const rawGroups = data.attributeGroups;
                 const colorVariants: ColorVariant[] = Array.isArray(data.colorVariants)
                     ? data.colorVariants.map((v: { name?: string; hex?: string; image?: string; price?: number }) => ({
@@ -600,7 +602,8 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
             const specsRecord: Record<string, string> = {};
             formData.filterSpecs.forEach(({ key, value }) => {
                 const k = key.trim();
-                if (k && featuredSpecKeys.includes(k)) specsRecord[k] = value.trim();
+                // Keep every specification (the converted standard list lives here too), not just the featured ones.
+                if (k && value.trim()) specsRecord[k] = value.trim();
             });
             const {
                 filterSpecs: _omit,
@@ -1981,6 +1984,44 @@ export default function ProductFormPage({ params }: { params: Promise<{ id: stri
                         </div>
                     )}
                 </section>
+
+                {/* Every other specification on the product (e.g. the converted standard list) */}
+                {formData.filterSpecs.some((s) => !featuredSpecKeys.includes(s.key)) && (
+                    <section id="other-specs" className="scroll-mt-32 border-t border-border-soft pt-6">
+                        <h2 className="text-xl font-bold text-main">Specifications</h2>
+                        <p className="text-sub text-sm mt-0.5 mb-4">Shown on the product page. Clear a value to remove it.</p>
+                        <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+                            {formData.filterSpecs
+                                .filter((s) => !featuredSpecKeys.includes(s.key))
+                                .map((s) => (
+                                    <div key={s.key} className="rounded-lg border border-border-soft bg-panel/60 p-3">
+                                        <p className="text-main text-sm font-semibold mb-2">{specLabels[s.key] || formatSpecLabel(s.key)}</p>
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                                type="text"
+                                                className="w-full bg-panel border border-border-soft rounded-lg px-3 py-2 text-main text-sm focus:outline-none focus:border-accent"
+                                                value={s.value}
+                                                onChange={(e) =>
+                                                    setFormData({
+                                                        ...formData,
+                                                        filterSpecs: formData.filterSpecs.map((x) => (x.key === s.key ? { ...x, value: e.target.value } : x)),
+                                                    })
+                                                }
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => removeFilterSpecByKey(s.key)}
+                                                className="p-2 text-red-400 hover:bg-red-400/10 rounded"
+                                                title="Remove"
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                        </div>
+                    </section>
+                )}
 
                 {/* Product details — attribute groups (e.g. General, Cable Specs) */}
                 <section id="attributes" className="scroll-mt-32 border-t border-border-soft pt-6">

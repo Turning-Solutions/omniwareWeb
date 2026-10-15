@@ -1,3 +1,4 @@
+import { catalogCacheInvalidation } from '../utils/catalogCacheInvalidation';
 import mongoose from 'mongoose';
 
 const categorySchema = new mongoose.Schema({
@@ -17,6 +18,8 @@ const categorySchema = new mongoose.Schema({
 // Indexes for parent/child traversal and active category reads.
 categorySchema.index({ parentId: 1 });
 categorySchema.index({ isActive: 1, parentId: 1 });
+
+categorySchema.plugin(catalogCacheInvalidation);
 
 // In Next.js dev HMR, mongoose model cache can keep an older schema.
 // Recreate the model in non-production so newly added fields persist immediately.

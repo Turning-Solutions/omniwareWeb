@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import { expandLayoutSlugForCategoryFilter } from '../../../lib/categoryFilterLayout';
 import Brand from '../models/Brand';
 import Category from '../models/Category';
+import { cached } from './cache';
 
 /**
  * When filtering by a parent category (e.g. slug `storage`), include every
@@ -31,6 +32,9 @@ async function expandCategoryTreeIds(
     }
     return [...out].map((s) => new mongoose.Types.ObjectId(s));
 }
+
+/** Brand/category slug resolution is stable between catalog writes (which bump the cache version). */
+const LOOKUP_TTL_MS = 10 * 60 * 1000;
 
 export interface MatchStageCache {
     brandIds?: mongoose.Types.ObjectId[];
@@ -89,13 +93,18 @@ export const buildProductMatchStage = async (
             if (cache.brandIds.length > 0) matchStage.brandId = { $in: cache.brandIds };
         } else {
             const brands = (brand as string).split(',');
-            const brandDocs = await Brand.find({
-                $or: [
-                    { slug: { $in: brands } },
-                    { _id: { $in: brands.filter((b: string) => mongoose.Types.ObjectId.isValid(b)) } }
-                ]
+            const hexIds = await cached<string[]>('brandIds', [...brands].sort().join(','), LOOKUP_TTL_MS, async () => {
+                const brandDocs = await Brand.find({
+                    $or: [
+                        { slug: { $in: brands } },
+                        { _id: { $in: brands.filter((b: string) => mongoose.Types.ObjectId.isValid(b)) } },
+                    ],
+                })
+                    .select('_id')
+                    .lean();
+                return brandDocs.map((b) => String(b._id));
             });
-            const ids = brandDocs.map((b) => b._id);
+            const ids = (hexIds ?? []).map((h) => new mongoose.Types.ObjectId(h));
             if (cache) cache.brandIds = ids;
             if (ids.length > 0) matchStage.brandId = { $in: ids };
         }
@@ -118,11 +127,17 @@ export const buildProductMatchStage = async (
                 }
             }
             const uniqueSlugParts = [...new Set(expandedSlugParts.map((s) => s.toLowerCase()))];
-            const catDocs = await Category.find({
-                $or: [{ slug: { $in: uniqueSlugParts } }, { _id: { $in: objectIds } }],
+            const hexIds = await cached<string[]>('categoryIds', uniqueSlugParts.sort().join(',') + '|' + [...objectIds].sort().join(','), LOOKUP_TTL_MS, async () => {
+                const catDocs = await Category.find({
+                    $or: [{ slug: { $in: uniqueSlugParts } }, { _id: { $in: objectIds } }],
+                })
+                    .select('_id')
+                    .lean();
+                const rootIds = catDocs.map((c) => c._id as mongoose.Types.ObjectId);
+                const expanded = await expandCategoryTreeIds(rootIds);
+                return expanded.map((id) => String(id));
             });
-            const rootIds = catDocs.map((c) => c._id);
-            const ids = await expandCategoryTreeIds(rootIds);
+            const ids = (hexIds ?? []).map((h) => new mongoose.Types.ObjectId(h));
             if (cache) cache.categoryIds = ids;
             if (ids.length > 0) matchStage.categoryIds = { $in: ids };
         }

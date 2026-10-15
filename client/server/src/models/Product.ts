@@ -1,3 +1,4 @@
+import { catalogCacheInvalidation } from '../utils/catalogCacheInvalidation';
 import mongoose from 'mongoose';
 
 const productSchema = new mongoose.Schema({
@@ -91,6 +92,8 @@ productSchema.index({ availability: 1 });
 productSchema.index({ 'specs.$**': 1 });
 productSchema.index({ sku: 1 }, { unique: true, sparse: true });
 productSchema.index({ slug: 1 }, { unique: true, sparse: true });
+
+productSchema.plugin(catalogCacheInvalidation);
 
 // In Next.js dev HMR, mongoose model cache can keep an older schema.
 // Recreate the model in non-production so newly added fields persist immediately.
