@@ -5,6 +5,7 @@ import Category from '../models/Category';
 import CategoryFeaturedSpecs from '../models/CategoryFeaturedSpecs';
 import FacetSnapshot from '../models/FacetSnapshot';
 import { buildProductMatchStage, SPECS_OBJECT_TO_ARRAY_PROJECT, DISCOUNT_ONLY_STAGES, type MatchStageCache } from '../utils/productAggregation';
+import { featuredSpecKeysForProduct } from '../utils/productFeaturedSpecKeys';
 import { normalizeSpecKey } from '../utils/normalizeSpecKey';
 import { buildFacetRequestCacheKey, clearFacetResponseCache, getFacetResponseCache, setFacetResponseCache } from '../utils/facetRuntimeCache';
 import { bumpCatalogVersion, withResponseCache } from '../utils/cache';
@@ -647,7 +648,7 @@ export const getProductBySlug = async (req: Request, res: Response) => {
         if (product) {
             const normalized = normalizeProductAttributeGroups(product);
             const sanitized = stripAdminOnlyProductFields(normalized);
-            res.json(withDiscountInfo(sanitized));
+            res.json({ ...withDiscountInfo(sanitized), featuredSpecKeys: await featuredSpecKeysForProduct(product) });
         } else {
             res.status(404).json({ message: 'Product not found' });
         }

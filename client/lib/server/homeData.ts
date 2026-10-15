@@ -9,6 +9,7 @@
  *
  * This single change cuts homepage SSR time from 3-8 s down to ~200-500 ms.
  */
+import { featuredSpecKeysForProduct } from '@/server/src/utils/productFeaturedSpecKeys';
 import 'server-only';
 
 import { cache } from 'react';
@@ -261,5 +262,6 @@ export const fetchProductBySlugDirect = cache(async (slug: string) => {
     // Same post-processing chain as getProductBySlug in productController
     const normalized = normalizeProductAttributeGroups(product);
     const sanitized = stripAdminOnlyProductFields(normalized);
-    return serialize(withDiscountInfo(sanitized));
+    const featuredSpecKeys = await featuredSpecKeysForProduct(product);
+    return serialize({ ...withDiscountInfo(sanitized), featuredSpecKeys });
 });

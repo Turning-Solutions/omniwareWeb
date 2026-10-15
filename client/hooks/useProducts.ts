@@ -85,6 +85,7 @@ export interface Product {
     specs?: Record<string, string>;
     /** Display name per spec key, e.g. { Cas_Latency: "CAS Latency" }. */
     specLabels?: Record<string, string>;
+    featuredSpecKeys?: string[];
     attributes?: { name?: string; value: string }[];
     /** Grouped attributes for product details (e.g. General, Cable Specs). Falls back to attributes as one group. */
     attributeGroups?: { category: string; attributes: { name?: string; value: string }[] }[];

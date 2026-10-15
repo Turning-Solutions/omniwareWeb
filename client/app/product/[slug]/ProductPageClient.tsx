@@ -168,6 +168,11 @@ function ProductPageInner({ slug }: { slug: string }) {
     const currentPrice = applyDiscountToPrice(currentOriginalPrice);
 
     const currentStock = selectedVariant?.stock?.qty ?? product.stock?.qty ?? 0;
+    // Specifications box = featured specs only; the remaining specs move to Product details.
+    const allSpecEntries = Object.entries(product.specs ?? {});
+    const featuredKeys = product.featuredSpecKeys ?? [];
+    const featuredSpecEntries = featuredKeys.length ? allSpecEntries.filter(([k]) => featuredKeys.includes(k)) : allSpecEntries;
+    const otherSpecEntries = featuredKeys.length ? allSpecEntries.filter(([k]) => !featuredKeys.includes(k)) : [];
     const availability = product.availability ?? (currentStock > 0 ? "in_stock" : "out_of_stock");
 
     const availabilityConfig = {
@@ -555,14 +560,14 @@ function ProductPageInner({ slug }: { slug: string }) {
                     </div>
 
                     {/* Specs Map (filter specs) — key specs sit above the prose description. */}
-                    {product.specs && Object.keys(product.specs).length > 0 && (
+                    {featuredSpecEntries.length > 0 && (
                         <div className="mb-8">
                             <h3 className="mb-4 flex items-center gap-2 text-base font-semibold text-[#F1F1F1]">
                                 <AlertCircle className="h-4 w-4 text-[#D12B28]" aria-hidden /> Specifications
                             </h3>
                             <div className="rounded-2xl border border-white/[0.07] bg-[#121212]/90 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
                                 <div className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
-                                    {Object.entries(product.specs).map(([key, value]) => (
+                                    {featuredSpecEntries.map(([key, value]) => (
                                         <div key={key}>
                                             <span className="block text-[11px] font-medium uppercase tracking-wide text-[#8E8E8E]">
                                                 {product.specLabels?.[key] || formatSpecificationLabel(key)}
@@ -580,11 +585,24 @@ function ProductPageInner({ slug }: { slug: string }) {
 
                             {/* Product details (attributes by category) — full-width band, categories divided inside */}
                             {(() => {
-                                const groups: { category: string; attributes: { name?: string; value: string }[] }[] = product.attributeGroups?.length
+                                const baseGroups: { category: string; attributes: { name?: string; value: string }[] }[] = product.attributeGroups?.length
                                     ? product.attributeGroups
                                     : product.attributes?.length
                                       ? [{ category: "General", attributes: product.attributes }]
                                       : [];
+                                // Specs that aren't featured go here, in their stored order.
+                                const groups = otherSpecEntries.length
+                                    ? [
+                                          {
+                                              category: "Specifications",
+                                              attributes: otherSpecEntries.map(([key, value]) => ({
+                                                  name: product.specLabels?.[key] || formatSpecificationLabel(key),
+                                                  value: String(value),
+                                              })),
+                                          },
+                                          ...baseGroups,
+                                      ]
+                                    : baseGroups;
 
                                 if (groups.length === 0) return null;
 
